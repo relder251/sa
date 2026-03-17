@@ -746,11 +746,18 @@
 
     setActionButtonsDisabled(true);
 
-    const res = await fetch(`/api/review/${currentToken}/action`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Session-Key': sessionKey },
-      body: JSON.stringify(payload),
-    });
+    let res;
+    try {
+      res = await fetch(`/api/review/${currentToken}/action`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Key': sessionKey },
+        body: JSON.stringify(payload),
+      });
+    } catch (err) {
+      setActionButtonsDisabled(false);
+      showToast('Network error — please try again.', true);
+      return;
+    }
 
     if (!res.ok) {
       setActionButtonsDisabled(false);
@@ -791,7 +798,7 @@
   }
 
   function setActionButtonsDisabled(disabled) {
-    ['btnApprove','btnRegen','btnQueue','btnUnqueue','btnDnfu','btnPdf','btnArchive'].forEach(id => {
+    ['btnApprove','btnRegen','btnQueue','btnUnqueue','btnDnfu','btnPdf','btnArchive','btnArchiveSent','btnArchiveDeclined'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = disabled;
     });

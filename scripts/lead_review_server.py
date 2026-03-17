@@ -502,7 +502,7 @@ async def list_leads(
     order = sort_map.get(sort, sort_map["newest"])
 
     query = f"""
-        SELECT l.id, l.first_name, l.last_name, l.email, l.service_area,
+        SELECT l.id, l.first_name, l.last_name, l.email, l.domain, l.service_area,
                l.status, l.archived, l.created_at, l.sent_at,
                d.subject AS draft_subject
         FROM sa_leads l
@@ -532,6 +532,7 @@ async def list_leads(
                 "first_name":    l["first_name"] or "",
                 "last_name":     l["last_name"] or "",
                 "email":         l["email"],
+                "domain":        l["domain"] or "",
                 "service_area":  l["service_area"] or "",
                 "status":        l["status"] or "",
                 "archived":      l["archived"],
