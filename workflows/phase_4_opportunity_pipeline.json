@@ -1,0 +1,84 @@
+{
+  "id": "agentic-pipeline-004",
+  "name": "Phase 4: Opportunity Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "folder",
+        "path": "/data/output/opportunities/pending",
+        "events": ["add"]
+      },
+      "id": "opp-trigger",
+      "name": "Watch Opportunities",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "command": "=node /data/scripts/opportunity_intake.js {{ $json.path }}"
+      },
+      "id": "opp-setup",
+      "name": "Setup Project",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = JSON.parse($input.item.json.stdout);\nif (data.skip) { return []; }\nreturn [{ json: data }];"
+      },
+      "id": "opp-parse",
+      "name": "Parse Setup",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pipeline-server:5002/run-opportunity",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { name: $json.name, prompt: $json.prompt, project_base: $json.projectBase, project_dir: $json.projectDir, plan_path: $json.planPath, code_output_path: $json.codeOutputPath, report_path: $json.reportPath } }}",
+        "options": { "timeout": 1200000 },
+        "onError": "continueErrorOutput"
+      },
+      "id": "opp-run",
+      "name": "Run Opportunity",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "command": "=mv {{ $('Parse Setup').item.json.runningPath }} /data/output/opportunities/done/"
+      },
+      "id": "opp-done",
+      "name": "Mark Done",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Watch Opportunities": {
+      "main": [[{"node": "Setup Project",    "type": "main", "index": 0}]]
+    },
+    "Setup Project": {
+      "main": [[{"node": "Parse Setup",      "type": "main", "index": 0}]]
+    },
+    "Parse Setup": {
+      "main": [[{"node": "Run Opportunity",  "type": "main", "index": 0}]]
+    },
+    "Run Opportunity": {
+      "main": [[{"node": "Mark Done",        "type": "main", "index": 0}]]
+    }
+  }
+}

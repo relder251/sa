@@ -1,0 +1,29 @@
+# Secrets
+.env
+*.pem
+*.key
+certbot/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Claude / tool data
+.claude/
+.superpowers/
+.playwright-mcp/
+
+# Generated output
+output/
+backup/
+
+# Nested git repos (not submodules)
+deerflow/
+notebooks/
+
+# Jupyter checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/

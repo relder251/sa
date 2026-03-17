@@ -1,0 +1,486 @@
+################################################################################
+# LiteLLM Proxy Config — Tiered Access (Local / Hybrid / Cloud)
+#
+# HOW TIERS WORK:
+#   Users call the proxy with a model name that maps to their tier group.
+#   The router handles fallbacks automatically within each tier.
+#
+#   Tier keys are issued via the /key/generate endpoint after startup:
+#     Local  key → can only call "local/*" models
+#     Hybrid key → can only call "hybrid/*" models
+#     Cloud  key → can call everything
+#
+#   Or users can just use the model alias directly with the master key
+#   during development/testing.
+################################################################################
+
+model_list:
+
+  ##############################################################################
+  # INDIVIDUAL MODELS (building blocks — referenced by groups below)
+  ##############################################################################
+
+  # ── OLLAMA (local Docker service) ──────────────────────────────────────────
+  - model_name: _ollama-llama3
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: http://ollama:11434
+
+  # Fast 3B model for classification tasks
+  - model_name: _ollama-fast
+    litellm_params:
+      model: ollama_chat/llama3.2:3b
+      api_base: http://ollama:11434
+
+  - model_name: _ollama-mistral
+    litellm_params:
+      model: ollama_chat/mistral:7b-instruct-q4_0
+      api_base: http://ollama:11434
+
+  - model_name: _ollama-deepseek
+    litellm_params:
+      model: ollama_chat/deepseek-r1:7b
+      api_base: http://ollama:11434
+
+  - model_name: _ollama-codellama
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: http://ollama:11434
+
+  # ── OLLAMA CLOUD (VPS) ─────────────────────────────────────────────────────
+  - model_name: _ollama-cloud-llama3
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: os.environ/OLLAMA_CLOUD_API_BASE
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+
+  - model_name: _ollama-cloud-mistral
+    litellm_params:
+      model: ollama_chat/mistral:7b-instruct-q4_0
+      api_base: os.environ/OLLAMA_CLOUD_API_BASE
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+
+  # ── CHEAP / FAST CLOUD (hybrid fallback candidates) ───────────────────────
+  - model_name: _groq-llama3-70b
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: _groq-llama3-8b
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: _groq-deepseek-r1
+    litellm_params:
+      model: groq/deepseek-r1-distill-llama-70b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: _gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: _gemini-flash-25
+    litellm_params:
+      model: gemini/gemini-2.5-flash-preview-05-20
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: _deepseek-chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: _deepseek-reasoner
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: _mistral-small
+    litellm_params:
+      model: mistral/mistral-small-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  # ── PREMIUM CLOUD ──────────────────────────────────────────────────────────
+  - model_name: _claude-opus
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20251101
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: _claude-sonnet
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: _claude-haiku
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: _gpt-4o
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: _gpt-4o-mini
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: _o3
+    litellm_params:
+      model: openai/o3
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: _o4-mini
+    litellm_params:
+      model: openai/o4-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: _gemini-pro
+    litellm_params:
+      model: gemini/gemini-2.5-pro-preview-06-05
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: _mistral-large
+    litellm_params:
+      model: mistral/mistral-large-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: _codestral
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: _perplexity-sonar
+    litellm_params:
+      model: perplexity/sonar-pro
+      api_key: os.environ/PERPLEXITY_API_KEY
+
+  - model_name: _sambanova-405b
+    litellm_params:
+      model: sambanova/Meta-Llama-3.1-405B-Instruct
+      api_key: os.environ/SAMBANOVA_API_KEY
+
+  - model_name: _openrouter-qwen3
+    litellm_params:
+      model: openrouter/qwen/qwen3-235b-a22b
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  - model_name: _venice-llama3
+    litellm_params:
+      model: openai/llama-3.3-70b
+      api_key: os.environ/VENICE_API_KEY
+      api_base: https://api.venice.ai/api/v1
+
+  - model_name: _venice-mistral
+    litellm_params:
+      model: openai/mistral-31-24b
+      api_key: os.environ/VENICE_API_KEY
+      api_base: https://api.venice.ai/api/v1
+
+  - model_name: _venice-admin
+    litellm_params:
+      model: openai/llama-3.3-70b
+      api_key: os.environ/VENICE_ADMIN_API_KEY
+      api_base: https://api.venice.ai/api/v1
+
+  - model_name: _hf-zephyr
+    litellm_params:
+      model: huggingface/HuggingFaceH4/zephyr-7b-beta
+      api_key: os.environ/HUGGINGFACE_API_KEY
+
+
+  ##############################################################################
+  # TIER GROUPS
+  # Users call these names. The router load-balances within the group
+  # and the fallback chain handles failures across tiers.
+  ##############################################################################
+
+  # ── TIER 1: LOCAL ──────────────────────────────────────────────────────────
+  # Free. Runs entirely on-device/VPS. No cloud calls ever.
+  # Best for: privacy-sensitive work, offline use, zero cost.
+
+  # 3B fast model first for local/chat — snappy responses
+  - model_name: local/chat
+    litellm_params:
+      model: ollama_chat/llama3.2:3b
+      api_base: http://ollama:11434
+
+  - model_name: local/chat
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: http://ollama:11434
+
+  - model_name: local/chat
+    litellm_params:
+      model: ollama_chat/mistral:7b-instruct-q4_0
+      api_base: http://ollama:11434
+
+  - model_name: local/code
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: http://ollama:11434
+
+  - model_name: local/code
+    litellm_params:
+      model: ollama_chat/deepseek-r1:7b
+      api_base: http://ollama:11434
+
+  - model_name: local/reason
+    litellm_params:
+      model: ollama_chat/deepseek-r1:7b
+      api_base: http://ollama:11434
+
+  - model_name: local/fast
+    litellm_params:
+      model: ollama_chat/llama3.2:3b
+      api_base: http://ollama:11434
+
+
+  # ── TIER 2: HYBRID ─────────────────────────────────────────────────────────
+  # Low cost. Tries local first, falls back to cheap/fast cloud providers.
+  # Best for: general use, developers, cost-conscious users.
+  # Fallback order: Ollama local → Ollama cloud → Groq → Gemini Flash → DeepSeek
+
+  - model_name: hybrid/chat
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: http://ollama:11434
+
+  - model_name: hybrid/chat
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: os.environ/OLLAMA_CLOUD_API_BASE
+      api_key: os.environ/OLLAMA_CLOUD_API_KEY
+
+  - model_name: hybrid/chat
+    litellm_params:
+      model: groq/llama-3.3-70b-versatile
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: hybrid/chat
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: hybrid/chat
+    litellm_params:
+      model: deepseek/deepseek-chat
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: hybrid/code
+    litellm_params:
+      model: ollama_chat/qwen2.5-coder:7b
+      api_base: http://ollama:11434
+
+  - model_name: hybrid/code
+    litellm_params:
+      model: ollama_chat/deepseek-r1:7b
+      api_base: http://ollama:11434
+
+  - model_name: hybrid/code
+    litellm_params:
+      model: groq/deepseek-r1-distill-llama-70b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: hybrid/code
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: hybrid/reason
+    litellm_params:
+      model: ollama_chat/deepseek-r1:7b
+      api_base: http://ollama:11434
+
+  - model_name: hybrid/reason
+    litellm_params:
+      model: groq/deepseek-r1-distill-llama-70b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: hybrid/reason
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: hybrid/fast
+    litellm_params:
+      model: groq/llama-3.1-8b-instant
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: hybrid/fast
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: hybrid/fast
+    litellm_params:
+      model: ollama_chat/llama3.1:8b-instruct-q4_0
+      api_base: http://ollama:11434
+
+
+  # ── TIER 3: CLOUD ──────────────────────────────────────────────────────────
+  # Full access. Priority-routed to best model per task.
+  # Best for: production workloads, complex tasks, highest quality.
+
+  - model_name: cloud/chat
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: cloud/chat
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: cloud/chat
+    litellm_params:
+      model: gemini/gemini-2.5-pro-preview-06-05
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: cloud/smart
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20251101
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: cloud/smart
+    litellm_params:
+      model: openai/o3
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: cloud/smart
+    litellm_params:
+      model: gemini/gemini-2.5-pro-preview-06-05
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: cloud/code
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: cloud/code
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+  - model_name: cloud/code
+    litellm_params:
+      model: openai/gpt-4o
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: cloud/reason
+    litellm_params:
+      model: openai/o3
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: cloud/reason
+    litellm_params:
+      model: deepseek/deepseek-reasoner
+      api_key: os.environ/DEEPSEEK_API_KEY
+
+  - model_name: cloud/reason
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20251101
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: cloud/fast
+    litellm_params:
+      model: anthropic/claude-haiku-4-5-20251001
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+  - model_name: cloud/fast
+    litellm_params:
+      model: openai/gpt-4o-mini
+      api_key: os.environ/OPENAI_API_KEY
+
+  - model_name: cloud/fast
+    litellm_params:
+      model: gemini/gemini-2.0-flash
+      api_key: os.environ/GEMINI_API_KEY
+
+  - model_name: cloud/search
+    litellm_params:
+      model: perplexity/sonar-pro
+      api_key: os.environ/PERPLEXITY_API_KEY
+
+  - model_name: cloud/search
+    litellm_params:
+      model: perplexity/sonar-reasoning-pro
+      api_key: os.environ/PERPLEXITY_API_KEY
+
+
+################################################################################
+# ROUTER — fallback chains between tiers
+# If a whole tier is down, escalate to the next.
+# Format: { "source_model_group": ["fallback_group1", "fallback_group2"] }
+################################################################################
+router_settings:
+  routing_strategy: least-busy           # within a group: pick least loaded
+  num_retries: 2
+  timeout: 900
+  retry_after: 2
+  allowed_fails: 2                        # mark a model unhealthy after 2 fails
+  cooldown_time: 60                       # seconds before retrying a failed model
+
+  # Cross-tier fallbacks — only kicks in if ALL models in the primary group fail
+  fallbacks:
+    # Local tier: local → hybrid → free → cloud
+    - local/chat:    ["hybrid/chat",   "free/chat",   "cloud/fast"]
+    - local/code:    ["hybrid/code",   "free/code",   "cloud/code"]
+    - local/reason:  ["hybrid/reason", "free/reason", "cloud/reason"]
+    - local/fast:    ["hybrid/fast",   "free/fast",   "cloud/fast"]
+    # Hybrid tier: hybrid → free → cloud
+    - hybrid/chat:   ["free/chat",   "cloud/fast",  "cloud/chat"]
+    - hybrid/code:   ["free/code",   "cloud/code",  "cloud/chat"]
+    - hybrid/reason: ["free/reason", "cloud/reason","cloud/chat"]
+    - hybrid/fast:   ["free/fast",   "cloud/fast"]
+    # Cloud tier: try free before giving up entirely
+    - cloud/fast:    ["free/fast",   "free/chat",   "hybrid/chat"]
+    - cloud/chat:    ["free/chat",   "hybrid/chat"]
+    - cloud/code:    ["free/code",   "hybrid/code"]
+    - cloud/reason:  ["free/reason", "hybrid/reason"]
+    # Free tier: degrade to hybrid if free models are all down
+    - free/fast:     ["hybrid/fast",  "hybrid/chat"]
+    - free/chat:     ["hybrid/chat"]
+    - free/code:     ["hybrid/code"]
+    - free/reason:   ["hybrid/reason"]
+
+
+################################################################################
+# GENERAL SETTINGS
+################################################################################
+general_settings:
+  master_key: os.environ/LITELLM_API_KEY
+  allow_requests_on_db_unavailable: true
+
+  # ── Per-tier key templates ──────────────────────────────────────────────────
+  # After startup, create keys via the UI or API:
+  #
+  #   POST http://localhost:4000/key/generate
+  #   Authorization: Bearer $LITELLM_API_KEY
+  #
+  #   LOCAL tier key:
+  #   { "models": ["local/chat","local/code","local/reason"],
+  #     "metadata": {"tier":"local"}, "max_budget": null }
+  #
+  #   HYBRID tier key:
+  #   { "models": ["local/*","hybrid/chat","hybrid/code","hybrid/reason","hybrid/fast"],
+  #     "metadata": {"tier":"hybrid"}, "max_budget": 5.00,
+  #     "budget_duration": "30d" }
+  #
+  #   CLOUD tier key:
+  #   { "models": ["local/*","hybrid/*","cloud/*"],
+  #     "metadata": {"tier":"cloud"}, "max_budget": 50.00,
+  #     "budget_duration": "30d" }
+
+
+################################################################################
+# LOGGING
+################################################################################
+litellm_settings:
+  drop_params: true
+  set_verbose: false
+  json_logs: true
+  success_callback: []
+  failure_callback: []

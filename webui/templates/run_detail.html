@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ run.name }} &mdash; Agentic SDLC{% endblock %}
+
+{% block content %}
+<div class="run-detail-page">
+
+  <!-- Header -->
+  <div class="run-header">
+    <div class="run-header-left">
+      <a href="/" class="back-link">&larr; Board</a>
+      <h1 class="run-name">{{ run.name }}</h1>
+      <span class="badge badge-{{ run.status }}">{{ run.status | upper }}</span>
+      {% if elapsed %}
+      <span class="run-elapsed">&#128336; {{ elapsed }}</span>
+      {% endif %}
+    </div>
+    <div class="run-header-actions">
+      {% if run.status == "running" %}
+      <form method="POST" action="/runs/{{ run.name }}/cancel" style="display:inline"
+            hx-post="/runs/{{ run.name }}/cancel" hx-push-url="true">
+        <button class="btn btn-danger" type="submit"
+                onclick="return confirm('Cancel this run?')">&#9726; Cancel</button>
+      </form>
+      {% endif %}
+      {% if run.status in ["done", "failed"] %}
+      <form method="POST" action="/runs/{{ run.name }}/retry" style="display:inline"
+            hx-post="/runs/{{ run.name }}/retry" hx-push-url="true">
+        <button class="btn btn-secondary" type="submit"
+                onclick="this.disabled=true; this.textContent='Queuing…'">&#8635; Retry</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Prompt -->
+  {% if run.prompt %}
+  <div class="run-prompt-block">
+    <span class="prompt-label">Prompt:</span>
+    <span class="prompt-text">{{ run.prompt }}</span>
+  </div>
+  {% endif %}
+
+  <!-- Phase progress -->
+  <div id="phase-bar"
+    {% if not run.completed_at %}
+      hx-get="/partials/run/{{ run.name }}/phases"
+      hx-trigger="every 3s"
+      hx-swap="outerHTML"
+    {% endif %}
+  >
+    {% include "partials/phase_badges.html" %}
+  </div>
+
+  <!-- Main content area: log + files -->
+  <div class="run-body">
+
+    <!-- Live log pane -->
+    <div class="log-pane">
+      <div class="pane-header">
+        <span class="pane-title">&#128195; Pipeline Log</span>
+        {% if run.status == "running" %}
+        <span class="live-indicator">&#9679; LIVE</span>
+        {% endif %}
+      </div>
+      <div
+        class="log-container"
+        id="log-container"
+        hx-ext="sse"
+        sse-connect="/runs/{{ run.name }}/stream"
+      >
+        <div id="log-output" class="log-output">
+          <span class="log-waiting">Connecting to log stream...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Output files panel -->
+    <div class="files-pane">
+      <div class="pane-header">
+        <span class="pane-title">&#128196; Output Files</span>
+      </div>
+      <div
+        id="file-tree"
+        class="file-tree"
+        hx-get="/partials/run/{{ run.name }}/files"
+        hx-trigger="load, every 10s"
+        hx-target="#file-tree"
+        hx-swap="innerHTML"
+      >
+        <span class="loading-text">Loading files...</span>
+      </div>
+      <div id="file-content" class="file-content">
+        <div class="file-content-placeholder">
+          <span>Select a file to view its contents</span>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- .run-body -->
+
+  <!-- Approval panel -->
+  <div id="approval-panel"
+    hx-get="/partials/approvals"
+    hx-trigger="load"
+    hx-target="#approval-panel"
+    hx-swap="outerHTML"
+  >
+    <span class="loading-text">Checking approvals...</span>
+  </div>
+
+</div><!-- .run-detail-page -->
+
+{% block extra_head %}
+<script>
+  // Auto-scroll log pane to bottom when new content arrives
+  document.addEventListener("htmx:sseMessage", function(evt) {
+    var logOutput = document.getElementById("log-output");
+    var container = document.getElementById("log-container");
+    if (logOutput && container) {
+      // Append the new line as a <div>
+      var line = document.createElement("div");
+      line.className = "log-line";
+      line.textContent = evt.detail.data;
+      logOutput.appendChild(line);
+      container.scrollTop = container.scrollHeight;
+    }
+  });
+</script>
+{% endblock %}
+{% endblock %}

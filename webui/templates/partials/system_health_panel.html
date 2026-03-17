@@ -1,0 +1,34 @@
+<div id="health-grid" class="health-grid"
+     hx-get="/partials/system/health"
+     hx-trigger="every 10s"
+     hx-swap="outerHTML">
+
+  {% for svc in services %}
+  <div class="health-card health-{{ svc.status }}">
+    <div class="health-card-icon">
+      {% if svc.status == "ok" %}&#9989;{% else %}&#10060;{% endif %}
+    </div>
+    <div class="health-card-info">
+      <span class="svc-name">{{ svc.name }}</span>
+      <span class="svc-status">{{ "Online" if svc.status == "ok" else "Offline" }}</span>
+    </div>
+    <div class="health-card-latency">
+      <span class="svc-latency">{{ svc.latency_ms }}ms</span>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% if models %}
+  <div class="health-models-panel">
+    <h3 class="models-title">Available LiteLLM Models</h3>
+    <ul class="models-list">
+      {% for model in models %}
+      <li class="model-item">
+        <span class="model-id">{{ model.id if model.id is defined else model }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+</div>

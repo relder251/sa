@@ -1,0 +1,66 @@
+<div id="board" class="board"
+     hx-get="/partials/board"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+
+  <!-- PENDING -->
+  <div class="board-column board-column--pending">
+    <div class="column-header">
+      <span class="column-title">PENDING</span>
+      <span class="column-count">{{ grouped.pending | length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for run in grouped.pending %}
+        {% include "partials/run_card.html" %}
+      {% else %}
+        <div class="empty-column">No pending runs</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- RUNNING -->
+  <div class="board-column board-column--running">
+    <div class="column-header">
+      <span class="column-title">RUNNING</span>
+      <span class="column-count">{{ grouped.running | length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for run in grouped.running %}
+        {% include "partials/run_card.html" %}
+      {% else %}
+        <div class="empty-column">No running runs</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- DONE -->
+  <div class="board-column board-column--done">
+    <div class="column-header">
+      <span class="column-title">DONE</span>
+      <span class="column-count">{{ grouped.done | length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for run in grouped.done %}
+        {% include "partials/run_card.html" %}
+      {% else %}
+        <div class="empty-column">No completed runs</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- FAILED -->
+  <div class="board-column board-column--failed">
+    <div class="column-header">
+      <span class="column-title">FAILED</span>
+      <span class="column-count">{{ grouped.failed | length }}</span>
+    </div>
+    <div class="column-cards">
+      {% for run in grouped.failed %}
+        {% include "partials/run_card.html" %}
+      {% else %}
+        <div class="empty-column">No failed runs</div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>

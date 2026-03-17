@@ -1,0 +1,29 @@
+<div class="run-card run-card--{{ run.status }}">
+  <div class="run-card-header">
+    <a class="run-card-name" href="/runs/{{ run.name }}">{{ run.name }}</a>
+    <span class="badge badge-{{ run.status }}">{{ run.status | upper }}</span>
+  </div>
+
+  <!-- Mini phase pills -->
+  <div class="mini-phase-bar">
+    {% for i in range(1, 11) %}
+      {% set phase = run.phases.get(i|string, {}) %}
+      {% set phase_status = phase.get("status", "pending") if phase else "pending" %}
+      <span class="mini-pill mini-pill--{{ phase_status }}" title="Phase {{ i }}: {{ phase.get('name', '') }}">{{ i }}</span>
+    {% endfor %}
+  </div>
+
+  <!-- Prompt preview -->
+  {% if run.prompt %}
+  <div class="run-card-prompt">
+    {{ run.prompt[:80] }}{% if run.prompt | length > 80 %}&hellip;{% endif %}
+  </div>
+  {% endif %}
+
+  <!-- Elapsed time -->
+  {% if run.created_at %}
+  <div class="run-card-meta">
+    <span class="run-card-time">&#128336; {{ run.created_at[:10] }}</span>
+  </div>
+  {% endif %}
+</div>

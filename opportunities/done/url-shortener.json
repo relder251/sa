@@ -1,0 +1,6 @@
+{
+  "name": "url-shortener",
+  "prompt": "Build a Python CLI tool that shortens URLs using the TinyURL API (no API key required). Store shortened URLs in a local SQLite database. Support three commands: shorten <url>, list, delete <short_code>. No external dependencies beyond the requests library and stdlib.",
+  "status": "running",
+  "startedAt": "2026-03-10T21:15:05.207Z"
+}

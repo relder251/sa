@@ -1,0 +1,29 @@
+{% if not files %}
+<div class="file-tree-empty">No output files yet.</div>
+{% else %}
+<div class="file-tree-inner">
+  {% for dirname, dir_files in grouped.items() %}
+  <div class="file-dir">
+    {% if dirname != "." %}
+    <div class="file-dir-name">&#128193; {{ dirname }}/</div>
+    {% endif %}
+    <ul class="file-list">
+      {% for f in dir_files %}
+      <li class="file-item">
+        <a class="file-link"
+           href="#"
+           hx-get="/partials/run/{{ run.name }}/file?path={{ f.path | urlencode }}"
+           hx-target="#file-content"
+           hx-swap="innerHTML"
+        >
+          <span class="file-icon">&#128196;</span>
+          <span class="file-name">{{ f.name }}</span>
+        </a>
+        <span class="file-size">{{ f.size | filesizeformat if f.size is defined else "" }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}

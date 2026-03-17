@@ -1,0 +1,30 @@
+<div id="phase-bar" class="phase-bar"
+  {% if not run.completed_at %}
+    hx-get="/partials/run/{{ run.name }}/phases"
+    hx-trigger="every 3s"
+    hx-swap="outerHTML"
+  {% endif %}
+>
+  {% set phase_labels = {
+    "1": "Plan",
+    "2": "Code Gen",
+    "3": "Test & Fix",
+    "4": "Full Pipeline",
+    "5": "Quality Gate",
+    "6": "Docs",
+    "7": "Git Push",
+    "8": "Deploy",
+    "9": "Monitor",
+    "10": "Approval Gate"
+  } %}
+  {% for i in range(1, 11) %}
+    {% set key = i | string %}
+    {% set phase = phases.get(key, {}) %}
+    {% set status = phase.get("status", "pending") if phase else "pending" %}
+    {% set label = phase.get("name", phase_labels.get(key, "Phase " ~ i)) if phase else phase_labels.get(key, "Phase " ~ i) %}
+    <div class="phase-pill phase-pill--{{ status }}" title="{{ label }}">
+      <span class="phase-num">{{ i }}</span>
+      <span class="phase-label">{{ label }}</span>
+    </div>
+  {% endfor %}
+</div>

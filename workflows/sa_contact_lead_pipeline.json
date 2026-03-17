@@ -1,0 +1,1807 @@
+{
+  "updatedAt": "2026-03-16T20:06:53.980Z",
+  "createdAt": "2026-03-14T18:03:58.471Z",
+  "id": "sa-lead-pipeline-001",
+  "name": "SA Contact Lead Pipeline",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "4bb7cacc-08c8-4b64-9437-35dc4aa8b3ea",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "path": "sa-lead-intake",
+        "options": {},
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "webhookId": "sa-lead-pipeline-001"
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "f01042e0-13f3-442b-8f26-a643833341d5",
+      "name": "Respond 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [
+        200,
+        300
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({status: 'received'}) }}"
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "d385fd74-e898-4d44-af7c-29b3ea2991d4",
+      "name": "Parse & Save Lead to PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        400,
+        300
+      ],
+      "parameters": {
+        "query": "INSERT INTO sa_leads (first_name, last_name, email, domain, service_area, message, status) VALUES ($1,$2,$3,$4,$5,$6,'pending_research') RETURNING id",
+        "options": {
+          "queryReplacement": "={{ [\n  $json.body.first_name,\n  $json.body.last_name,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service_area,\n  $json.body.message\n] }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "be0d9c19-fb3d-4888-8e23-1617cd83cf6c",
+      "name": "Company Research (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        600,
+        200
+      ],
+      "parameters": {
+        "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "cloud/smart"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'. Service: '+$('Webhook').item.json.body.service_area+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {type:'json_object'} }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "633f5793-97fe-4dcd-8c14-d7770a6ec64b",
+      "name": "Save Research to PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        800,
+        200
+      ],
+      "parameters": {
+        "query": "UPDATE sa_leads SET company_research=$1, status='research_complete', research_completed_at=NOW() WHERE id=$2",
+        "options": {
+          "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); let s = m ? m[1].trim() : raw.trim(); try { s = JSON.stringify(JSON.parse(s)); } catch(e) { s = s.split('\\n').join('\\\\n').split('\\r').join('\\\\r').split('\\t').join('\\\\t'); } return [s, $('Parse & Save Lead to PG').item.json.id]; })() }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "c299d7ef-e9df-47d8-ae77-880ef9b751b8",
+      "name": "AI Lead Analysis (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1000,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "cloud/smart"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service_area+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {type:'json_object'} }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "89b04254-a8a4-4773-8729-ab8a3cb88c38",
+      "name": "Save Analysis to PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "query": "UPDATE sa_leads SET summary=$1, approach=$2, conversation_starters=$3, questions=$4, scenarios=$5, status='pending_draft' WHERE id=$6",
+        "options": {
+          "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); const jsonStr = (m ? m[1].trim() : raw.trim()); const a = JSON.parse(jsonStr); return [a.summary, a.approach, JSON.stringify(a.conversation_starters), JSON.stringify(a.questions), JSON.stringify(a.scenarios), $('Parse & Save Lead to PG').item.json.id]; })() }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "e1abb39b-e403-416f-a575-84f2a105352d",
+      "name": "Generate Email Draft (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        1400,
+        300
+      ],
+      "parameters": {
+        "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "cloud/smart"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {type:'json_object'} }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "bfd0f7b8-ef52-40a7-b19c-de647e539982",
+      "name": "Save Draft to PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1600,
+        300
+      ],
+      "parameters": {
+        "query": "INSERT INTO sa_lead_drafts (lead_id, subject, body_text, is_current) VALUES ($1,$2,$3,TRUE) RETURNING id",
+        "options": {
+          "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); const jsonStr = (m ? m[1].trim() : raw.trim()); const d = JSON.parse(jsonStr); return [$('Parse & Save Lead to PG').item.json.id, d.subject, d.body_text]; })() }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "49991968-e12a-4913-b376-c0c67b539ad0",
+      "name": "Create Notion Lead Page",
+      "type": "n8n-nodes-base.notion",
+      "position": [
+        1800,
+        200
+      ],
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "create",
+        "databaseId": "={{ $env.NOTION_LEADS_DB_ID }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Name",
+              "type": "title",
+              "titleValue": "={{ $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name }}"
+            },
+            {
+              "key": "Email",
+              "type": "email",
+              "emailValue": "={{ $('Webhook').item.json.body.email }}"
+            },
+            {
+              "key": "Domain",
+              "type": "url",
+              "urlValue": "={{ 'https://' + $('Webhook').item.json.body.email.split('@').pop() }}"
+            },
+            {
+              "key": "Status",
+              "type": "select",
+              "selectValue": "Pending Review"
+            },
+            {
+              "key": "Lead ID",
+              "type": "richText",
+              "textContent": "={{ $('Parse & Save Lead to PG').item.json.id }}"
+            }
+          ]
+        }
+      },
+      "credentials": {
+        "notionApi": {
+          "id": "OU0MF8tF4h6Tb0uW",
+          "name": "SA Notion"
+        }
+      },
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "288dfbbc-5c18-469f-b81d-e230ba4cfa5e",
+      "name": "Save Notion ID to PG",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        2000,
+        200
+      ],
+      "parameters": {
+        "query": "UPDATE sa_leads SET notion_page_id=$1 WHERE id=$2",
+        "options": {
+          "queryReplacement": "={{ [$json.id, $('Parse & Save Lead to PG').item.json.id] }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "b5ff2b5f-15a7-4cf8-b198-b82d0f87395a",
+      "name": "Create Review Token",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        1800,
+        400
+      ],
+      "parameters": {
+        "query": "INSERT INTO sa_review_tokens (lead_id, n8n_resume_url) VALUES ($1, $2) RETURNING token",
+        "options": {
+          "queryReplacement": "={{ [\n  $('Parse & Save Lead to PG').item.json.id,\n  $execution.resumeUrl\n] }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "4d615579-0896-4553-969d-525d61b2d3a6",
+      "name": "Set Status: Pending Review",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        2000,
+        400
+      ],
+      "parameters": {
+        "query": "UPDATE sa_leads SET status='pending_review', draft_generated_at=NOW(), first_notified_at=NOW() WHERE id=$1",
+        "options": {
+          "queryReplacement": "={{ [$('Parse & Save Lead to PG').item.json.id] }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "86c911a9-194e-4c04-a90c-91d94ccafedb",
+      "name": "Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2200,
+        100
+      ],
+      "parameters": {
+        "message": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.first_name }} {{ $('Webhook').item.json.body.last_name }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service_area }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>",
+        "options": {},
+        "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' \u2014 ' + $('Webhook').item.json.body.service_area }}",
+        "toEmail": "={{ $env.NOTIFY_EMAIL }}",
+        "fromEmail": "relder@sovereignadvisory.ai",
+        "emailFormat": "html"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "R7l3YzvGGiSf2PrS",
+          "name": "SA Neo.space SMTP"
+        }
+      },
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "08d4d4f8-077a-4f4e-b86f-9d1de9f27e25",
+      "name": "SMS (Verizon email gateway)",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2200,
+        250
+      ],
+      "parameters": {
+        "message": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+        "options": {},
+        "subject": "New SA Lead",
+        "toEmail": "={{ $env.NOTIFY_SMS_EMAIL }}",
+        "fromEmail": "relder@sovereignadvisory.ai"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "R7l3YzvGGiSf2PrS",
+          "name": "SA Neo.space SMTP"
+        }
+      },
+      "typeVersion": 2,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "577988fb-eb91-467d-ab3c-40ac7f738527",
+      "name": "Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "position": [
+        2200,
+        400
+      ],
+      "parameters": {
+        "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service_area + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "MEWPjUrMwjkJ9XWP",
+          "name": "SA Telegram Bot"
+        }
+      },
+      "typeVersion": 1,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "a9a70972-abe9-4064-9af7-45d8a0312e44",
+      "name": "WhatsApp (Twilio)",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2200,
+        550
+      ],
+      "parameters": {
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "authentication": "genericCredentialType",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $env.WHATSAPP_NOTIFY_TO }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}"
+            }
+          ]
+        },
+        "genericAuthType": "httpBasicAuth"
+      },
+      "credentials": {
+        "httpBasicAuth": {
+          "id": "DZ1NSVibAbM2WXlp",
+          "name": "SA Twilio"
+        }
+      },
+      "typeVersion": 4,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "6fed4626-5396-41bb-890b-f3e5f574fa92",
+      "name": "Wait for Review Decision",
+      "type": "n8n-nodes-base.wait",
+      "position": [
+        2400,
+        350
+      ],
+      "parameters": {
+        "resume": "webhook",
+        "options": {
+          "httpMethod": "POST"
+        }
+      },
+      "typeVersion": 1
+    },
+    {
+      "id": "5ff53fb0-b8ca-427d-9ae6-4c0282c6db17",
+      "name": "Route by Action",
+      "type": "n8n-nodes-base.switch",
+      "position": [
+        2600,
+        350
+      ],
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 4,
+        "output": "={{ ({'approve':0,'regenerate':1,'queue':2,'dnfu':3}[$json.query.action]) ?? 3 }}"
+      },
+      "typeVersion": 3
+    },
+    {
+      "id": "378c6d1b-b4a7-48ee-8333-4eb029efef37",
+      "name": "Send Outreach Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [
+        2800,
+        150
+      ],
+      "parameters": {
+        "options": {},
+        "subject": "={{ (() => { const raw = $('Generate Email Draft (LLM)').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); return JSON.parse(s).subject; })() }}",
+        "toEmail": "={{ $('Webhook').item.json.body.email }}",
+        "fromEmail": "Robert Elder <relder@sovereignadvisory.ai>",
+        "emailFormat": "text",
+        "text": "={{ (() => { const raw = $('Generate Email Draft (LLM)').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); return JSON.parse(s).body_text; })() }}"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "R7l3YzvGGiSf2PrS",
+          "name": "SA Neo.space SMTP"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "266e0368-c583-4ec7-83bc-15d17e0f6e7a",
+      "name": "Mark Lead Sent",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        3000,
+        150
+      ],
+      "parameters": {
+        "query": "UPDATE sa_leads SET status='sent', sent_at=NOW() WHERE id=$1",
+        "options": {
+          "queryReplacement": "={{ [$('Parse & Save Lead to PG').item.json.id] }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    },
+    {
+      "id": "184e2bb5-f913-4a7c-bff7-5842f4471bb8",
+      "name": "Re-run AI Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [
+        2800,
+        350
+      ],
+      "parameters": {
+        "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "keypair",
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "cloud/smart"
+            },
+            {
+              "name": "messages",
+              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Original draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer notes:\\n'+($json.notes||'')}] }}"
+            },
+            {
+              "name": "response_format",
+              "value": "={{ {type:'json_object'} }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+            }
+          ]
+        }
+      },
+      "typeVersion": 4
+    },
+    {
+      "id": "19bb1afd-f848-4a12-ab6f-db7badebf497",
+      "name": "Save New Draft Version",
+      "type": "n8n-nodes-base.postgres",
+      "position": [
+        3000,
+        350
+      ],
+      "parameters": {
+        "query": "UPDATE sa_lead_drafts SET is_current=FALSE WHERE lead_id=$1;\nINSERT INTO sa_lead_drafts (lead_id, version, subject, body_text, is_current) SELECT $1, COALESCE(MAX(version),0)+1, $2, $3, TRUE FROM sa_lead_drafts WHERE lead_id=$1;",
+        "options": {
+          "queryReplacement": "={{ (() => { const raw = $('Re-run AI Analysis').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); const d = JSON.parse(s); return [$('Parse & Save Lead to PG').item.json.id, d.subject, d.body_text]; })() }}"
+        },
+        "operation": "executeQuery"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "72Gr5GGT0iOjYXjc",
+          "name": "SA PostgreSQL"
+        }
+      },
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Respond 200 OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond 200 OK": {
+      "main": [
+        [
+          {
+            "node": "Parse & Save Lead to PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Action": {
+      "main": [
+        [
+          {
+            "node": "Send Outreach Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Re-run AI Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        []
+      ]
+    },
+    "Save Draft to PG": {
+      "main": [
+        [
+          {
+            "node": "Create Notion Lead Page",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create Review Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-run AI Analysis": {
+      "main": [
+        [
+          {
+            "node": "Save New Draft Version",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Review Token": {
+      "main": [
+        [
+          {
+            "node": "Set Status: Pending Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Analysis to PG": {
+      "main": [
+        [
+          {
+            "node": "Generate Email Draft (LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Research to PG": {
+      "main": [
+        [
+          {
+            "node": "AI Lead Analysis (LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Lead Analysis (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Save Analysis to PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company Research (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Save Research to PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Notion Lead Page": {
+      "main": [
+        [
+          {
+            "node": "Save Notion ID to PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Save Lead to PG": {
+      "main": [
+        [
+          {
+            "node": "Company Research (LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Review Decision": {
+      "main": [
+        [
+          {
+            "node": "Route by Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Email Draft (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Save Draft to PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Outreach Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Mark Lead Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Status: Pending Review": {
+      "main": [
+        [
+          {
+            "node": "Email Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "SMS (Verizon email gateway)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait for Review Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": {
+    "instanceId": ""
+  },
+  "pinData": null,
+  "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+  "activeVersionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+  "versionCounter": 23,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-14T18:03:58.471Z",
+      "createdAt": "2026-03-14T18:03:58.471Z",
+      "role": "workflow:owner",
+      "workflowId": "sa-lead-pipeline-001",
+      "projectId": "McH7zyUSuk3mIOB2",
+      "project": {
+        "updatedAt": "2026-03-14T18:00:56.159Z",
+        "createdAt": "2026-03-10T13:02:13.755Z",
+        "id": "McH7zyUSuk3mIOB2",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-16T20:06:54.076Z",
+    "createdAt": "2026-03-14T18:03:58.471Z",
+    "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+    "workflowId": "sa-lead-pipeline-001",
+    "nodes": [
+      {
+        "id": "4bb7cacc-08c8-4b64-9437-35dc4aa8b3ea",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "position": [
+          0,
+          300
+        ],
+        "parameters": {
+          "path": "sa-lead-intake",
+          "options": {},
+          "httpMethod": "POST",
+          "responseMode": "responseNode",
+          "webhookId": "sa-lead-pipeline-001"
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "f01042e0-13f3-442b-8f26-a643833341d5",
+        "name": "Respond 200 OK",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "position": [
+          200,
+          300
+        ],
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({status: 'received'}) }}"
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "d385fd74-e898-4d44-af7c-29b3ea2991d4",
+        "name": "Parse & Save Lead to PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          400,
+          300
+        ],
+        "parameters": {
+          "query": "INSERT INTO sa_leads (first_name, last_name, email, domain, service_area, message, status) VALUES ($1,$2,$3,$4,$5,$6,'pending_research') RETURNING id",
+          "options": {
+            "queryReplacement": "={{ [\n  $json.body.first_name,\n  $json.body.last_name,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service_area,\n  $json.body.message\n] }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "be0d9c19-fb3d-4888-8e23-1617cd83cf6c",
+        "name": "Company Research (LLM)",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          600,
+          200
+        ],
+        "parameters": {
+          "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+          "method": "POST",
+          "sendBody": true,
+          "specifyBody": "keypair",
+          "contentType": "json",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "model",
+                "value": "cloud/smart"
+              },
+              {
+                "name": "messages",
+                "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'. Service: '+$('Webhook').item.json.body.service_area+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
+              },
+              {
+                "name": "response_format",
+                "value": "={{ {type:'json_object'} }}"
+              }
+            ]
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4
+      },
+      {
+        "id": "633f5793-97fe-4dcd-8c14-d7770a6ec64b",
+        "name": "Save Research to PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          800,
+          200
+        ],
+        "parameters": {
+          "query": "UPDATE sa_leads SET company_research=$1, status='research_complete', research_completed_at=NOW() WHERE id=$2",
+          "options": {
+            "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); let s = m ? m[1].trim() : raw.trim(); try { s = JSON.stringify(JSON.parse(s)); } catch(e) { s = s.split('\\n').join('\\\\n').split('\\r').join('\\\\r').split('\\t').join('\\\\t'); } return [s, $('Parse & Save Lead to PG').item.json.id]; })() }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "c299d7ef-e9df-47d8-ae77-880ef9b751b8",
+        "name": "AI Lead Analysis (LLM)",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1000,
+          300
+        ],
+        "parameters": {
+          "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+          "method": "POST",
+          "sendBody": true,
+          "specifyBody": "keypair",
+          "contentType": "json",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "model",
+                "value": "cloud/smart"
+              },
+              {
+                "name": "messages",
+                "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service_area+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
+              },
+              {
+                "name": "response_format",
+                "value": "={{ {type:'json_object'} }}"
+              }
+            ]
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4
+      },
+      {
+        "id": "89b04254-a8a4-4773-8729-ab8a3cb88c38",
+        "name": "Save Analysis to PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          1200,
+          300
+        ],
+        "parameters": {
+          "query": "UPDATE sa_leads SET summary=$1, approach=$2, conversation_starters=$3, questions=$4, scenarios=$5, status='pending_draft' WHERE id=$6",
+          "options": {
+            "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); const jsonStr = (m ? m[1].trim() : raw.trim()); const a = JSON.parse(jsonStr); return [a.summary, a.approach, JSON.stringify(a.conversation_starters), JSON.stringify(a.questions), JSON.stringify(a.scenarios), $('Parse & Save Lead to PG').item.json.id]; })() }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "e1abb39b-e403-416f-a575-84f2a105352d",
+        "name": "Generate Email Draft (LLM)",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          1400,
+          300
+        ],
+        "parameters": {
+          "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+          "method": "POST",
+          "sendBody": true,
+          "specifyBody": "keypair",
+          "contentType": "json",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "model",
+                "value": "cloud/smart"
+              },
+              {
+                "name": "messages",
+                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
+              },
+              {
+                "name": "response_format",
+                "value": "={{ {type:'json_object'} }}"
+              }
+            ]
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4
+      },
+      {
+        "id": "bfd0f7b8-ef52-40a7-b19c-de647e539982",
+        "name": "Save Draft to PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          1600,
+          300
+        ],
+        "parameters": {
+          "query": "INSERT INTO sa_lead_drafts (lead_id, subject, body_text, is_current) VALUES ($1,$2,$3,TRUE) RETURNING id",
+          "options": {
+            "queryReplacement": "={{ (() => { const raw = $json.choices[0].message.content; const m = raw.match(/```(?:json)?\\s*([\\s\\S]*?)\\s*```/); const jsonStr = (m ? m[1].trim() : raw.trim()); const d = JSON.parse(jsonStr); return [$('Parse & Save Lead to PG').item.json.id, d.subject, d.body_text]; })() }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "49991968-e12a-4913-b376-c0c67b539ad0",
+        "name": "Create Notion Lead Page",
+        "type": "n8n-nodes-base.notion",
+        "position": [
+          1800,
+          200
+        ],
+        "parameters": {
+          "resource": "databasePage",
+          "operation": "create",
+          "databaseId": "={{ $env.NOTION_LEADS_DB_ID }}",
+          "propertiesUi": {
+            "propertyValues": [
+              {
+                "key": "Name",
+                "type": "title",
+                "titleValue": "={{ $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name }}"
+              },
+              {
+                "key": "Email",
+                "type": "email",
+                "emailValue": "={{ $('Webhook').item.json.body.email }}"
+              },
+              {
+                "key": "Domain",
+                "type": "url",
+                "urlValue": "={{ 'https://' + $('Webhook').item.json.body.email.split('@').pop() }}"
+              },
+              {
+                "key": "Status",
+                "type": "select",
+                "selectValue": "Pending Review"
+              },
+              {
+                "key": "Lead ID",
+                "type": "richText",
+                "textContent": "={{ $('Parse & Save Lead to PG').item.json.id }}"
+              }
+            ]
+          }
+        },
+        "credentials": {
+          "notionApi": {
+            "id": "OU0MF8tF4h6Tb0uW",
+            "name": "SA Notion"
+          }
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "288dfbbc-5c18-469f-b81d-e230ba4cfa5e",
+        "name": "Save Notion ID to PG",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          2000,
+          200
+        ],
+        "parameters": {
+          "query": "UPDATE sa_leads SET notion_page_id=$1 WHERE id=$2",
+          "options": {
+            "queryReplacement": "={{ [$json.id, $('Parse & Save Lead to PG').item.json.id] }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "b5ff2b5f-15a7-4cf8-b198-b82d0f87395a",
+        "name": "Create Review Token",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          1800,
+          400
+        ],
+        "parameters": {
+          "query": "INSERT INTO sa_review_tokens (lead_id, n8n_resume_url) VALUES ($1, $2) RETURNING token",
+          "options": {
+            "queryReplacement": "={{ [\n  $('Parse & Save Lead to PG').item.json.id,\n  $execution.resumeUrl\n] }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "4d615579-0896-4553-969d-525d61b2d3a6",
+        "name": "Set Status: Pending Review",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          2000,
+          400
+        ],
+        "parameters": {
+          "query": "UPDATE sa_leads SET status='pending_review', draft_generated_at=NOW(), first_notified_at=NOW() WHERE id=$1",
+          "options": {
+            "queryReplacement": "={{ [$('Parse & Save Lead to PG').item.json.id] }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "86c911a9-194e-4c04-a90c-91d94ccafedb",
+        "name": "Email Notification",
+        "type": "n8n-nodes-base.emailSend",
+        "position": [
+          2200,
+          100
+        ],
+        "parameters": {
+          "message": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.first_name }} {{ $('Webhook').item.json.body.last_name }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service_area }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>",
+          "options": {},
+          "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' \u2014 ' + $('Webhook').item.json.body.service_area }}",
+          "toEmail": "={{ $env.NOTIFY_EMAIL }}",
+          "fromEmail": "relder@sovereignadvisory.ai",
+          "emailFormat": "html"
+        },
+        "credentials": {
+          "smtp": {
+            "id": "R7l3YzvGGiSf2PrS",
+            "name": "SA Neo.space SMTP"
+          }
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "08d4d4f8-077a-4f4e-b86f-9d1de9f27e25",
+        "name": "SMS (Verizon email gateway)",
+        "type": "n8n-nodes-base.emailSend",
+        "position": [
+          2200,
+          250
+        ],
+        "parameters": {
+          "message": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+          "options": {},
+          "subject": "New SA Lead",
+          "toEmail": "={{ $env.NOTIFY_SMS_EMAIL }}",
+          "fromEmail": "relder@sovereignadvisory.ai"
+        },
+        "credentials": {
+          "smtp": {
+            "id": "R7l3YzvGGiSf2PrS",
+            "name": "SA Neo.space SMTP"
+          }
+        },
+        "typeVersion": 2,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "577988fb-eb91-467d-ab3c-40ac7f738527",
+        "name": "Telegram Notification",
+        "type": "n8n-nodes-base.telegram",
+        "position": [
+          2200,
+          400
+        ],
+        "parameters": {
+          "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service_area + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+          "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "MEWPjUrMwjkJ9XWP",
+            "name": "SA Telegram Bot"
+          }
+        },
+        "typeVersion": 1,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "a9a70972-abe9-4064-9af7-45d8a0312e44",
+        "name": "WhatsApp (Twilio)",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          2200,
+          550
+        ],
+        "parameters": {
+          "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+          "method": "POST",
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "authentication": "genericCredentialType",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "From",
+                "value": "={{ $env.TWILIO_WHATSAPP_FROM }}"
+              },
+              {
+                "name": "To",
+                "value": "={{ $env.WHATSAPP_NOTIFY_TO }}"
+              },
+              {
+                "name": "Body",
+                "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}"
+              }
+            ]
+          },
+          "genericAuthType": "httpBasicAuth"
+        },
+        "credentials": {
+          "httpBasicAuth": {
+            "id": "DZ1NSVibAbM2WXlp",
+            "name": "SA Twilio"
+          }
+        },
+        "typeVersion": 4,
+        "onError": "continueRegularOutput"
+      },
+      {
+        "id": "6fed4626-5396-41bb-890b-f3e5f574fa92",
+        "name": "Wait for Review Decision",
+        "type": "n8n-nodes-base.wait",
+        "position": [
+          2400,
+          350
+        ],
+        "parameters": {
+          "resume": "webhook",
+          "options": {
+            "httpMethod": "POST"
+          }
+        },
+        "typeVersion": 1
+      },
+      {
+        "id": "5ff53fb0-b8ca-427d-9ae6-4c0282c6db17",
+        "name": "Route by Action",
+        "type": "n8n-nodes-base.switch",
+        "position": [
+          2600,
+          350
+        ],
+        "parameters": {
+          "mode": "expression",
+          "numberOutputs": 4,
+          "output": "={{ ({'approve':0,'regenerate':1,'queue':2,'dnfu':3}[$json.query.action]) ?? 3 }}"
+        },
+        "typeVersion": 3
+      },
+      {
+        "id": "378c6d1b-b4a7-48ee-8333-4eb029efef37",
+        "name": "Send Outreach Email (SMTP)",
+        "type": "n8n-nodes-base.emailSend",
+        "position": [
+          2800,
+          150
+        ],
+        "parameters": {
+          "options": {},
+          "subject": "={{ (() => { const raw = $('Generate Email Draft (LLM)').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); return JSON.parse(s).subject; })() }}",
+          "toEmail": "={{ $('Webhook').item.json.body.email }}",
+          "fromEmail": "Robert Elder <relder@sovereignadvisory.ai>",
+          "emailFormat": "text",
+          "text": "={{ (() => { const raw = $('Generate Email Draft (LLM)').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); return JSON.parse(s).body_text; })() }}"
+        },
+        "credentials": {
+          "smtp": {
+            "id": "R7l3YzvGGiSf2PrS",
+            "name": "SA Neo.space SMTP"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "266e0368-c583-4ec7-83bc-15d17e0f6e7a",
+        "name": "Mark Lead Sent",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3000,
+          150
+        ],
+        "parameters": {
+          "query": "UPDATE sa_leads SET status='sent', sent_at=NOW() WHERE id=$1",
+          "options": {
+            "queryReplacement": "={{ [$('Parse & Save Lead to PG').item.json.id] }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      },
+      {
+        "id": "184e2bb5-f913-4a7c-bff7-5842f4471bb8",
+        "name": "Re-run AI Analysis",
+        "type": "n8n-nodes-base.httpRequest",
+        "position": [
+          2800,
+          350
+        ],
+        "parameters": {
+          "url": "={{ $env.LITELLM_BASE_URL }}/v1/chat/completions",
+          "method": "POST",
+          "sendBody": true,
+          "specifyBody": "keypair",
+          "contentType": "json",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "model",
+                "value": "cloud/smart"
+              },
+              {
+                "name": "messages",
+                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Original draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer notes:\\n'+($json.notes||'')}] }}"
+              },
+              {
+                "name": "response_format",
+                "value": "={{ {type:'json_object'} }}"
+              }
+            ]
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "=Bearer {{ $env.LITELLM_API_KEY }}"
+              }
+            ]
+          }
+        },
+        "typeVersion": 4
+      },
+      {
+        "id": "19bb1afd-f848-4a12-ab6f-db7badebf497",
+        "name": "Save New Draft Version",
+        "type": "n8n-nodes-base.postgres",
+        "position": [
+          3000,
+          350
+        ],
+        "parameters": {
+          "query": "UPDATE sa_lead_drafts SET is_current=FALSE WHERE lead_id=$1;\nINSERT INTO sa_lead_drafts (lead_id, version, subject, body_text, is_current) SELECT $1, COALESCE(MAX(version),0)+1, $2, $3, TRUE FROM sa_lead_drafts WHERE lead_id=$1;",
+          "options": {
+            "queryReplacement": "={{ (() => { const raw = $('Re-run AI Analysis').item.json.choices[0].message.content; const m = raw.match(/```[^`]*```/); const s = m ? m[0].replace(/```[^\\n]*\\n/, '').replace(/```$/, '').trim() : raw.trim(); const d = JSON.parse(s); return [$('Parse & Save Lead to PG').item.json.id, d.subject, d.body_text]; })() }}"
+          },
+          "operation": "executeQuery"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "72Gr5GGT0iOjYXjc",
+            "name": "SA PostgreSQL"
+          }
+        },
+        "typeVersion": 2
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 OK",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Respond 200 OK": {
+        "main": [
+          [
+            {
+              "node": "Parse & Save Lead to PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Route by Action": {
+        "main": [
+          [
+            {
+              "node": "Send Outreach Email (SMTP)",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Re-run AI Analysis",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [],
+          []
+        ]
+      },
+      "Save Draft to PG": {
+        "main": [
+          [
+            {
+              "node": "Create Notion Lead Page",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Create Review Token",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Re-run AI Analysis": {
+        "main": [
+          [
+            {
+              "node": "Save New Draft Version",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Review Token": {
+        "main": [
+          [
+            {
+              "node": "Set Status: Pending Review",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Analysis to PG": {
+        "main": [
+          [
+            {
+              "node": "Generate Email Draft (LLM)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Save Research to PG": {
+        "main": [
+          [
+            {
+              "node": "AI Lead Analysis (LLM)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Lead Analysis (LLM)": {
+        "main": [
+          [
+            {
+              "node": "Save Analysis to PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Company Research (LLM)": {
+        "main": [
+          [
+            {
+              "node": "Save Research to PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Create Notion Lead Page": {
+        "main": [
+          [
+            {
+              "node": "Save Notion ID to PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse & Save Lead to PG": {
+        "main": [
+          [
+            {
+              "node": "Company Research (LLM)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Wait for Review Decision": {
+        "main": [
+          [
+            {
+              "node": "Route by Action",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Generate Email Draft (LLM)": {
+        "main": [
+          [
+            {
+              "node": "Save Draft to PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Send Outreach Email (SMTP)": {
+        "main": [
+          [
+            {
+              "node": "Mark Lead Sent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Status: Pending Review": {
+        "main": [
+          [
+            {
+              "node": "Email Notification",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "SMS (Verizon email gateway)",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Wait for Review Decision",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "import",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-14T18:04:09.599Z",
+        "id": 42,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:41:52.840Z",
+        "id": 43,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "deactivated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:41:57.914Z",
+        "id": 44,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:49:41.245Z",
+        "id": 45,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "deactivated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:49:41.308Z",
+        "id": 46,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:55:49.802Z",
+        "id": 47,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "deactivated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T19:55:49.849Z",
+        "id": 48,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T20:00:35.338Z",
+        "id": 49,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "deactivated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T20:00:35.382Z",
+        "id": 50,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T20:07:12.445Z",
+        "id": 51,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "deactivated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      },
+      {
+        "createdAt": "2026-03-16T20:07:12.493Z",
+        "id": 52,
+        "workflowId": "sa-lead-pipeline-001",
+        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "event": "activated",
+        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+      }
+    ]
+  }
+}

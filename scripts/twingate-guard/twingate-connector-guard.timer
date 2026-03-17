@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Twingate connector guard every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+Unit=twingate-connector-guard.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

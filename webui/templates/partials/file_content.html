@@ -1,0 +1,27 @@
+<div class="file-content-view">
+  <div class="file-content-header">
+    <span class="file-content-icon">&#128196;</span>
+    <span class="file-content-name">{{ filename }}</span>
+    <span class="file-content-ext">{{ ext }}</span>
+  </div>
+
+  {% if is_markdown %}
+  <div class="markdown-body">
+    {{ rendered_html | safe }}
+  </div>
+  {% elif ext in [".py", ".js", ".ts", ".sh", ".bash"] %}
+  <pre class="code-block code-block--code"><code class="lang{{ ext[1:] }}">{{ content }}</code></pre>
+  {% elif ext in [".json"] %}
+  <pre class="code-block code-block--json"><code>{{ content }}</code></pre>
+  {% elif ext in [".yaml", ".yml"] %}
+  <pre class="code-block code-block--yaml"><code>{{ content }}</code></pre>
+  {% elif ext in [".txt", ".log", ".env"] %}
+  <pre class="code-block code-block--text"><code>{{ content }}</code></pre>
+  {% elif ext in [".html", ".xml"] %}
+  <pre class="code-block code-block--markup"><code>{{ content }}</code></pre>
+  {% elif ext in [".toml", ".ini", ".cfg"] %}
+  <pre class="code-block code-block--config"><code>{{ content }}</code></pre>
+  {% else %}
+  <pre class="code-block"><code>{{ content }}</code></pre>
+  {% endif %}
+</div>

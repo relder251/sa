@@ -1,0 +1,53 @@
+<div id="approval-panel" class="approval-panel">
+
+  {% if not approvals %}
+  <div class="approval-empty">
+    <span class="approval-empty-icon">&#10003;</span>
+    <span>No pending approvals</span>
+  </div>
+  {% else %}
+  <div class="approvals-header">
+    <h3 class="approvals-title">&#9888; Pending Approvals</h3>
+  </div>
+
+  {% for run in approvals %}
+  <div class="approval-item">
+    <div class="approval-item-header">
+      <a class="approval-run-name" href="/runs/{{ run.name }}">{{ run.name }}</a>
+      {% if run.approval and run.approval.requested_at %}
+      <span class="approval-time">Requested: {{ run.approval.requested_at[:19].replace("T", " ") }}</span>
+      {% endif %}
+    </div>
+
+    {% if run.prompt %}
+    <div class="approval-prompt">{{ run.prompt[:120] }}{% if run.prompt | length > 120 %}&hellip;{% endif %}</div>
+    {% endif %}
+
+    <div class="approval-actions">
+      <!-- Approve form -->
+      <form class="approval-form approval-form--approve"
+            hx-post="/approvals/{{ run.name }}/approve"
+            hx-target="#approval-panel"
+            hx-swap="outerHTML">
+        <input type="text" name="approver" class="form-input form-input--sm" placeholder="Your name" required />
+        <input type="text" name="comment" class="form-input form-input--sm" placeholder="Comment (optional)" />
+        <button class="btn btn-success btn-sm" type="submit">&#10003; Approve</button>
+      </form>
+
+      <!-- Reject form -->
+      <form class="approval-form approval-form--reject"
+            hx-post="/approvals/{{ run.name }}/reject"
+            hx-target="#approval-panel"
+            hx-swap="outerHTML">
+        <input type="text" name="approver" class="form-input form-input--sm" placeholder="Your name" required />
+        <input type="text" name="reason" class="form-input form-input--sm" placeholder="Reason for rejection" required />
+        <input type="hidden" name="comment" value="" />
+        <button class="btn btn-danger btn-sm" type="submit">&#10007; Reject</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+  {% endif %}
+
+</div>

@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}System Health &mdash; Agentic SDLC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">System Health</h1>
+  <p class="page-subtitle">Live status of all pipeline services.</p>
+</div>
+
+<div class="health-page">
+
+  <!-- Service health grid -->
+  <section class="health-section">
+    <h2 class="section-title">Services</h2>
+    <div
+      id="health-grid"
+      hx-get="/partials/system/health"
+      hx-trigger="load, every 10s"
+      hx-target="#health-grid"
+      hx-swap="outerHTML"
+    >
+      <div class="health-loading">Loading service status...</div>
+    </div>
+  </section>
+
+  <!-- Model tiers info -->
+  <section class="health-section">
+    <h2 class="section-title">Model Tiers</h2>
+    <div class="tiers-info">
+      <div class="tier-card">
+        <span class="tier-name">local/*</span>
+        <span class="tier-desc">Ollama on-device (zero cost)</span>
+        <span class="tier-models">chat, code, reason, fast</span>
+      </div>
+      <div class="tier-card">
+        <span class="tier-name">hybrid/*</span>
+        <span class="tier-desc">Ollama + Groq/Gemini/DeepSeek fallback</span>
+        <span class="tier-models">chat, code, reason, fast</span>
+      </div>
+      <div class="tier-card">
+        <span class="tier-name">cloud/*</span>
+        <span class="tier-desc">Anthropic, OpenAI, Gemini, Perplexity</span>
+        <span class="tier-models">chat, smart, code, reason, fast, search</span>
+      </div>
+      <div class="tier-card">
+        <span class="tier-name">free/*</span>
+        <span class="tier-desc">Dynamic free models (OpenRouter/Groq/Gemini)</span>
+        <span class="tier-models">chat, code, reason, fast</span>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}

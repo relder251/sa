@@ -1,0 +1,207 @@
+{
+  "id": "agentic-executor-001",
+  "name": "Phase 2: The Executor (File Watcher)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "file",
+        "path": "/data/output/project_plan.md",
+        "events": ["add", "change"]
+      },
+      "id": "file-trigger",
+      "name": "Watch Project Plan",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "command": "cat /data/output/project_plan.md"
+      },
+      "id": "read-plan",
+      "name": "Read Project Plan",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://litellm:4000/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer sk-vibe-coding-key-123" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'hybrid/code', max_tokens: 8192, messages: [{ role: 'system', content: 'You are the Lead Executor of an automated solution builder. Take the provided project plan and generate a complete, production-ready initial codebase.\\n\\nYou MUST output every file using EXACTLY this format with NO exceptions:\\n\\n===FILE: path/to/filename.ext===\\n[full file content here]\\n===END FILE===\\n\\nREQUIRED files to generate:\\n- Main application file(s) with full implementation\\n- tests/ directory with at least one test file covering core functionality\\n- requirements.txt (or package.json / go.mod / equivalent)\\n- Dockerfile for containerized execution\\n- .gitignore appropriate for the language/framework\\n- README.md with: project description, setup steps, usage examples, and how to run tests\\n\\nFILE STRUCTURE RULES:\\n- Use a logical project directory (e.g. src/, tests/)\\n- Each ===FILE:=== block must contain the COMPLETE, RUNNABLE file content\\n- Files must be self-consistent: imports must match actual file paths\\n- Output files in dependency order: config/deps first, core modules, then tests, then docs\\n\\nCRITICAL PROHIBITIONS — violating these will cause the build to fail:\\n- NEVER use diff format, patch syntax, or merge conflict markers (<<<<<<< SEARCH, =======, >>>>>>> REPLACE)\\n- NEVER use markdown code fences inside file blocks\\n- NEVER truncate content or write placeholder comments like # rest of implementation here\\n- NEVER output commentary or explanation between ===FILE:=== blocks\\n- Output COMPLETE files only — every line, from top to bottom' }, { role: 'user', content: $json.stdout }] }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "llm-executor",
+      "name": "Execute Coding Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [700, 300]
+    },
+    {
+      "parameters": {
+        "command": "=cat << 'EOFILE' > /data/output/execution_output.md\n{{ $json.choices[0].message.content }}\nEOFILE"
+      },
+      "id": "save-raw",
+      "name": "Save AI Response",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [950, 300]
+    },
+    {
+      "parameters": {
+        "command": "node /data/scripts/validate_format.js /data/output/execution_output.md"
+      },
+      "id": "validate-format",
+      "name": "Validate Format",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-valid",
+              "leftValue": "={{ $json.stdout }}",
+              "operator": { "type": "string", "operation": "contains" },
+              "rightValue": "\"valid\":true"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-valid",
+      "name": "Check Valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "command": "node /data/scripts/extract_files.js /data/output/execution_output.md /data/output/project"
+      },
+      "id": "extract-files",
+      "name": "Extract Files to Disk",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1700, 150]
+    },
+    {
+      "parameters": {
+        "command": "cat /data/output/execution_output.md"
+      },
+      "id": "read-for-fix",
+      "name": "Read For Fix",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1450, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://litellm:4000/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer sk-vibe-coding-key-123" },
+            { "name": "Content-Type",  "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'free/code', max_tokens: 8192, messages: [{ role: 'system', content: 'You are a code quality fixer. The AI output below failed validation. Fix ALL reported issues and re-output the complete corrected code.\\n\\nUse EXACTLY this format for every file:\\n===FILE: path/to/filename.ext===\\n[complete file content]\\n===END FILE===\\n\\nCRITICAL:\\n- Output COMPLETE file contents only — every line, top to bottom\\n- NEVER use diff format, patch syntax, or merge conflict markers\\n- NEVER truncate or use placeholder comments\\n- Preserve all correct parts of the original output' }, { role: 'user', content: 'VALIDATION ISSUES FOUND:\\n' + $(\\'Validate Format\\').item.json.stdout + '\\n\\nORIGINAL OUTPUT TO FIX:\\n' + $json.stdout }] }) }}",
+        "options": { "timeout": 120000 }
+      },
+      "id": "llm-fix",
+      "name": "LLM Fix",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1700, 500]
+    },
+    {
+      "parameters": {
+        "command": "=cat << 'EOFILE' > /data/output/execution_output.md\n{{ $json.choices[0].message.content }}\nEOFILE"
+      },
+      "id": "save-fixed",
+      "name": "Save Fixed Response",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [1950, 500]
+    },
+    {
+      "parameters": {
+        "command": "node /data/scripts/extract_files.js /data/output/execution_output.md /data/output/project"
+      },
+      "id": "extract-files-fixed",
+      "name": "Extract Files Fixed",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2200, 500]
+    },
+    {
+      "parameters": {
+        "command": "node /data/scripts/postprocess.js /data/output/project"
+      },
+      "id": "postprocess",
+      "name": "Auto-fix Project",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [2450, 300]
+    }
+  ],
+  "connections": {
+    "Watch Project Plan": {
+      "main": [[{"node": "Read Project Plan", "type": "main", "index": 0}]]
+    },
+    "Read Project Plan": {
+      "main": [[{"node": "Execute Coding Task", "type": "main", "index": 0}]]
+    },
+    "Execute Coding Task": {
+      "main": [[{"node": "Save AI Response", "type": "main", "index": 0}]]
+    },
+    "Save AI Response": {
+      "main": [[{"node": "Validate Format", "type": "main", "index": 0}]]
+    },
+    "Validate Format": {
+      "main": [[{"node": "Check Valid", "type": "main", "index": 0}]]
+    },
+    "Check Valid": {
+      "main": [
+        [{"node": "Extract Files to Disk", "type": "main", "index": 0}],
+        [{"node": "Read For Fix",          "type": "main", "index": 0}]
+      ]
+    },
+    "Extract Files to Disk": {
+      "main": [[{"node": "Auto-fix Project", "type": "main", "index": 0}]]
+    },
+    "Read For Fix": {
+      "main": [[{"node": "LLM Fix", "type": "main", "index": 0}]]
+    },
+    "LLM Fix": {
+      "main": [[{"node": "Save Fixed Response", "type": "main", "index": 0}]]
+    },
+    "Save Fixed Response": {
+      "main": [[{"node": "Extract Files Fixed", "type": "main", "index": 0}]]
+    },
+    "Extract Files Fixed": {
+      "main": [[{"node": "Auto-fix Project", "type": "main", "index": 0}]]
+    }
+  }
+}

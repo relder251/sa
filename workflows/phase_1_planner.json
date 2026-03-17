@@ -1,0 +1,90 @@
+{
+  "id": "agentic-planner-002",
+  "name": "Phase 1: Project Plan Generator (with File Save)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "generate-plan",
+        "options": {},
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://litellm:4000/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer sk-vibe-coding-key-123"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"hybrid/chat\",\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"You are the lead architect of an automated solution builder. Take the user's raw idea and break it down into a detailed, multi-phased project plan to build the final deliverable.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $json.body.prompt }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "llm-brain",
+      "name": "Ask AI for Project Plan",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "command": "=cat << 'EOF' > /data/output/project_plan.md\n{{ $json.choices[0].message.content }}\nEOF"
+      },
+      "id": "save-to-disk",
+      "name": "Save Plan to Disk",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        700,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Ask AI for Project Plan": {
+      "main": [
+        [
+          {
+            "node": "Save Plan to Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Ask AI for Project Plan",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
