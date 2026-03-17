@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>SA Lead Review</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:          #0e0f11;
+      --surface:     #16181c;
+      --surface-2:   #1e2126;
+      --border:      rgba(255,255,255,0.08);
+      --border-2:    rgba(255,255,255,0.14);
+      --text-1:      #e8e9eb;
+      --text-2:      #9ea3ad;
+      --text-3:      #5c6170;
+      --gold:        #c8a96e;
+      --gold-dim:    rgba(200,169,110,0.15);
+      --green:       #4a8a5a;
+      --green-dim:   rgba(74,138,90,0.2);
+      --red-dim:     rgba(138,74,74,0.2);
+      --blue-dim:    rgba(74,100,180,0.2);
+      --amber-dim:   rgba(180,140,60,0.2);
+      --copper-pale: rgba(200,169,110,0.1);
+      --radius:      8px;
+      --bg-card:     #16181c;
+      --text:        #e8e9eb;
+    }
+
+    body { background: var(--bg); color: var(--text-1); font-family: 'Georgia', serif;
+           font-size: 0.9rem; line-height: 1.6; min-height: 100vh; }
+
+    /* ── Auth screen ── */
+    #auth-screen { display:flex; align-items:center; justify-content:center;
+                   min-height:100vh; }
+    .auth-card { background:var(--surface); border:1px solid var(--border-2);
+                 border-radius:12px; padding:2.5rem 2rem; width:100%; max-width:360px; }
+    .auth-card h1 { font-size:1rem; color:var(--gold); letter-spacing:0.08em;
+                    text-transform:uppercase; margin-bottom:0.4rem; }
+    .auth-card p  { color:var(--text-2); font-size:0.8rem; margin-bottom:1.5rem; }
+    .auth-card input { width:100%; background:var(--bg); border:1px solid var(--border-2);
+                       border-radius:6px; padding:0.6rem 0.8rem; color:var(--text-1);
+                       font-size:0.9rem; outline:none; margin-bottom:0.8rem; }
+    .auth-card input:focus { border-color:var(--gold); }
+    .auth-card button { width:100%; background:var(--gold); color:#111; border:none;
+                        border-radius:6px; padding:0.65rem; font-size:0.9rem;
+                        cursor:pointer; font-weight:600; }
+    .auth-card button:hover { opacity:0.88; }
+    .auth-error { color:#e07070; font-size:0.8rem; margin-top:0.4rem; }
+
+    /* ── Layout ── */
+    .app-shell { display:flex; flex-direction:column; min-height:100vh; }
+    .top-bar { background:var(--surface); border-bottom:1px solid var(--border);
+               padding:0.75rem 1.5rem; display:flex; align-items:center;
+               justify-content:space-between; }
+    .top-bar .brand { color:var(--gold); font-size:0.8rem; letter-spacing:0.1em;
+                      text-transform:uppercase; }
+    .top-bar .nav-back { background:none; border:1px solid var(--border-2);
+                         color:var(--text-2); font-size:0.8rem; padding:0.35rem 0.75rem;
+                         border-radius:5px; cursor:pointer; display:none; }
+    .top-bar .nav-back:hover { color:var(--text-1); border-color:var(--border-2); }
+
+    /* ── Dashboard ── */
+    #dashboard-screen { padding:1.5rem; max-width:1000px; margin:0 auto; width:100%; }
+    .dash-header { margin-bottom:1.5rem; }
+    .dash-header h2 { font-size:1.1rem; color:var(--text-1); font-weight:normal; }
+    .dash-header p  { font-size:0.8rem; color:var(--text-3); margin-top:0.2rem; }
+
+    .lead-table { width:100%; border-collapse:collapse; }
+    .lead-table th { font-size:0.7rem; letter-spacing:0.08em; text-transform:uppercase;
+                     color:var(--text-3); padding:0.6rem 1rem; border-bottom:1px solid var(--border);
+                     text-align:left; }
+    .lead-table td { padding:0.85rem 1rem; border-bottom:1px solid var(--border);
+                     vertical-align:middle; }
+    .lead-table tr:last-child td { border-bottom:none; }
+    .lead-table tr.lead-row { cursor:pointer; transition:background 0.1s; }
+    .lead-table tr.lead-row:hover { background:var(--surface-2); }
+    .lead-name { color:var(--text-1); font-size:0.9rem; }
+    .lead-email { color:var(--text-3); font-size:0.78rem; }
+    .lead-service { color:var(--text-2); font-size:0.82rem; }
+    .lead-date { color:var(--text-3); font-size:0.78rem; white-space:nowrap; }
+
+    .status-pill { display:inline-block; padding:0.2rem 0.6rem; border-radius:20px;
+                   font-size:0.72rem; font-weight:600; letter-spacing:0.04em;
+                   text-transform:uppercase; white-space:nowrap; }
+    .pill-pending    { background:var(--amber-dim);  color:#c8aa55; border:1px solid rgba(180,140,60,0.3); }
+    .pill-queued     { background:var(--blue-dim);   color:#7090d0; border:1px solid rgba(74,100,180,0.3); }
+    .pill-regenerating { background:rgba(160,100,40,0.2); color:#c07030; border:1px solid rgba(160,100,40,0.3); }
+    .pill-sent       { background:var(--green-dim);  color:#6ab07a; border:1px solid rgba(74,138,90,0.3); }
+    .pill-dnfu       { background:var(--red-dim);    color:#d07070; border:1px solid rgba(138,74,74,0.3); }
+
+    /* ── Dashboard toolbar ───────────────────────────────────────────── */
+    .dash-toolbar { display:flex; flex-wrap:wrap; gap:0.5rem; align-items:center; margin-bottom:0.75rem; }
+    .dash-toolbar input[type=text] {
+      flex:1; min-width:140px; background:var(--bg-card); border:1px solid var(--border);
+      border-radius:6px; padding:0.35rem 0.7rem; color:var(--text); font-size:0.85rem;
+    }
+    .dash-toolbar input[type=text]::placeholder { color:var(--text-2); }
+    .dash-toolbar select {
+      background:var(--bg-card); border:1px solid var(--border); border-radius:6px;
+      padding:0.35rem 0.6rem; color:var(--text); font-size:0.85rem; cursor:pointer;
+    }
+    .filter-pills { display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.5rem; }
+    .filter-pill {
+      padding:0.25rem 0.75rem; border-radius:20px; font-size:0.78rem; font-weight:600;
+      cursor:pointer; border:1px solid var(--border); background:var(--bg-card);
+      color:var(--text-2); transition:background 0.15s, color 0.15s;
+      user-select:none;
+    }
+    .filter-pill.active { background:var(--gold-dim); color:var(--gold); border-color:rgba(200,169,110,0.4); }
+    .bulk-bar { display:none; align-items:center; gap:0.75rem; padding:0.5rem 0; }
+    .bulk-bar.visible { display:flex; }
+    .lead-cb { accent-color:var(--gold); width:15px; height:15px; cursor:pointer; flex-shrink:0; }
+
+    .empty-state { text-align:center; padding:4rem 2rem; color:var(--text-3); font-size:0.85rem; }
+
+    /* ── Detail screen ── */
+    #detail-screen { padding:1.5rem; max-width:860px; margin:0 auto; width:100%; }
+
+    .card { background:var(--surface); border:1px solid var(--border);
+            border-radius:var(--radius); padding:1.25rem 1.5rem; margin-bottom:1rem; }
+    .card-title { font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase;
+                  color:var(--gold); margin-bottom:1rem; }
+
+    .prospect-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.75rem; }
+    .prospect-field label { display:block; font-size:0.68rem; text-transform:uppercase;
+                            letter-spacing:0.06em; color:var(--text-3); margin-bottom:0.2rem; }
+    .prospect-field span  { font-size:0.88rem; color:var(--text-1); }
+
+    .message-box { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+                   padding:0.85rem 1rem; color:var(--text-2); font-size:0.85rem;
+                   white-space:pre-wrap; }
+
+    .research-text { color:var(--text-2); font-size:0.85rem; line-height:1.7; }
+    .col-head { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.06em;
+                color:var(--text-3); margin-bottom:0.5rem; margin-top:0.75rem; }
+    .col-head:first-child { margin-top:0; }
+    .three-col { display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem; }
+    @media(max-width:640px){ .three-col { grid-template-columns:1fr; } }
+    .item-list { padding-left:1.2rem; color:var(--text-2); font-size:0.83rem; }
+    .item-list li { margin-bottom:0.5rem; }
+
+    /* Email draft */
+    .email-subject { font-size:0.82rem; color:var(--text-3); margin-bottom:0.75rem; }
+    .email-subject span { color:var(--text-1); }
+    .email-body { background:var(--bg); border:1px solid var(--border); border-radius:6px;
+                  padding:1rem; color:var(--text-2); font-size:0.85rem;
+                  line-height:1.7; white-space:pre-wrap; }
+    .email-body-edit { display:none; width:100%; background:var(--bg); border:1px solid var(--gold);
+                       border-radius:6px; padding:1rem; color:var(--text-1); font-size:0.85rem;
+                       line-height:1.7; min-height:200px; resize:vertical; outline:none; }
+    .edit-toggle { background:none; border:none; color:var(--gold); font-size:0.78rem;
+                   cursor:pointer; padding:0; margin-bottom:0.5rem; }
+    .edit-toggle:hover { opacity:0.8; }
+
+    /* Regen state */
+    .regen-loading { display:none; align-items:center; gap:0.5rem; padding:0.75rem 0;
+                     color:var(--text-2); font-size:0.85rem; }
+    .regen-loading .spinner { width:14px; height:14px; border:2px solid var(--border);
+                              border-top-color:var(--gold); border-radius:50%;
+                              animation:spin 0.7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    .regen-notes { width:100%; background:var(--bg); border:1px solid var(--border);
+                   border-radius:6px; padding:0.7rem 0.85rem; color:var(--text-1);
+                   font-size:0.83rem; line-height:1.5; min-height:64px; resize:vertical;
+                   outline:none; margin-top:0.75rem; }
+    .regen-notes:focus { border-color:var(--border-2); }
+
+    /* Action bar */
+    .action-bar { position:sticky; bottom:0; background:var(--surface);
+                  border-top:1px solid var(--border); padding:1rem 1.5rem;
+                  display:none; gap:0.75rem; flex-wrap:wrap; }
+    .btn { padding:0.55rem 1.1rem; border-radius:6px; font-size:0.85rem;
+           cursor:pointer; border:1px solid transparent; transition:opacity 0.15s,transform 0.1s; }
+    .btn:hover { opacity:0.88; transform:translateY(-1px); }
+    .btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+    .btn-approve    { background:var(--green); color:#fff; border-color:var(--green); }
+    .btn-regenerate { background:var(--gold-dim); color:var(--gold); border-color:rgba(200,169,110,0.3); }
+    .btn-queue      { background:transparent; color:var(--text-2); border-color:var(--border-2); }
+    .btn-pdf        { background:transparent; color:var(--gold); border-color:rgba(200,169,110,0.3); }
+    .btn-dnfu       { background:var(--red-dim); color:#c87070; border-color:rgba(138,74,74,0.3); }
+
+    /* Sent state */
+    .sent-banner { background:var(--green-dim); border:1px solid rgba(74,138,90,0.3);
+                   border-radius:6px; padding:0.75rem 1rem; color:#6ab07a;
+                   font-size:0.85rem; display:none; margin-top:0.5rem; }
+
+    /* Toast */
+    .toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(60px);
+             background:var(--surface-2); border:1px solid var(--border-2); border-radius:8px;
+             padding:0.65rem 1.25rem; font-size:0.83rem; color:var(--text-1);
+             transition:transform 0.25s ease, opacity 0.25s ease; opacity:0; z-index:100;
+             white-space:nowrap; }
+    .toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+    .toast.error { border-color:rgba(180,60,60,0.5); color:#e07070; }
+  </style>
+</head>
+<body>
+
+<!-- ── Auth ─────────────────────────────────────────────────────────────────── -->
+<div id="auth-screen">
+  <div class="auth-card">
+    <h1>Sovereign Advisory</h1>
+    <p>Lead Review Portal</p>
+    <form id="authForm">
+      <input type="password" id="authPassword" placeholder="Review password" autocomplete="current-password">
+      <div class="auth-error" id="authError" style="display:none"></div>
+      <button type="submit">Access Review</button>
+    </form>
+  </div>
+</div>
+
+<!-- ── App shell ─────────────────────────────────────────────────────────────── -->
+<div class="app-shell" id="app-shell" style="display:none">
+  <div class="top-bar">
+    <span class="brand">Sovereign Advisory · Lead Review</span>
+    <button class="nav-back" id="navBack" onclick="showDashboard()">← All Leads</button>
+  </div>
+
+  <!-- Dashboard -->
+  <div id="dashboard-screen" style="display:none">
+    <div class="dash-header">
+      <h2>Lead Queue</h2>
+      <p id="dashSubtitle"></p>
+    </div>
+
+    <!-- Filter pills -->
+    <div class="filter-pills" id="filterPills">
+      <span class="filter-pill" data-pill="all">All</span>
+      <span class="filter-pill active" data-pill="needs_action">Needs Action</span>
+      <span class="filter-pill" data-pill="sent">Sent</span>
+      <span class="filter-pill" data-pill="declined">Declined</span>
+      <span class="filter-pill" data-pill="queued">Queued</span>
+      <span class="filter-pill" data-pill="archived">Archived</span>
+    </div>
+
+    <!-- Search + sort toolbar -->
+    <div class="dash-toolbar">
+      <input type="text" id="searchInput" placeholder="🔍  Search name, company, email…" oninput="applyClientFilter()">
+      <select id="sortSelect" onchange="onSortChange()">
+        <option value="newest">Newest</option>
+        <option value="oldest">Oldest</option>
+        <option value="name_asc">Name A→Z</option>
+        <option value="name_desc">Name Z→A</option>
+        <option value="company_asc">Company A→Z</option>
+        <option value="sent_desc">Sent date (newest first)</option>
+      </select>
+    </div>
+
+    <!-- Bulk action bar (shown when checkboxes are checked) -->
+    <div class="bulk-bar" id="bulkBar">
+      <span id="bulkCount" style="font-size:0.85rem;color:var(--text-2)">0 selected</span>
+      <button class="btn" style="background:var(--gold-dim);color:var(--gold);border-color:rgba(200,169,110,0.3)" onclick="doBulkArchive()">Archive selected</button>
+      <button class="btn" style="font-size:0.8rem" onclick="clearCheckboxes()">✕ Clear</button>
+    </div>
+
+    <table class="lead-table" id="leadTable">
+      <thead>
+        <tr>
+          <th style="width:1.5rem"><input type="checkbox" class="lead-cb" id="cbSelectAll" title="Select all" onchange="toggleSelectAll(this)"></th>
+          <th>Name</th>
+          <th>Service</th>
+          <th>Status</th>
+          <th>Received</th>
+        </tr>
+      </thead>
+      <tbody id="leadTableBody"></tbody>
+    </table>
+    <div class="empty-state" id="emptyState" style="display:none">No leads match this filter.</div>
+  </div>
+
+  <!-- Detail -->
+  <div id="detail-screen" style="display:none">
+    <div id="detailContent"></div>
+    <div class="action-bar" id="actionBar">
+      <button class="btn btn-dnfu"        id="btnDnfu">Do Not Follow Up</button>
+      <button class="btn btn-queue"       id="btnQueue">Queue for Later</button>
+      <button class="btn btn-queue"       id="btnUnqueue" style="display:none">Retrieve from Hold</button>
+      <button class="btn btn-regenerate"  id="btnRegen">Regenerate Draft</button>
+      <button class="btn btn-pdf"         id="btnPdf">↓ Brief PDF</button>
+      <button class="btn btn-approve"     id="btnApprove">Approve &amp; Send</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  // ── State ─────────────────────────────────────────────────────────────────
+  let sessionKey   = sessionStorage.getItem('sa_review_sk');
+  let currentToken = null;
+  let regenPoll    = null;
+
+  // ── Filter / sort state ────────────────────────────────────────────────────
+  const FILTER_KEY = 'sa_lead_dashboard_v1';
+  let activePills  = ['needs_action'];   // restored from localStorage below
+  let currentSort  = 'newest';
+  let allLeads     = [];                 // full server response for client-side filter
+
+  // Restore filter state from localStorage before first render
+  loadFilterState();
+
+  // Wire filter pill clicks
+  document.querySelectorAll('.filter-pill').forEach(el => {
+    el.addEventListener('click', () => onPillClick(el.dataset.pill));
+  });
+
+  // ── History / popstate ────────────────────────────────────────────────────
+  window.addEventListener('popstate', e => {
+    if (!sessionKey) { showAuth(null); return; }
+    const state = e.state;
+    if (state && state.view === 'detail' && state.token) {
+      showDetail(state.token, false);
+    } else {
+      showDashboard(false);
+    }
+  });
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  (function init() {
+    // Check if URL has a token (direct link from notification)
+    const parts    = window.location.pathname.split('/').filter(Boolean);
+    const urlToken = parts.length >= 2 && parts[parts.length - 1] !== 'review'
+                     ? parts[parts.length - 1] : null;
+
+    if (sessionKey) {
+      if (urlToken) showDetail(urlToken);
+      else showDashboard();
+    } else {
+      showAuth(urlToken);
+    }
+  })();
+
+  // ── Auth ──────────────────────────────────────────────────────────────────
+  function showAuth(redirectToken) {
+    document.getElementById('auth-screen').style.display   = 'flex';
+    document.getElementById('app-shell').style.display     = 'none';
+  }
+
+  document.getElementById('authForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const pw  = document.getElementById('authPassword').value;
+    const err = document.getElementById('authError');
+
+    // Try global auth first (dashboard flow)
+    const res = await fetch('/api/review/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: pw }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      sessionKey = data.session_key;
+      sessionStorage.setItem('sa_review_sk', sessionKey);
+      err.style.display = 'none';
+      document.getElementById('auth-screen').style.display = 'none';
+
+      // Check URL for direct token link
+      const parts    = window.location.pathname.split('/').filter(Boolean);
+      const urlToken = parts.length >= 2 && parts[parts.length - 1] !== 'review'
+                       ? parts[parts.length - 1] : null;
+      if (urlToken) showDetail(urlToken);
+      else showDashboard();
+    } else {
+      err.textContent   = 'Incorrect password. Please try again.';
+      err.style.display = 'block';
+    }
+  });
+
+  // ── Dashboard ─────────────────────────────────────────────────────────────
+  async function showDashboard(pushHistory = true) {
+    stopRegenPoll();
+    currentToken = null;
+    if (pushHistory) history.pushState({view:'dashboard'}, '', '/review/');
+    document.getElementById('app-shell').style.display      = 'flex';
+    document.getElementById('auth-screen').style.display    = 'none';
+    document.getElementById('dashboard-screen').style.display = 'block';
+    document.getElementById('detail-screen').style.display  = 'none';
+    document.getElementById('actionBar').style.display      = 'none';
+    document.getElementById('navBack').style.display        = 'none';
+    document.getElementById('emptyState').style.display     = 'none';
+    document.getElementById('leadTableBody').innerHTML      = '';
+    clearCheckboxes();
+    try {
+      const res = await fetch('/api/review/leads' + pillsToParams(), {
+        headers: { 'X-Session-Key': sessionKey },
+      });
+      if (res.status === 401) { sessionExpired(); return; }
+      const data = await res.json();
+      allLeads = data.leads || [];
+      applyClientFilter();
+    } catch (err) {
+      console.error('showDashboard fetch error:', err);
+      showToast('Failed to load lead list — please refresh.', true);
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('emptyState').textContent  = 'Failed to load leads. Please refresh the page.';
+    }
+  }
+
+  function loadFilterState() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(FILTER_KEY) || '{}');
+      if (Array.isArray(saved.pills) && saved.pills.length > 0) activePills = saved.pills;
+      if (saved.sort) currentSort = saved.sort;
+    } catch (_) {}
+    // Sync UI
+    document.querySelectorAll('.filter-pill').forEach(el => {
+      el.classList.toggle('active', activePills.includes(el.dataset.pill));
+    });
+    const sel = document.getElementById('sortSelect');
+    if (sel) sel.value = currentSort;
+  }
+
+  function saveFilterState() {
+    localStorage.setItem(FILTER_KEY, JSON.stringify({ pills: activePills, sort: currentSort }));
+  }
+
+  function onPillClick(pill) {
+    if (pill === 'all') {
+      activePills = ['all'];
+    } else {
+      activePills = activePills.filter(p => p !== 'all');  // remove "all" mode
+      if (activePills.includes(pill)) {
+        activePills = activePills.filter(p => p !== pill);
+        if (activePills.length === 0) activePills = ['needs_action'];  // fallback
+      } else {
+        activePills.push(pill);
+      }
+    }
+    document.querySelectorAll('.filter-pill').forEach(el => {
+      el.classList.toggle('active', activePills.includes(el.dataset.pill));
+    });
+    saveFilterState();
+    showDashboard(false);  // re-fetch with new filters, no history push
+  }
+
+  function onSortChange() {
+    currentSort = document.getElementById('sortSelect').value;
+    saveFilterState();
+    showDashboard(false);
+  }
+
+  // Build query params for the /api/review/leads request from activePills
+  function pillsToParams() {
+    if (activePills.includes('all')) return '?sort=' + currentSort;
+
+    const pillStatusMap = {
+      needs_action: ['pending_review', 'queued', 'regenerating'],
+      sent:         ['sent'],
+      declined:     ['do_not_follow_up'],
+      queued:       ['queued'],
+    };
+
+    const statusPills    = activePills.filter(p => p !== 'archived');
+    const archivedActive = activePills.includes('archived');
+
+    const params = new URLSearchParams();
+    params.set('sort', currentSort);
+
+    let statuses = [];
+    statusPills.forEach(p => {
+      if (pillStatusMap[p]) statuses.push(...pillStatusMap[p]);
+    });
+    // De-duplicate
+    [...new Set(statuses)].forEach(s => params.append('status', s));
+
+    if (archivedActive) {
+      params.set('archived', 'true');
+    } else if (statusPills.length > 0) {
+      // Implicit archived=false for all status-filtered queries
+      params.set('archived', 'false');
+    }
+
+    return '?' + params.toString();
+  }
+
+  function applyClientFilter() {
+    const q = (document.getElementById('searchInput')?.value || '').toLowerCase();
+    const leads = q
+      ? allLeads.filter(l =>
+          [l.first_name, l.last_name, l.email, l.domain, l.service_area]
+            .join(' ').toLowerCase().includes(q)
+        )
+      : allLeads;
+
+    const tbody = document.getElementById('leadTableBody');
+    tbody.innerHTML = '';
+    let rendered = 0;
+
+    leads.forEach(lead => {
+      if (!lead.token && !['sent','do_not_follow_up'].includes(lead.status)) return;
+      rendered++;
+      const fullName = [lead.first_name, lead.last_name].filter(Boolean).join(' ');
+      const tr = document.createElement('tr');
+      tr.style.cursor = 'pointer';
+      tr.dataset.leadId = lead.id;
+      tr.innerHTML = `
+        <td onclick="event.stopPropagation()">
+          <input type="checkbox" class="lead-cb row-cb" data-id="${esc(lead.id)}" onchange="onRowCheck()">
+        </td>
+        <td>
+          <div class="lead-name">${esc(fullName || lead.email)}</div>
+          ${fullName ? `<div class="lead-email">${esc(lead.email)}</div>` : ''}
+        </td>
+        <td>${esc(lead.service_area || '—')}</td>
+        <td>${statusPill(lead.status)}</td>
+        <td>${fmtDate(lead.created_at)}</td>
+      `;
+      if (lead.token) {
+        tr.addEventListener('click', () => showDetail(lead.token));
+      }
+      tbody.appendChild(tr);
+    });
+
+    const subtitle = document.getElementById('dashSubtitle');
+    if (subtitle) subtitle.textContent = `${rendered} lead${rendered !== 1 ? 's' : ''}`;
+
+    const es = document.getElementById('emptyState');
+    es.style.display = rendered === 0 ? 'block' : 'none';
+  }
+
+  function onRowCheck() {
+    const checked = document.querySelectorAll('.row-cb:checked');
+    const bulkBar = document.getElementById('bulkBar');
+    const countEl = document.getElementById('bulkCount');
+    if (checked.length > 0) {
+      bulkBar.classList.add('visible');
+      countEl.textContent = `${checked.length} selected`;
+    } else {
+      bulkBar.classList.remove('visible');
+    }
+    // Update select-all checkbox state
+    const all = document.querySelectorAll('.row-cb');
+    const cbAll = document.getElementById('cbSelectAll');
+    if (cbAll) {
+      cbAll.checked = all.length > 0 && checked.length === all.length;
+      cbAll.indeterminate = checked.length > 0 && checked.length < all.length;
+    }
+  }
+
+  function toggleSelectAll(cb) {
+    document.querySelectorAll('.row-cb').forEach(el => { el.checked = cb.checked; });
+    onRowCheck();
+  }
+
+  function clearCheckboxes() {
+    document.querySelectorAll('.row-cb').forEach(el => { el.checked = false; });
+    const cbAll = document.getElementById('cbSelectAll');
+    if (cbAll) { cbAll.checked = false; cbAll.indeterminate = false; }
+    const bulkBar = document.getElementById('bulkBar');
+    if (bulkBar) bulkBar.classList.remove('visible');
+  }
+
+  async function doBulkArchive() {
+    const checked = [...document.querySelectorAll('.row-cb:checked')];
+    if (checked.length === 0) return;
+    const lead_ids = checked.map(el => el.dataset.id);
+    try {
+      const res = await fetch('/api/review/bulk-archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Session-Key': sessionKey },
+        body: JSON.stringify({ lead_ids }),
+      });
+      if (res.status === 401) { sessionExpired(); return; }
+      const data = await res.json();
+      showToast(`Archived ${data.archived_count} lead${data.archived_count !== 1 ? 's' : ''}.`);
+      showDashboard(false);
+    } catch (err) {
+      showToast('Bulk archive failed — please try again.', true);
+    }
+  }
+
+  function statusPill(status) {
+    const map = {
+      pending_review: ['pill-pending',     'Pending'],
+      queued:         ['pill-queued',      'Queued'],
+      regenerating:   ['pill-regenerating','Regenerating'],
+      sent:           ['pill-sent',        'Sent'],
+      do_not_follow_up: ['pill-dnfu',      'Declined'],
+    };
+    const [cls, label] = map[status] || ['pill-pending', status];
+    return `<span class="status-pill ${cls}">${label}</span>`;
+  }
+
+  // ── Detail ────────────────────────────────────────────────────────────────
+  async function showDetail(token, pushHistory = true) {
+    stopRegenPoll();
+    currentToken = token;
+    if (pushHistory) history.pushState({view:'detail', token}, '', `/review/${token}`);
+    document.getElementById('app-shell').style.display       = 'flex';
+    document.getElementById('auth-screen').style.display     = 'none';
+    document.getElementById('dashboard-screen').style.display = 'none';
+    document.getElementById('detail-screen').style.display   = 'block';
+    document.getElementById('navBack').style.display         = 'block';
+    document.getElementById('detailContent').innerHTML = '<p style="color:var(--text-3);padding:2rem">Loading…</p>';
+
+    const res = await fetch(`/api/review/${token}`, {
+      headers: { 'X-Session-Key': sessionKey },
+    });
+    if (res.status === 401) { sessionExpired(); return; }
+    if (!res.ok) { showToast('Failed to load lead data', true); return; }
+    const data = await res.json();
+    renderDetail(data);
+  }
+
+  function renderDetail(d) {
+    const lead  = d.lead;
+    const draft = d.draft || {};
+    const c     = document.getElementById('detailContent');
+    const isSent = ['sent','do_not_follow_up'].includes(lead.status);
+
+    c.innerHTML = '';
+
+    // Prospect card
+    c.innerHTML += card('Prospect Details', `
+      <div class="prospect-grid">
+        <div class="prospect-field"><label>Name</label><span>${esc(lead.first_name)} ${esc(lead.last_name)}</span></div>
+        <div class="prospect-field"><label>Email</label><span>${esc(lead.email)}</span></div>
+        <div class="prospect-field"><label>Domain</label><span>${esc(lead.domain || '—')}</span></div>
+        <div class="prospect-field"><label>Service</label><span>${esc(lead.service_area || '—')}</span></div>
+        <div class="prospect-field"><label>Received</label><span>${fmtDate(lead.created_at)}</span></div>
+        <div class="prospect-field"><label>Status</label><span>${statusPill(lead.status)}</span></div>
+      </div>
+    `);
+
+    c.innerHTML += card('Original Message', `<div class="message-box">${esc(lead.message || '(none)')}</div>`);
+
+    const research = lead.company_research || lead.person_research || {};
+    const resText  = research.summary || (typeof research === 'string' ? research : '');
+    if (resText) c.innerHTML += card('Research', `<p class="research-text">${esc(resText)}</p>`);
+
+    if (lead.summary || lead.approach) {
+      c.innerHTML += card('Strategic Analysis', `
+        ${lead.summary  ? `<p class="col-head">Summary</p><p class="research-text" style="margin-bottom:1rem">${esc(lead.summary)}</p>` : ''}
+        ${lead.approach ? `<p class="col-head">Recommended Approach</p><p class="research-text">${esc(lead.approach)}</p>` : ''}
+      `);
+    }
+
+    const starters  = lead.conversation_starters || [];
+    const questions = lead.questions || [];
+    const scenarios = lead.scenarios || [];
+    if (starters.length || questions.length || scenarios.length) {
+      c.innerHTML += card('Engagement Toolkit', `
+        <div class="three-col">
+          <div><p class="col-head">Conversation Starters</p>${ol(starters)}</div>
+          <div><p class="col-head">Key Questions</p>${ol(questions)}</div>
+          <div><p class="col-head">Support Scenarios</p>${ol(scenarios)}</div>
+        </div>
+      `);
+    }
+
+    // Email draft card
+    if (draft.body_text || draft.subject) {
+      c.innerHTML += card('Proposed Email Draft', `
+        <div class="email-subject">Subject: <span id="draftSubject">${esc(draft.subject || '')}</span></div>
+        <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">✎ Edit before approving</button>
+        <div class="regen-loading" id="regenLoading">
+          <div class="spinner"></div>
+          <span>Regenerating draft…</span>
+        </div>
+        <div class="email-body" id="emailBody">${esc(draft.body_text || '').replace(/\n/g,'<br>')}</div>
+        <textarea class="email-body-edit" id="emailBodyEdit">${esc(draft.body_text || '')}</textarea>
+        <div class="sent-banner" id="sentBanner">✓ Email sent to ${esc(lead.email)}</div>
+        <textarea class="regen-notes" id="regenNotes" placeholder="Notes for regeneration (optional)…" ${isSent ? 'disabled' : ''}></textarea>
+      `);
+
+    }
+
+    // Action bar
+    const bar = document.getElementById('actionBar');
+    if (isSent) {
+      bar.style.display = 'none';
+    } else {
+      bar.style.display = 'flex';
+      const isQueued = lead.status === 'queued';
+      document.getElementById('btnQueue').style.display   = isQueued ? 'none' : '';
+      document.getElementById('btnUnqueue').style.display = isQueued ? '' : 'none';
+      if (lead.status === 'regenerating') startRegenPoll();
+    }
+
+    // Wire buttons
+    document.getElementById('btnApprove').onclick  = () => doAction('approve');
+    document.getElementById('btnRegen').onclick    = () => doAction('regenerate');
+    document.getElementById('btnQueue').onclick    = () => doAction('queue');
+    document.getElementById('btnUnqueue').onclick  = () => doAction('unqueue');
+    document.getElementById('btnPdf').onclick      = async () => {
+      const r = await fetch(`/api/review/${currentToken}/pdf`, { headers: { 'X-Session-Key': sessionKey } });
+      if (!r.ok) { showToast('PDF not available', true); return; }
+      const blob = await r.blob();
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `brief_${lead.last_name || 'lead'}.pdf`;
+      a.click(); URL.revokeObjectURL(url);
+    };
+    document.getElementById('btnDnfu').onclick     = () => {
+      if (confirm('Mark as Do Not Follow Up? This cannot be undone from the portal.')) doAction('dnfu');
+    };
+  }
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  async function doAction(action) {
+    const notes     = document.getElementById('regenNotes')?.value || '';
+    const editArea  = document.getElementById('emailBodyEdit');
+    const editedBody = editArea?.style.display !== 'none' ? editArea?.value : null;
+    const payload   = { action, notes };
+    if (editedBody) payload.email_body_text = editedBody;
+
+    setActionButtonsDisabled(true);
+
+    const res = await fetch(`/api/review/${currentToken}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Session-Key': sessionKey },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      setActionButtonsDisabled(false);
+      showToast(res.status === 410 ? 'This review link has already been used.' : 'Action failed — please try again.', true);
+      return;
+    }
+
+    if (action === 'approve' || action === 'dnfu') {
+      // Show sent banner inline — no page reload
+      const banner = document.getElementById('sentBanner');
+      if (action === 'approve' && banner) banner.style.display = 'block';
+      document.getElementById('actionBar').style.display = 'none';
+      showToast(action === 'approve' ? 'Email sent successfully.' : 'Lead marked Do Not Follow Up.');
+
+    } else if (action === 'regenerate') {
+      showToast('Regenerating draft…');
+      document.getElementById('regenLoading').style.display = 'flex';
+      document.getElementById('emailBody').style.display    = 'none';
+      const editTog = document.getElementById('editToggle');
+      if (editTog) editTog.style.display = 'none';
+      startRegenPoll();
+
+    } else if (action === 'queue') {
+      document.getElementById('btnQueue').style.display   = 'none';
+      document.getElementById('btnUnqueue').style.display = '';
+      setActionButtonsDisabled(false);
+      showToast('Lead queued for later.');
+
+    } else if (action === 'unqueue') {
+      document.getElementById('btnUnqueue').style.display = 'none';
+      document.getElementById('btnQueue').style.display   = '';
+      setActionButtonsDisabled(false);
+      showToast('Lead retrieved from hold.');
+    }
+  }
+
+  function setActionButtonsDisabled(disabled) {
+    ['btnApprove','btnRegen','btnQueue','btnUnqueue','btnDnfu','btnPdf'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.disabled = disabled;
+    });
+  }
+
+  // ── Regenerate polling ────────────────────────────────────────────────────
+  function startRegenPoll() {
+    stopRegenPoll();
+    regenPoll = setInterval(async () => {
+      if (!currentToken) { stopRegenPoll(); return; }
+      const res = await fetch(`/api/review/${currentToken}`, {
+        headers: { 'X-Session-Key': sessionKey },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.lead.status !== 'regenerating') {
+        stopRegenPoll();
+        // Update email block in place
+        const draft = data.draft || {};
+        const subj  = document.getElementById('draftSubject');
+        const body  = document.getElementById('emailBody');
+        const edit  = document.getElementById('emailBodyEdit');
+        const tog   = document.getElementById('editToggle');
+        const load  = document.getElementById('regenLoading');
+        if (subj) subj.textContent = draft.subject || '';
+        if (body) { body.innerHTML = esc(draft.body_text || '').replace(/\n/g,'<br>'); body.style.display = ''; }
+        if (edit) { edit.value = draft.body_text || ''; edit.style.display = 'none'; }
+        if (tog)  { tog.textContent = '✎ Edit before approving'; tog.style.display = ''; }
+        if (load) load.style.display = 'none';
+        setActionButtonsDisabled(false);
+        showToast('Draft updated.');
+      }
+    }, 3000);
+  }
+
+  function stopRegenPoll() {
+    if (regenPoll) { clearInterval(regenPoll); regenPoll = null; }
+  }
+
+  // ── Edit toggle ───────────────────────────────────────────────────────────
+  function toggleEdit() {
+    const view = document.getElementById('emailBody');
+    const edit = document.getElementById('emailBodyEdit');
+    const btn  = document.getElementById('editToggle');
+    const isEditing = edit.style.display !== 'none';
+    if (isEditing) {
+      view.innerHTML   = esc(edit.value).replace(/\n/g,'<br>');
+      view.style.display = ''; edit.style.display = 'none';
+      btn.textContent  = '✎ Edit before approving';
+    } else {
+      edit.value = view.innerText;
+      view.style.display = 'none'; edit.style.display = 'block';
+      btn.textContent  = '✓ Done editing';
+    }
+  }
+
+  // ── Session expiry ────────────────────────────────────────────────────────
+  function sessionExpired() {
+    sessionStorage.removeItem('sa_review_sk');
+    sessionKey = null;
+    document.getElementById('app-shell').style.display  = 'none';
+    document.getElementById('auth-screen').style.display = 'flex';
+    document.getElementById('authError').textContent    = 'Session expired — please sign in again.';
+    document.getElementById('authError').style.display  = 'block';
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  let _toastTimer;
+  function showToast(msg, isError = false) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.className = 'toast', 3000);
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function card(title, content) {
+    return `<div class="card"><p class="card-title">${title}</p>${content}</div>`;
+  }
+  function ol(items) {
+    return `<ul class="item-list">${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul>`;
+  }
+  function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+  }
+</script>
+</body>
+</html>
