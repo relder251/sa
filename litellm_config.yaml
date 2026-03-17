@@ -436,6 +436,7 @@ router_settings:
     - hybrid/reason: ["free/reason", "cloud/reason","cloud/chat"]
     - hybrid/fast:   ["free/fast",   "cloud/fast"]
     # Cloud tier: try free before giving up entirely
+    - cloud/smart:   ["free/fast",   "local/fast"]
     - cloud/fast:    ["free/fast",   "free/chat",   "hybrid/chat"]
     - cloud/chat:    ["free/chat",   "hybrid/chat"]
     - cloud/code:    ["free/code",   "hybrid/code"]
