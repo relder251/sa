@@ -171,8 +171,9 @@
 
     /* Action bar */
     .action-bar { position:sticky; bottom:0; background:var(--surface);
-                  border-top:1px solid var(--border); padding:1rem 1.5rem;
-                  display:none; gap:0.75rem; flex-wrap:wrap; }
+                  border-top:1px solid var(--border); padding:0.75rem 1.5rem;
+                  display:none; gap:0.5rem; flex-wrap:nowrap; justify-content:center; align-items:center; }
+    .action-bar .btn { padding:0.4rem 0.7rem; font-size:0.8rem; }
     .btn { padding:0.55rem 1.1rem; border-radius:6px; font-size:0.85rem;
            cursor:pointer; border:1px solid transparent; transition:opacity 0.15s,transform 0.1s; }
     .btn:hover { opacity:0.88; transform:translateY(-1px); }
