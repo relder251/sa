@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# System deps for reportlab (font rendering)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libfontconfig1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements-lead-review.txt .
+RUN pip install --no-cache-dir -r requirements-lead-review.txt
+
+# Copy application files
+COPY lead_review_server.py .
+COPY lead_pdf_generator.py .
+COPY templates/ templates/
+
+# Placeholder for logo mount
+RUN mkdir -p /app/sovereign_advisory
+
+EXPOSE 5003
+
+CMD ["python", "lead_review_server.py"]

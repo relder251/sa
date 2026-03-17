@@ -1,0 +1,21 @@
+<div id="stats-bar" class="stats-bar"
+     hx-get="/partials/stats"
+     hx-trigger="every 5s"
+     hx-swap="outerHTML">
+  <div class="stat-item stat-pending">
+    <span class="stat-count">{{ counts.pending }}</span>
+    <span class="stat-label">Pending</span>
+  </div>
+  <div class="stat-item stat-running">
+    <span class="stat-count">{{ counts.running }}</span>
+    <span class="stat-label">Running</span>
+  </div>
+  <div class="stat-item stat-done">
+    <span class="stat-count">{{ counts.done }}</span>
+    <span class="stat-label">Done</span>
+  </div>
+  <div class="stat-item stat-failed">
+    <span class="stat-count">{{ counts.failed }}</span>
+    <span class="stat-label">Failed</span>
+  </div>
+</div>

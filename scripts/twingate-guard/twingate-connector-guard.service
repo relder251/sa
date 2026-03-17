@@ -1,0 +1,16 @@
+[Unit]
+Description=Twingate connector guard and token-expiry trigger
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/twingate-connector-guard
+ExecStart=/usr/local/bin/twingate_connector_guard.sh
+User=root
+Group=root
+Nice=10
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Pipeline Board &mdash; Agentic SDLC{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Pipeline Board</h1>
+  <p class="page-subtitle">Submit ideas and track AI-powered software development runs.</p>
+</div>
+
+<!-- Launch form -->
+<section class="launch-section">
+  <form
+    class="launch-form"
+    action="/runs"
+    method="POST"
+    hx-post="/runs"
+    hx-target="body"
+    hx-push-url="true"
+  >
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label" for="name">Project Name</label>
+        <input
+          class="form-input"
+          type="text"
+          id="name"
+          name="name"
+          placeholder="e.g. task-manager-api"
+          required
+          pattern="[A-Za-z0-9_\-]+"
+          title="Letters, numbers, hyphens and underscores only"
+        />
+      </div>
+      <div class="form-group form-group--wide">
+        <label class="form-label" for="prompt">Prompt</label>
+        <textarea
+          class="form-textarea"
+          id="prompt"
+          name="prompt"
+          rows="3"
+          placeholder="Describe the software you want to build..."
+          required
+        ></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" type="submit">&#9889; Launch Pipeline</button>
+    </div>
+  </form>
+</section>
+
+<!-- Stats bar -->
+{% include "partials/stats.html" %}
+
+<!-- Board -->
+{% include "partials/board.html" %}
+{% endblock %}

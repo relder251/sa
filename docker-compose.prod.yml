@@ -1,0 +1,465 @@
+networks:
+  sa_web:
+    driver: bridge
+  vibe_net:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  ollama_data:
+  pg_data:
+
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sa_nginx
+    restart: unless-stopped
+    ports:
+      - "187.77.208.197:80:80"
+      - "187.77.208.197:443:443"
+    volumes:
+#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+#      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+#      - ./www:/usr/share/nginx/html:ro
+#      - ./ssl:/etc/letsencrypt:ro
+#      - ./ssl/dhparam:/etc/nginx/dhparam:ro
+#      - ./certbot/www:/var/www/certbot:ro
+     - ./logs:/var/log/nginx
+     - /opt/sovereignadvisory/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+     - /opt/sovereignadvisory/nginx/conf.d:/etc/nginx/conf.d:ro
+     - /opt/sovereignadvisory/www:/usr/share/nginx/html:ro
+     - /opt/sovereignadvisory/ssl:/etc/letsencrypt:ro
+     - /opt/sovereignadvisory/ssl/dhparam:/etc/nginx/dhparam:ro
+     - /opt/sovereignadvisory/certbot/www:/var/www/certbot:ro
+    networks:
+      - sa_web
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --max-redirect=0 -qO- http://localhost/ 2>/dev/null; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 8 ]"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      com.sovereignadvisory.service: "nginx"
+
+  nginx-private:
+    image: nginx:1.27-alpine
+    container_name: sa_nginx_private
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:443:443"
+    volumes:
+      - ./nginx-private/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-private/conf.d:/etc/nginx/conf.d:ro
+#      - ./ssl:/etc/letsencrypt:ro
+      - ./logs/nginx-private:/var/log/nginx
+      - /opt/sovereignadvisory/ssl:/etc/letsencrypt:ro
+    depends_on:
+      n8n:
+        condition: service_started
+      litellm:
+        condition: service_started
+      webui:
+        condition: service_started
+      jupyter:
+        condition: service_started
+      ollama:
+        condition: service_started
+      pipeline-server:
+        condition: service_started
+    networks:
+      - vibe_net
+    labels:
+      com.sovereignadvisory.service: "nginx-private"
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: sa_certbot
+    restart: always
+    volumes:
+      - ./ssl:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet;
+          sleep 12h & wait $${!};
+        done"
+    networks:
+      - sa_web
+    labels:
+      com.sovereignadvisory.service: "certbot"
+
+  lead-review:
+    build:
+      context: ${SDLC_SCRIPTS_DIR:-/opt/agentic-sdlc/scripts}
+      dockerfile: Dockerfile.lead_review
+    image: sa_lead_review:latest
+    container_name: sa_lead_review
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      LEAD_REVIEW_PASSWORD: ${LEAD_REVIEW_PASSWORD}
+      N8N_BASE_URL: http://n8n:5678
+      PDF_OUTPUT_DIR: /data/output/lead_pdfs
+      LITELLM_BASE_URL: http://litellm:4000
+    volumes:
+      - ${SDLC_OUTPUT_DIR:-/opt/agentic-sdlc/output}:/data/output
+      - ${SA_LOGO_PATH:-/opt/sovereignadvisory/www/logo.png}:/app/sovereign_advisory/logo.png:ro
+    networks:
+      - vibe_net
+      - sa_web
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      com.sovereignadvisory.service: "lead-review"
+
+  twingate:
+    image: twingate/connector:1
+    container_name: twingate
+    pull_policy: always
+    restart: unless-stopped
+    environment:
+      TWINGATE_NETWORK: ${TWINGATE_NETWORK}
+      TWINGATE_ACCESS_TOKEN: ${TWINGATE_ACCESS_TOKEN}
+      TWINGATE_REFRESH_TOKEN: ${TWINGATE_REFRESH_TOKEN}
+      TWINGATE_LABEL_HOSTNAME: ${HOSTNAME:-}
+      TWINGATE_LABEL_DEPLOYED_BY: docker
+    network_mode: host
+    labels:
+      com.sovereignadvisory.service: "twingate"
+
+  postgres:
+    image: postgres:15
+    container_name: litellm_db
+    environment:
+      - POSTGRES_USER=${LITELLM_USER}
+      - POSTGRES_PASSWORD=${LITELLM_PASSWORD}
+      - POSTGRES_DB=${LITELLM_DB}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    environment:
+      - N8N_PORT=5678
+      - NODE_ENV=production
+      - WEBHOOK_URL=${N8N_PUBLIC_BASE_URL:-https://n8n.private.sovereignadvisory.ai}
+      - N8N_HOST=${N8N_PRIVATE_HOSTNAME:-n8n.private.sovereignadvisory.ai}
+      - N8N_PROTOCOL=https
+      - N8N_EDITOR_BASE_URL=${N8N_PUBLIC_BASE_URL:-https://n8n.private.sovereignadvisory.ai}
+      - NODES_EXCLUDE=[]
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=litellm
+      - DB_POSTGRESDB_PASSWORD=litellm_password
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_RUNNERS_ENABLED=false
+      - N8N_TRUST_PROXY=true
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - N8N_SECURE_COOKIE=true
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - LEAD_REVIEW_BASE_URL=${LEAD_REVIEW_BASE_URL}
+      - NOTION_LEADS_DB_ID=${NOTION_LEADS_DB_ID}
+      - NOTIFY_EMAIL=${NOTIFY_EMAIL}
+      - NOTIFY_SMS_EMAIL=${NOTIFY_SMS_EMAIL}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
+      - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows:/data/workflows
+      - ./output:/data/output
+      - ./opportunities:/data/opportunities
+      - ./scripts:/data/scripts:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    environment:
+      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_MAX_LOADED_MODELS=1
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    environment:
+      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm
+      - STORE_MODEL_IN_DB=True
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+      - VENICE_API_KEY=${VENICE_API_KEY}
+      - VENICE_ADMIN_API_KEY=${VENICE_ADMIN_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://ollama:11434}
+      - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_SCHEDULE=0 0 3 * * *
+      - WATCHTOWER_STOP_TIMEOUT=30s
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - DOCKER_API_VERSION=1.41
+    networks:
+      - vibe_net
+    restart: unless-stopped
+
+  free-model-sync:
+    image: python:3.12-slim
+    container_name: free_model_sync
+    volumes:
+      - ./free_model_sync.py:/app/free_model_sync.py:ro
+    working_dir: /app
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    command: >
+      bash -c "pip install requests -q &&
+               python free_model_sync.py &&
+               echo 'Initial sync done — ofelia handles scheduling.' &&
+               sleep infinity"
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  test-runner:
+    image: python:3.12-slim
+    container_name: test_runner
+    volumes:
+      - ./output:/data/output
+      - ./scripts:/data/scripts:ro
+    working_dir: /app
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - PHASE3_MAX_ATTEMPTS=3
+    command: >
+      bash -c "pip install flask requests -q &&
+               python /data/scripts/test_runner_server.py"
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\" "]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  pipeline-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.pipeline
+    container_name: pipeline_server
+    volumes:
+      - ./output:/data/output
+      - ./scripts:/data/scripts:ro
+      - ./phases:/data/phases:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - PHASE3_MAX_ATTEMPTS=3
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+      - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
+      - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
+      - DEPLOY_TARGET=${DEPLOY_TARGET:-skip}
+      - DEPLOY_SSH_HOST=${DEPLOY_SSH_HOST:-}
+      - DEPLOY_SSH_USER=${DEPLOY_SSH_USER:-}
+      - DEPLOY_SSH_KEY_PATH=${DEPLOY_SSH_KEY_PATH:-}
+      - ENABLE_APPROVAL_GATE=${ENABLE_APPROVAL_GATE:-false}
+      - APPROVAL_TIMEOUT_HOURS=${APPROVAL_TIMEOUT_HOURS:-24}
+      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\" "]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  webui:
+    build:
+      context: ./webui
+    container_name: webui
+    volumes:
+      - ./output:/data/output:ro
+      - ./output/opportunities:/data/output/opportunities
+    environment:
+      - OUTPUT_BASE=/data/output
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - N8N_BASE_URL=http://n8n:5678
+      - PIPELINE_SERVER_URL=http://pipeline-server:5002
+      - TEST_RUNNER_URL=http://test-runner:5001
+      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      - pipeline-server
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" "]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: ofelia
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./ofelia.ini:/etc/ofelia/config.ini:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      - free-model-sync
+
+  jupyter:
+    image: quay.io/jupyter/scipy-notebook:latest
+    container_name: jupyter
+    environment:
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-vibe-dev-token}
+      - JUPYTER_ENABLE_LAB=yes
+      - LITELLM_BASE_URL=http://litellm:4000
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - N8N_BASE_URL=http://n8n:5678
+      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./output:/home/jovyan/output
+      - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
+      - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
+    user: root
+    command:
+      - bash
+      - -c
+      - |
+        pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
+        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN:-vibe-dev-token} --ServerApp.ip=0.0.0.0 --ServerApp.allow_root=True --ServerApp.open_browser=False --ServerApp.port=8888
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8888/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"

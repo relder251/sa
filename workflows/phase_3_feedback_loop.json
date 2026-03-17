@@ -1,0 +1,42 @@
+{
+  "id": "agentic-phase3-001",
+  "name": "Phase 3: Test & Fix Feedback Loop",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "phase3-run",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "phase3-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://test-runner:5001/run",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ project_dir: $json.body.project_dir || '/data/output/project' }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "run-tests",
+      "name": "Run Tests & Fix Loop",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [500, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Run Tests & Fix Loop", "type": "main", "index": 0}]]
+    }
+  }
+}

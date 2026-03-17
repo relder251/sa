@@ -1,0 +1,8 @@
+# Local OIDC test override — enables OIDC with localhost callback URL.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.oidc-test.yml up -d --build lead-review
+services:
+  lead-review:
+    environment:
+      - OIDC_ENABLED=true
+      - LEAD_REVIEW_PUBLIC_URL=http://localhost:5003
+      - KEYCLOAK_EXTERNAL_URL=http://localhost:8080
