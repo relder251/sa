@@ -188,6 +188,20 @@
                    border-radius:6px; padding:0.75rem 1rem; color:#6ab07a;
                    font-size:0.85rem; display:none; margin-top:0.5rem; }
 
+    /* ── Archive inline expand ────────────────────────────────────────── */
+    .archive-expand {
+      display:none; align-items:center; gap:0.5rem; flex-wrap:wrap;
+      background:var(--bg-card); border:1px solid rgba(200,169,110,0.3);
+      border-radius:8px; padding:0.5rem 0.75rem;
+    }
+    .archive-expand.visible { display:flex; }
+    .archive-expand .archive-label {
+      font-size:0.82rem; color:var(--gold); font-weight:600; white-space:nowrap;
+    }
+    @media (max-width:640px) {
+      .archive-expand { flex-direction:column; align-items:flex-start; }
+    }
+
     /* Toast */
     .toast { position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(60px);
              background:var(--surface-2); border:1px solid var(--border-2); border-radius:8px;
@@ -277,6 +291,13 @@
     <div id="detailContent"></div>
     <div class="action-bar" id="actionBar">
       <button class="btn btn-dnfu"        id="btnDnfu">Do Not Follow Up</button>
+      <button class="btn" id="btnArchive" style="background:var(--gold-dim);color:var(--gold);border-color:rgba(200,169,110,0.3)">📁 Archive</button>
+      <div class="archive-expand" id="archiveExpand">
+        <span class="archive-label">Archive as…</span>
+        <button class="btn btn-approve" id="btnArchiveSent" style="font-size:0.82rem;padding:0.35rem 0.9rem">Sent</button>
+        <button class="btn btn-dnfu"    id="btnArchiveDeclined" style="font-size:0.82rem;padding:0.35rem 0.9rem">Declined</button>
+        <button class="btn"             id="btnArchiveCancel"   style="font-size:0.82rem;padding:0.35rem 0.7rem;color:var(--text-2)">✕</button>
+      </div>
       <button class="btn btn-queue"       id="btnQueue">Queue for Later</button>
       <button class="btn btn-queue"       id="btnUnqueue" style="display:none">Retrieve from Hold</button>
       <button class="btn btn-regenerate"  id="btnRegen">Regenerate Draft</button>
@@ -384,6 +405,10 @@
     document.getElementById('emptyState').style.display     = 'none';
     document.getElementById('leadTableBody').innerHTML      = '';
     clearCheckboxes();
+    const ae = document.getElementById('archiveExpand');
+    if (ae) { ae.classList.remove('visible'); }
+    const ba = document.getElementById('btnArchive');
+    if (ba) ba.style.display = '';
     try {
       const res = await fetch('/api/review/leads' + pillsToParams(), {
         headers: { 'X-Session-Key': sessionKey },
@@ -698,15 +723,26 @@
     document.getElementById('btnDnfu').onclick     = () => {
       if (confirm('Mark as Do Not Follow Up? This cannot be undone from the portal.')) doAction('dnfu');
     };
+    document.getElementById('btnArchive').onclick = () => {
+      document.getElementById('archiveExpand').classList.add('visible');
+      document.getElementById('btnArchive').style.display = 'none';
+    };
+    document.getElementById('btnArchiveCancel').onclick = () => {
+      document.getElementById('archiveExpand').classList.remove('visible');
+      document.getElementById('btnArchive').style.display = '';
+    };
+    document.getElementById('btnArchiveSent').onclick    = () => doAction('archive', 'sent');
+    document.getElementById('btnArchiveDeclined').onclick = () => doAction('archive', 'declined');
   }
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  async function doAction(action) {
+  async function doAction(action, disposition = '') {
     const notes     = document.getElementById('regenNotes')?.value || '';
     const editArea  = document.getElementById('emailBodyEdit');
     const editedBody = editArea?.style.display !== 'none' ? editArea?.value : null;
-    const payload   = { action, notes };
-    if (editedBody) payload.email_body_text = editedBody;
+    const payload = { action, notes };
+    if (editedBody)   payload.email_body_text = editedBody;
+    if (disposition)  payload.disposition     = disposition;
 
     setActionButtonsDisabled(true);
 
@@ -748,11 +784,14 @@
       document.getElementById('btnQueue').style.display   = '';
       setActionButtonsDisabled(false);
       showToast('Lead retrieved from hold.');
+    } else if (action === 'archive') {
+      showToast('Lead archived.');
+      showDashboard();
     }
   }
 
   function setActionButtonsDisabled(disabled) {
-    ['btnApprove','btnRegen','btnQueue','btnUnqueue','btnDnfu','btnPdf'].forEach(id => {
+    ['btnApprove','btnRegen','btnQueue','btnUnqueue','btnDnfu','btnPdf','btnArchive'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.disabled = disabled;
     });
