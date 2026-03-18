@@ -67,6 +67,13 @@ def test_n8n_health_endpoint(page: Page, n8n_url: str) -> None:
         f"n8n /healthz returned {response.status if response else 'None'}"
 
 
+def test_n8n_redirects_to_keycloak_for_login(page: Page, n8n_url: str) -> None:
+    """Accessing n8n without a session must redirect to Keycloak login."""
+    page.goto(f"{n8n_url}/")
+    page.wait_for_url("**/realms/agentic-sdlc/**", timeout=10_000)
+    assert "agentic-sdlc" in page.url
+
+
 # ── Web UI ────────────────────────────────────────────────────────────────────
 
 def test_webui_loads(page: Page, webui_url: str) -> None:
