@@ -76,6 +76,31 @@ fi
 check "pipeline-server health"      200 "http://localhost:5002/health"
 check "webui health"                200 "http://localhost:3000/health"
 
+# ── Backup service ────────────────────────────────────────────────────────────
+echo ""
+echo "── Backup service ──────────────────────────────"
+
+backup_status=$(docker inspect --format '{{.State.Status}}' backup 2>/dev/null || echo "not_found")
+if [ "$backup_status" = "running" ]; then
+  echo -e "  ${green}✅ PASS${reset}  backup container is running"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  backup container status: $backup_status"
+  ERRORS+=("backup container: expected running, got $backup_status")
+  FAIL=$((FAIL + 1))
+fi
+
+# Verify most recent backup file exists and is < 25 hours old
+latest_backup=$(find ./backup -name "postgres_*.sql.gz" -mtime -1 2>/dev/null | head -1)
+if [ -n "$latest_backup" ]; then
+  size=$(du -h "$latest_backup" | cut -f1)
+  echo -e "  ${green}✅ PASS${reset}  latest postgres backup: $latest_backup ($size)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${yellow}⚠ WARN${reset}   no postgres backup from last 24h (expected after first Ofelia run)"
+  # Not a hard failure — backup may not have run yet on first deploy
+fi
+
 # ── Web UI pages ──────────────────────────────────────────────────────────────
 echo ""
 echo "── Web UI pages ────────────────────────────────"
