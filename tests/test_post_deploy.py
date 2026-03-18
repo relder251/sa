@@ -23,6 +23,15 @@ from playwright.sync_api import Page, expect
 
 # ── Lead Review Portal ────────────────────────────────────────────────────────
 
+def test_lead_review_auth_redirects_to_keycloak(page: Page, lead_review_url: str) -> None:
+    """Lead review /auth/login must return 302 → Keycloak when OIDC enabled."""
+    r = page.request.get(f"{lead_review_url}/auth/login", max_redirects=0)
+    assert r.status == 302, f"Expected 302 redirect, got {r.status}"
+    location = r.headers.get("location", "")
+    assert "kc.sovereignadvisory.ai" in location or "agentic-sdlc" in location, \
+        f"Redirect target is not Keycloak: {location}"
+
+
 def test_lead_review_login_page_renders(page: Page, lead_review_url: str) -> None:
     """Login page must load and show the password form or dashboard.
     Skipped if the service uses token-based URLs (no /review base path).
