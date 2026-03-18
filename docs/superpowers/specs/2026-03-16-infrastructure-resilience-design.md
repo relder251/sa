@@ -40,21 +40,24 @@ Establish a practical resilience posture for the Agentic SDLC + Sovereign Adviso
 | `/opt/sovereignadvisory/ssl` | TLS certificates for `sovereignadvisory.ai` | `tar` → gzip | Medium |
 | `.env` | All API keys and secrets | Manual → password manager | **Critical (out-of-band)** |
 | `ollama_data` | Model weights | **Skip** — cheaper to re-pull | Low |
-| `n8n_data` | n8n internal settings | **Skip** — covered by postgres + git | Low |
+| `n8n_data` | n8n encrypted credential store | **Known gap** — see note below | Low |
 | Project files | All code and config | **Already in git** | n/a |
 
 **Why `pg_dumpall` instead of `pg_dump`:** The single postgres instance hosts three separate databases (`litellm`, `n8n`, `keycloak`). `pg_dumpall` captures all three in a single operation, avoiding the need for separate jobs and ensuring a consistent point-in-time snapshot.
 
+**Note on `n8n_data`:** This volume holds n8n's `N8N_ENCRYPTION_KEY`-encrypted credential store (API keys entered via the n8n UI). These credentials are not stored in postgres or git and cannot be recovered from either. Skipping this volume means that after a full DR, all n8n credentials (Slack, Twilio, etc.) must be re-entered manually. This is an accepted known gap for v1. A future improvement would be to `tar` this volume alongside the postgres dump.
+
+**Off-site backup gap:** The backup design is local-only (files written to `./backup/` on the VPS). If the VPS is lost, the backup files are also lost. Full disaster recovery therefore requires an off-site transfer mechanism (rclone to B2/S3, nightly rsync to a second server, etc.). This is out of scope for v1 but is a required follow-up before the DR runbook can provide its stated RTO guarantee.
+
 ### Backup service implementation
 
-Add a `backup` service to `docker-compose.yml`:
+Add a `backup` service to `docker-compose.yml`. The container stays alive (via `sleep infinity`) so Ofelia can `job-exec` into it on schedule:
 
 ```yaml
 backup:
   image: postgres:15
   container_name: backup
   volumes:
-    - pg_data:/var/lib/postgresql/data:ro
     - ./backup:/backup
     - ./output:/data/output:ro
     - ./opportunities:/data/opportunities:ro
@@ -62,16 +65,21 @@ backup:
     - ./scripts/backup.sh:/backup.sh:ro
   environment:
     - PGHOST=postgres
+    # litellm is the bootstrap superuser for this postgres instance (created via
+    # POSTGRES_USER in docker-compose.yml). pg_dumpall requires superuser privileges.
+    # Do not replace this with an application-scoped role.
     - PGUSER=${LITELLM_USER:-litellm}
     - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
-  entrypoint: ["bash", "/backup.sh"]
+  command: ["sleep", "infinity"]
   networks:
     - vibe_net
   depends_on:
     postgres:
       condition: service_healthy
-  restart: "no"
+  restart: unless-stopped
 ```
+
+Note: the `pg_data` volume is **not** mounted here. `pg_dumpall` connects to the running postgres instance over the network — it does not read volume files directly. Mounting `pg_data` would be misleading and could produce a corrupt backup if used as a file-level copy while postgres is running.
 
 ### Backup script — `scripts/backup.sh`
 
@@ -83,7 +91,9 @@ DATE=$(date +%Y-%m-%d)
 BACKUP_DIR=/backup
 
 # --- Postgres (all databases) ---
-pg_dumpall -h postgres -U "$PGUSER" | gzip > "$BACKUP_DIR/postgres_${DATE}.sql.gz"
+# Connects to running postgres via PGHOST/PGUSER/PGPASSWORD env vars.
+# litellm is the bootstrap superuser — required for pg_dumpall.
+pg_dumpall | gzip > "$BACKUP_DIR/postgres_${DATE}.sql.gz"
 
 # --- Output directory ---
 tar -czf "$BACKUP_DIR/output_${DATE}.tar.gz" -C /data output
@@ -94,10 +104,17 @@ tar -czf "$BACKUP_DIR/opportunities_${DATE}.tar.gz" -C /data opportunities
 # --- SSL certificates ---
 tar -czf "$BACKUP_DIR/ssl_${DATE}.tar.gz" -C / ssl
 
-# --- Retention: keep 7 daily + 4 weekly ---
-# Daily: delete files older than 7 days that are not a Sunday backup
-find "$BACKUP_DIR" -name "*.gz" -mtime +7 ! -newer "$BACKUP_DIR" \
-  | grep -v "$(date -d 'last sunday' +%Y-%m-%d)" | xargs -r rm -f
+# --- Retention: keep 7 daily + 4 weekly (Sunday) ---
+# Step 1: collect the 4 most recent Sunday dates to preserve
+SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done | tr '\n' '|' | sed 's/|$//')
+
+# Step 2: delete non-Sunday files older than 7 days
+find "$BACKUP_DIR" -name "*.gz" -mtime +7 \
+  | grep -vE "($SUNDAYS)" \
+  | xargs -r rm -f
+
+# Step 3: delete Sunday files older than 28 days
+find "$BACKUP_DIR" -name "*.gz" -mtime +28 | xargs -r rm -f
 
 echo "Backup complete: $DATE"
 ```
@@ -119,7 +136,7 @@ Runs at `02:00` daily — 1 hour before Watchtower's `03:00` update window.
 
 - **7 daily backups** kept at all times
 - **4 weekly backups** (Sunday snapshots) kept for 28 days
-- Backup script prunes older files automatically
+- Backup script prunes older files automatically (two-pass: daily first, then weekly)
 
 ### Out-of-band: `.env` backup
 
@@ -228,8 +245,10 @@ For broken migrations or data corruption:
 ssh vps 'cd ~/sa && docker compose stop n8n litellm lead-review keycloak'
 
 # 2. Restore from backup
+# Must connect to the 'postgres' maintenance database so pg_dumpall's
+# \connect directives (which switch between litellm/n8n/keycloak) work correctly.
 ssh vps 'gunzip -c ~/sa/backup/postgres_YYYY-MM-DD.sql.gz \
-  | docker exec -i litellm_db psql -U litellm'
+  | docker exec -i litellm_db psql -U litellm -d postgres'
 
 # 3. Restart services
 ssh vps 'cd ~/sa && docker compose start n8n litellm lead-review keycloak'
@@ -237,7 +256,7 @@ ssh vps 'cd ~/sa && docker compose start n8n litellm lead-review keycloak'
 
 ### Full disaster recovery (VPS total loss)
 
-Estimated recovery time: **~15 minutes** (excluding Ollama model re-pull).
+Estimated recovery time: **~15 minutes** (excluding Ollama model re-pull, and assuming backups are available — see off-site gap note under Pillar 1).
 
 ```bash
 # 1. Provision fresh VPS with Docker installed
@@ -247,23 +266,39 @@ git clone git@github.com:relder251/sa.git && cd sa
 
 # 3. Restore .env from password manager
 
-# 4. Bring the stack up
+# 4. Retrieve latest backups from off-site storage into ./backup/
+#    (rclone, scp, or manual download — requires off-site sync to be configured)
+
+# 5. Bring the stack up
 docker compose up -d
 
-# 5. Restore the database from latest backup
+# 6. Restore the database from latest backup
+# Connect to maintenance DB so \connect directives in pg_dumpall output work
 gunzip -c backup/postgres_<date>.sql.gz \
-  | docker exec -i litellm_db psql -U litellm
+  | docker exec -i litellm_db psql -U litellm -d postgres
 
-# 6. (Optional) Restore output and opportunities data
+# 7. (Optional) Restore output and opportunities data
 tar -xzf backup/output_<date>.tar.gz
 tar -xzf backup/opportunities_<date>.tar.gz
 
-# 7. Restore SSL certs (or let certbot re-issue)
+# 8. Restore SSL certs (or let certbot re-issue — slower but free)
+mkdir -p /opt/sovereignadvisory
 tar -xzf backup/ssl_<date>.tar.gz -C /opt/sovereignadvisory/
 
-# 8. Re-pull Ollama models as needed
+# 9. Re-enter n8n credentials in the n8n UI (known gap — not backed up)
+
+# 10. Re-pull Ollama models as needed
 docker exec ollama ollama pull <model>
 ```
+
+---
+
+## Known Gaps (v1)
+
+| Gap | Impact | Mitigation |
+|---|---|---|
+| No off-site backup transfer | Total VPS loss = backup loss | Future: add rclone/rsync job to push `./backup/` to B2/S3 nightly |
+| `n8n_data` not backed up | n8n credentials lost on DR | Future: add `n8n_data` tar to backup script; for now, re-enter manually |
 
 ---
 
