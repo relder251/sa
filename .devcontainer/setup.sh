@@ -4,13 +4,12 @@
 set -euo pipefail
 
 echo "=== Installing Python test dependencies ==="
-pip install --quiet \
-  pytest \
-  pytest-playwright \
-  playwright
+pip install --quiet -r tests/requirements.txt
 
 echo "=== Installing Playwright Chromium browser ==="
-# Chromium is used for all Playwright tests in this repo
+# Chromium is used for all Playwright tests in this repo.
+# Must run AFTER pip install so the installed playwright version drives
+# the browser revision that gets downloaded.
 playwright install chromium --with-deps
 
 echo "=== Verifying installations ==="
