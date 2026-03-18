@@ -1,22 +1,21 @@
 {
   "name": "SA Stack — Test Tooling",
 
-  // Pin to the exact Debian bookworm image via SHA digest — no tag string
-  // for Codespaces to normalise.  The problem: Codespaces CLI 0.80.3 strips
-  // the "-bookworm" variant suffix from any tag (3.11-bookworm → 3.11), and
-  // the untagged :3.11 image resolves to Debian trixie where moby-cli is
-  // absent.  A tag-less digest reference (@sha256:...) has nothing to strip.
-  //
-  // Digest verified: mcr.microsoft.com/devcontainers/python:3.11-bookworm
-  // on linux/amd64 → sha256:aea59f6834231486ee510ed90fc89659762e8ac246bb5e5fc49809ab736a0b94
+  // Codespaces CLI 0.80.3 strips OS variant suffixes from image tags
+  // (3.11-bookworm → 3.11 = Debian trixie).  Pin by SHA digest so there
+  // is no tag string to normalise.  Belt-and-suspenders: docker-in-docker
+  // below also works on trixie with moby:false, so the build succeeds even
+  // if the base image ends up normalised.
   "image": "mcr.microsoft.com/devcontainers/python@sha256:aea59f6834231486ee510ed90fc89659762e8ac246bb5e5fc49809ab736a0b94",
 
-  // Docker socket mount — for VS Code Remote Containers (local) only.
-  // In Codespaces this mounts the Codespace's own Docker daemon (not the host VPS).
-  // Uncomment if running locally with VS Code Remote Containers.
-  // "mounts": [
-  //   "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  // ],
+  // docker-in-docker runs its own daemon — no host socket required.
+  // Using DinD instead of docker-outside-of-docker means:
+  //   1. Codespaces does not inject docker-outside-of-docker (which fails
+  //      on trixie with its default moby:true).
+  //   2. Our moby:false option is never overridden by a Codespaces override.
+  //   3. docker-ce (moby:false path) IS supported on trixie, so the build
+  //      succeeds even if the base image is normalised to 3.11 (trixie).
+  "privileged": true,
 
   "features": {
     // Gives us git, curl, jq out of the box
@@ -25,11 +24,11 @@
       "configureZshAsDefaultShell": false
     },
 
-    // Belt-and-suspenders: if Codespaces somehow still injects trixie,
-    // moby:false makes the feature install docker-ce instead of moby-cli.
-    // docker-ce IS supported on trixie (in DOCKER_LICENSED_ARCHIVE_VERSION_CODENAMES).
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": false
+    // docker-in-docker: Codespaces never overrides this feature's options,
+    // so moby:false is guaranteed to be respected.  docker-ce works on trixie.
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "moby": false,
+      "dockerDashComposeVersion": "v2"
     }
   },
 
