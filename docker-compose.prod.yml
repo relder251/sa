@@ -18,15 +18,9 @@ services:
       - "187.77.208.197:80:80"
       - "187.77.208.197:443:443"
     volumes:
-#      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-#      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-#      - ./www:/usr/share/nginx/html:ro
-#      - ./ssl:/etc/letsencrypt:ro
-#      - ./ssl/dhparam:/etc/nginx/dhparam:ro
-#      - ./certbot/www:/var/www/certbot:ro
+     - ./nginx-public/nginx.conf:/etc/nginx/nginx.conf:ro
+     - ./nginx-public/conf.d:/etc/nginx/conf.d:ro
      - ./logs:/var/log/nginx
-     - /opt/sovereignadvisory/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-     - /opt/sovereignadvisory/nginx/conf.d:/etc/nginx/conf.d:ro
      - /opt/sovereignadvisory/www:/usr/share/nginx/html:ro
      - /opt/sovereignadvisory/ssl:/etc/letsencrypt:ro
      - /opt/sovereignadvisory/ssl/dhparam:/etc/nginx/dhparam:ro
