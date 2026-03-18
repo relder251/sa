@@ -1,10 +1,16 @@
 {
   "name": "SA Stack — Test Tooling",
 
-  // Python 3.11 on Debian bookworm (stable). DO NOT use the untagged :3.11
-  // — it resolves to Debian trixie, which is incompatible with the
-  // docker-outside-of-docker feature that Codespaces injects automatically.
-  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
+  // Build from a Dockerfile so the base image is a FROM line that Codespaces
+  // cannot normalise.  Using "image": directly causes Codespaces to strip the
+  // "-bookworm" variant tag (3.11-bookworm → 3.11), which resolves to Debian
+  // trixie.  The docker-outside-of-docker feature that Codespaces injects
+  // automatically fails on trixie because moby-cli was removed from that
+  // distribution.  With a Dockerfile the FROM line is never touched, so we
+  // always land on bookworm where moby works fine.
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
 
   // Docker socket mount — for VS Code Remote Containers (local) only.
   // In Codespaces this mounts the Codespace's own Docker daemon (not the host VPS).
@@ -18,16 +24,6 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
       "configureZshAsDefaultShell": false
-    },
-
-    // Codespaces always injects docker-outside-of-docker via --override-config.
-    // Declaring it here with moby:false ensures our option wins in the merge:
-    // the Codespaces-injected config uses empty options {}, so our explicit
-    // moby:false is not overridden.  Without this, the default moby:true causes
-    // the build to fail on Debian trixie (which the untagged :3.11 image resolves
-    // to) because moby-cli was removed from that distribution.
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": false
     }
   },
 
