@@ -15,7 +15,9 @@
 
   "features": {
     // Docker CLI (client only — uses the forwarded socket above)
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": "false"
+    },
     // Gives us git, curl, jq out of the box
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
