@@ -16,6 +16,7 @@ Environment variables (all required unless noted):
   PDF_OUTPUT_DIR        /data/output/lead_pdfs  (optional, default shown)
 """
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -36,6 +37,7 @@ from fastapi import FastAPI, HTTPException, Header, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import httpx
 from jose import jwt, JWTError
+from lead_pdf_generator import generate_lead_pdf
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 DATABASE_URL         = os.environ["DATABASE_URL"]
@@ -52,7 +54,7 @@ SMTP_PORT      = int(os.environ.get("NEO_SMTP_PORT", "465"))
 SMTP_USER      = os.environ.get("NEO_SMTP_USER", "resend")
 SMTP_PASS      = os.environ.get("NEO_SMTP_PASS", "")
 SMTP_FROM      = os.environ.get("NOTIFY_EMAIL", "relder@sovereignadvisory.ai")
-SMTP_FROM_NAME = "Robert Elder"
+SMTP_FROM_NAME = os.environ.get("SMTP_FROM_NAME", "Robert Elder")
 
 # ── OIDC / Keycloak config ─────────────────────────────────────────────────────
 OIDC_ENABLED           = os.environ.get("OIDC_ENABLED", "false").lower() == "true"
@@ -69,9 +71,16 @@ _jwks_cache: dict = {}
 JWKS_TTL = 3600  # 1 hour
 
 # In-memory session store: {session_key: {lead_id, expires_at}}
-# Small deployment — no Redis needed.
+# Small deployment — no Redis needed. Trade-off: sessions are lost on container
+# restart (crashes, Watchtower nightly updates). Acceptable at this scale.
 _sessions: dict[str, dict] = {}
 SESSION_TTL = 4 * 3600  # 4 hours
+
+# OIDC post-login nonce store: {nonce: {session_key, expires_at}}
+# Short-lived (60s) one-time tokens used to hand the session key to the browser
+# without exposing it in URLs (which appear in logs, browser history, Referer headers).
+_oidc_nonces: dict[str, dict] = {}
+OIDC_NONCE_TTL = 60  # seconds
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -589,9 +598,9 @@ async def bulk_archive(request: Request, x_session_key: str = Header(None)):
 
 
 @app.get("/review/{token}", response_class=HTMLResponse)
-async def review_page(token: str, request: Request, sk: Optional[str] = None):
+async def review_page(token: str, request: Request, sk: Optional[str] = None, oidc_nonce: Optional[str] = None):
     """Serve the review HTML portal.
-    - OIDC mode: redirects to Keycloak if no session key in query param.
+    - OIDC mode: redirects to Keycloak if no session established.
     - Password mode: serves HTML directly (client-side auth form).
     """
     html_path = TEMPLATE_DIR / "lead_review.html"
@@ -599,11 +608,22 @@ async def review_page(token: str, request: Request, sk: Optional[str] = None):
         raise HTTPException(status_code=500, detail="Review template missing")
 
     if OIDC_ENABLED:
-        if sk:
-            # Session key returned from /auth/callback — inject it into the page
-            # so JS can auto-authenticate without the password form.
+        resolved_sk: Optional[str] = sk
+        if oidc_nonce:
+            # Exchange one-time nonce for session key; nonce is consumed on use.
+            entry = _oidc_nonces.pop(oidc_nonce, None)
+            if entry and time.time() < entry["expires_at"]:
+                resolved_sk = entry["session_key"]
+        if resolved_sk:
+            # Inject session key directly into sessionStorage via an inline script
+            # so JS picks it up immediately without showing the password form.
             html = html_path.read_text()
-            inject = f'<script>window.__SK__ = "{sk}"; window.__OIDC__ = true;</script>'
+            inject = (
+                f'<script>'
+                f'sessionStorage.setItem("sa_review_sk", {json.dumps(resolved_sk)});'
+                f'window.__OIDC__ = true;'
+                f'</script>'
+            )
             html = html.replace("</head>", f"{inject}\n</head>")
             return HTMLResponse(content=html, status_code=200, headers=_NO_CACHE)
         # No session — redirect to Keycloak
@@ -648,8 +668,11 @@ async def auth_callback(
     token_row = await _get_review_token(state)
     session_key = _create_session(str(token_row["lead_id"]))
 
-    # Redirect to the review page with the session key injected via query param
-    return RedirectResponse(url=f"/review/{state}?sk={session_key}")
+    # Use a short-lived one-time nonce in the URL instead of the session key.
+    # The session key itself never appears in URLs (logs, browser history, Referer).
+    nonce = secrets.token_hex(32)
+    _oidc_nonces[nonce] = {"session_key": session_key, "expires_at": time.time() + OIDC_NONCE_TTL}
+    return RedirectResponse(url=f"/review/{state}?oidc_nonce={nonce}")
 
 
 @app.post("/api/review/{token}/auth")
@@ -796,9 +819,8 @@ async def take_action(token: str, request: Request, x_session_key: str = Header(
         if email_body_text:
             body = email_body_text
 
-        import asyncio
         try:
-            await asyncio.get_event_loop().run_in_executor(
+            await asyncio.get_running_loop().run_in_executor(
                 None, _send_outreach_email_sync, to_email, subject, body
             )
         except Exception as exc:
@@ -824,19 +846,20 @@ async def take_action(token: str, request: Request, x_session_key: str = Header(
     # regeneration caused 409 Conflict on all attempts after the first, silently
     # discarding reviewer notes. The server now handles regeneration in-process.
     if action == "regenerate":
-        import asyncio
         asyncio.create_task(_regenerate_draft_via_llm(lead_id, notes))
         return JSONResponse({"status": "ok", "action": action})
 
     # ── DNFU: resume n8n workflow ─────────────────────────────────────────────
-    internal_resume_url = n8n_resume_url
-    for ext in (
-        "https://n8n.private.sovereignadvisory.ai",
-        "https://sovereignadvisory.ai/n8n",
-        "http://localhost:5678",
-        "https://localhost:5678",
-    ):
-        internal_resume_url = internal_resume_url.replace(ext, N8N_BASE_URL)
+    # Rewrite the stored resume URL to use the internal Docker hostname.
+    # The URL stored in the DB may have been generated with a public hostname;
+    # parse and replace the scheme+host portion instead of matching literals.
+    from urllib.parse import urlparse, urlunparse
+    parsed = urlparse(n8n_resume_url)
+    internal_base = urlparse(N8N_BASE_URL)
+    internal_resume_url = urlunparse(parsed._replace(
+        scheme=internal_base.scheme,
+        netloc=internal_base.netloc,
+    ))
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -875,8 +898,6 @@ async def get_pdf(token: str, x_session_key: str = Header(None)):
         )
 
     # Generate on-the-fly
-    from lead_pdf_generator import generate_lead_pdf
-
     PDF_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     out_path = str(PDF_OUTPUT_DIR / f"lead_{lead_id}.pdf")
     generate_lead_pdf(lead, draft, out_path)

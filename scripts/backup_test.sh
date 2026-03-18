@@ -16,8 +16,8 @@ if [ ! -f "$DUMP_FILE" ]; then
 fi
 
 CONTAINER="pg_restore_test_$$"
-PG_USER="litellm"
-PG_PASS="litellm_password"
+PG_USER="${LITELLM_USER:-litellm}"
+PG_PASS="${LITELLM_PASSWORD:-litellm_password}"
 PASS=0
 FAIL=0
 

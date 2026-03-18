@@ -60,8 +60,8 @@ services:
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=litellm
-      - DB_POSTGRESDB_PASSWORD=litellm_password
+      - DB_POSTGRESDB_USER=${LITELLM_USER:-litellm}
+      - DB_POSTGRESDB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
       # Encryption key for credentials (must stay stable across restarts)
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
       # Disable task runners to avoid partial-init issues with webhook registration
@@ -156,7 +156,7 @@ services:
       - "4000:4000"
     environment:
       # ── Database ──────────────────────────────────────────────────────────
-      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm
+      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
       - STORE_MODEL_IN_DB=True
 
       # ── Proxy master key ──────────────────────────────────────────────────
@@ -452,14 +452,14 @@ services:
     ports:
       - "8888:8888"
     environment:
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-vibe-dev-token}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:?JUPYTER_TOKEN must be set in .env}
       - JUPYTER_ENABLE_LAB=yes
 
       # ── Stack service URLs (use service names — same Docker network) ──────
       - LITELLM_BASE_URL=http://litellm:4000
       - OLLAMA_BASE_URL=http://ollama:11434
       - N8N_BASE_URL=http://n8n:5678
-      - DATABASE_URL=postgresql://litellm:litellm_password@postgres:5432/litellm
+      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
 
       # ── All API keys available in notebooks ───────────────────────────────
       - LITELLM_API_KEY=${LITELLM_API_KEY}
@@ -477,13 +477,12 @@ services:
       - ./output:/home/jovyan/output
       - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
       - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
-    user: root
     command:
       - bash
       - -c
       - |
         pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
-        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN:-vibe-dev-token} --ServerApp.ip=0.0.0.0 --ServerApp.allow_root=True --ServerApp.open_browser=False --ServerApp.port=8888
+        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
     networks:
       - vibe_net
     restart: unless-stopped
