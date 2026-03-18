@@ -1,16 +1,15 @@
 {
   "name": "SA Stack — Test Tooling",
 
-  // Build from a Dockerfile so the base image is a FROM line that Codespaces
-  // cannot normalise.  Using "image": directly causes Codespaces to strip the
-  // "-bookworm" variant tag (3.11-bookworm → 3.11), which resolves to Debian
-  // trixie.  The docker-outside-of-docker feature that Codespaces injects
-  // automatically fails on trixie because moby-cli was removed from that
-  // distribution.  With a Dockerfile the FROM line is never touched, so we
-  // always land on bookworm where moby works fine.
-  "build": {
-    "dockerfile": "Dockerfile"
-  },
+  // Pin to the exact Debian bookworm image via SHA digest — no tag string
+  // for Codespaces to normalise.  The problem: Codespaces CLI 0.80.3 strips
+  // the "-bookworm" variant suffix from any tag (3.11-bookworm → 3.11), and
+  // the untagged :3.11 image resolves to Debian trixie where moby-cli is
+  // absent.  A tag-less digest reference (@sha256:...) has nothing to strip.
+  //
+  // Digest verified: mcr.microsoft.com/devcontainers/python:3.11-bookworm
+  // on linux/amd64 → sha256:aea59f6834231486ee510ed90fc89659762e8ac246bb5e5fc49809ab736a0b94
+  "image": "mcr.microsoft.com/devcontainers/python@sha256:aea59f6834231486ee510ed90fc89659762e8ac246bb5e5fc49809ab736a0b94",
 
   // Docker socket mount — for VS Code Remote Containers (local) only.
   // In Codespaces this mounts the Codespace's own Docker daemon (not the host VPS).
@@ -24,6 +23,13 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
       "configureZshAsDefaultShell": false
+    },
+
+    // Belt-and-suspenders: if Codespaces somehow still injects trixie,
+    // moby:false makes the feature install docker-ce instead of moby-cli.
+    // docker-ce IS supported on trixie (in DOCKER_LICENSED_ARCHIVE_VERSION_CODENAMES).
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
     }
   },
 
