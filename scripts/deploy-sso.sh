@@ -33,7 +33,7 @@ run() {
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
-env_get() { grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"'; }
+env_get() { grep -E "^${1}=" "$ENV_FILE" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' || true; }
 
 env_set() {
   local key="$1" val="$2"
@@ -76,7 +76,7 @@ echo "--- checking/generating secrets ---"
 webui_secret="$(env_get OAUTH2_PROXY_COOKIE_SECRET_WEBUI)"
 if [[ -z "$webui_secret" ]]; then
   echo "  generating OAUTH2_PROXY_COOKIE_SECRET_WEBUI"
-  run env_set OAUTH2_PROXY_COOKIE_SECRET_WEBUI "$(openssl rand -base64 32)"
+  env_set OAUTH2_PROXY_COOKIE_SECRET_WEBUI "$(openssl rand -base64 32)"
 else
   echo "  OAUTH2_PROXY_COOKIE_SECRET_WEBUI already set"
 fi
@@ -84,7 +84,7 @@ fi
 vault_token="$(env_get VAULTWARDEN_ADMIN_TOKEN)"
 if [[ -z "$vault_token" ]]; then
   echo "  generating VAULTWARDEN_ADMIN_TOKEN"
-  run env_set VAULTWARDEN_ADMIN_TOKEN "$(openssl rand -base64 48)"
+  env_set VAULTWARDEN_ADMIN_TOKEN "$(openssl rand -base64 48)"
 else
   echo "  VAULTWARDEN_ADMIN_TOKEN already set"
 fi
@@ -109,8 +109,12 @@ for key in "${required_secrets[@]}"; do
   fi
 done
 if [[ $missing -gt 0 ]]; then
-  echo "FATAL: $missing required secret(s) missing. Fix .env then re-run."
-  exit 1
+  if $DRY_RUN; then
+    echo "WARNING: $missing required secret(s) missing (would abort in live run — add them to .env first)"
+  else
+    echo "FATAL: $missing required secret(s) missing. Fix .env then re-run."
+    exit 1
+  fi
 fi
 
 # ── 4. Restart n8n (SSO env vars) ─────────────────────────────────────────────
@@ -124,7 +128,7 @@ run docker compose -f "$REPO_DIR/docker-compose.prod.yml" up -d \
   oauth2-proxy-litellm \
   oauth2-proxy-jupyter \
   vaultwarden \
-  sa_lead_review
+  lead-review
 
 # ── 6. Reload nginx-private ───────────────────────────────────────────────────
 echo "--- reloading nginx-private ---"
