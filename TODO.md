@@ -4,16 +4,10 @@
 
 ## Pending
 
-- [ ] **#5** Write design spec — Sub-project 1: Infrastructure Resilience
-  - Save to `docs/superpowers/specs/2026-03-16-infrastructure-resilience-design.md` and commit
-  - Blocked by: #4
-
-- [ ] **#6** Spec review loop + transition to writing-plans
-  - Dispatch spec-document-reviewer, fix issues, get user sign-off, then invoke writing-plans skill
-  - Blocked by: #5
-
 ## Done
 
+- [x] **#6** Spec review loop + transition to writing-plans
+- [x] **#5** Write design spec — Sub-project 1: Infrastructure Resilience
 - [x] **#4** Present and approve design — Sub-project 1: Infrastructure Resilience
 - [x] **#1** Explore project context
 - [x] **#2** Ask clarifying questions
