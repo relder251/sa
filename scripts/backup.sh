@@ -63,11 +63,12 @@ SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done \
   | tr '\n' '|' | sed 's/|$//')
 
 # Pass 1: delete non-Sunday files older than 7 days
+# grep -vE exits 1 when no lines match (no old files) — || true prevents pipefail abort
 find "$BACKUP_DIR" -name "*.gz" -mtime +7 \
   | grep -vE "($SUNDAYS)" \
-  | xargs -r rm -f
+  | xargs -r rm -f || true
 
-# Pass 2: delete Sunday files older than 28 days
+# Pass 2: delete ALL files older than 28 days (hard cutoff — even Sunday snapshots expire)
 find "$BACKUP_DIR" -name "*.gz" -mtime +28 | xargs -r rm -f
 
 echo "=== Backup complete: $DATE ==="
