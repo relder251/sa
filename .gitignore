@@ -24,7 +24,6 @@ backup/
 
 # Nested git repos (not submodules)
 deerflow/
-notebooks/
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
