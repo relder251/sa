@@ -18,6 +18,16 @@
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
       "configureZshAsDefaultShell": false
+    },
+
+    // Codespaces always injects docker-outside-of-docker via --override-config.
+    // Declaring it here with moby:false ensures our option wins in the merge:
+    // the Codespaces-injected config uses empty options {}, so our explicit
+    // moby:false is not overridden.  Without this, the default moby:true causes
+    // the build to fail on Debian trixie (which the untagged :3.11 image resolves
+    // to) because moby-cli was removed from that distribution.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "moby": false
     }
   },
 
