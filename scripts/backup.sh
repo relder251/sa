@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# backup.sh — daily backup: pg_dumpall + tar snapshots + retention pruning
+# Usage: bash backup.sh [--dry-run]
+#   --dry-run  Print commands without executing (safe to run anytime)
+#
+# Environment (set by docker-compose backup service):
+#   PGHOST, PGUSER, PGPASSWORD — postgres connection
+#   BACKUP_DIR                 — defaults to /backup
+#
+# Volumes expected:
+#   /backup            — output directory (host: ./backup)
+#   /data/output       — lead PDFs and pipeline output (read-only)
+#   /data/opportunities — pipeline input data (read-only)
+#   /ssl               — TLS certs at /opt/sovereignadvisory/ssl (read-only)
+
+set -euo pipefail
+
+DRY_RUN=false
+[[ "${1:-}" == "--dry-run" ]] && DRY_RUN=true
+
+DATE=$(date +%Y-%m-%d)
+BACKUP_DIR="${BACKUP_DIR:-/backup}"
+
+run() {
+  if $DRY_RUN; then
+    # printf '%q ' safely quotes args without shell metacharacter expansion
+    echo "[dry-run] $(printf '%q ' "$@")"
+  else
+    "$@"
+  fi
+}
+
+echo "=== Backup starting: $DATE (dry-run: $DRY_RUN) ==="
+
+# --- Postgres: all databases via pg_dumpall ---
+# litellm is the bootstrap superuser (POSTGRES_USER in docker-compose.yml).
+# pg_dumpall requires superuser — do not replace with an application-scoped role.
+echo "--- postgres ---"
+run bash -c "pg_dumpall | gzip > \"$BACKUP_DIR/postgres_${DATE}.sql.gz\""
+
+# --- Output directory ---
+echo "--- output ---"
+run tar -czf "$BACKUP_DIR/output_${DATE}.tar.gz" -C /data output
+
+# --- Opportunities directory ---
+echo "--- opportunities ---"
+run tar -czf "$BACKUP_DIR/opportunities_${DATE}.tar.gz" -C /data opportunities
+
+# --- SSL certificates ---
+echo "--- ssl ---"
+run tar -czf "$BACKUP_DIR/ssl_${DATE}.tar.gz" -C / ssl
+
+if $DRY_RUN; then
+  echo "=== Dry-run complete — no files written ==="
+  exit 0
+fi
+
+# --- Retention: 7 daily + 4 weekly (Sunday) backups ---
+echo "--- pruning old backups ---"
+
+# Collect the 4 most recent Sunday dates to preserve as weekly snapshots
+SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done \
+  | tr '\n' '|' | sed 's/|$//')
+
+# Pass 1: delete non-Sunday files older than 7 days
+find "$BACKUP_DIR" -name "*.gz" -mtime +7 \
+  | grep -vE "($SUNDAYS)" \
+  | xargs -r rm -f
+
+# Pass 2: delete Sunday files older than 28 days
+find "$BACKUP_DIR" -name "*.gz" -mtime +28 | xargs -r rm -f
+
+echo "=== Backup complete: $DATE ==="
