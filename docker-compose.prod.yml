@@ -8,6 +8,7 @@ volumes:
   n8n_data:
   ollama_data:
   pg_data:
+  vaultwarden_data:
 
 services:
   nginx:
@@ -467,6 +468,35 @@ services:
       start_period: 60s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
+
+  # Vaultwarden — self-hosted Bitwarden-compatible vault
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    environment:
+      - DOMAIN=https://vault.private.sovereignadvisory.ai
+      - SIGNUPS_ALLOWED=false
+      - INVITATIONS_ALLOWED=true
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - SSO_ENABLED=true
+      - SSO_ONLY=false
+      - SSO_AUTHORITY=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
+      - SSO_CLIENT_ID=vaultwarden
+      - SSO_CLIENT_SECRET=${VAULTWARDEN_OIDC_CLIENT_SECRET}
+      - SMTP_HOST=${NEO_SMTP_HOST}
+      - SMTP_PORT=${NEO_SMTP_PORT}
+      - SMTP_SECURITY=force_tls
+      - SMTP_USERNAME=${NEO_SMTP_USER}
+      - SMTP_PASSWORD=${NEO_SMTP_PASS}
+      - SMTP_FROM=${NOTIFY_EMAIL}
+      - SMTP_FROM_NAME=Sovereign Advisory Vault
+    volumes:
+      - vaultwarden_data:/data
+    networks:
+      - vibe_net
+    labels:
+      com.sovereignadvisory.service: "vaultwarden"
 
   # oauth2-proxy — LiteLLM UI (port 4001)
   oauth2-proxy-litellm:

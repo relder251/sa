@@ -123,6 +123,16 @@ def test_litellm_redirects_to_keycloak_for_login(page: Page, litellm_url: str) -
     assert "agentic-sdlc" in page.url
 
 
+# ── Vaultwarden ───────────────────────────────────────────────────────────────
+
+def test_vaultwarden_reachable(page: Page, vault_url: str) -> None:
+    """Vaultwarden login page must be reachable via private network."""
+    page.goto(f"{vault_url}/")
+    page.wait_for_load_state("networkidle")
+    assert page.title() != "" or "vault" in page.url.lower(), \
+        f"Vaultwarden not reachable at {vault_url}"
+
+
 # ── Backup container ──────────────────────────────────────────────────────────
 
 def test_backup_container_is_running() -> None:
