@@ -268,6 +268,39 @@ services:
         condition: service_healthy
 
   # -----------------------------------------
+  # Backup — daily pg_dumpall + tar snapshots
+  # Stays alive via sleep infinity so Ofelia
+  # can job-exec into it on schedule.
+  # Output: ./backup/postgres_YYYY-MM-DD.sql.gz
+  #         ./backup/output_YYYY-MM-DD.tar.gz
+  #         ./backup/opportunities_YYYY-MM-DD.tar.gz
+  #         ./backup/ssl_YYYY-MM-DD.tar.gz
+  # -----------------------------------------
+  backup:
+    image: postgres:15
+    container_name: backup
+    volumes:
+      - ./backup:/backup
+      - ./output:/data/output:ro
+      - ./opportunities:/data/opportunities:ro
+      - /opt/sovereignadvisory/ssl:/ssl:ro
+      - ./scripts/backup.sh:/backup.sh:ro
+    environment:
+      - PGHOST=postgres
+      # litellm is the bootstrap superuser (POSTGRES_USER in docker-compose).
+      # pg_dumpall requires superuser — do not replace with an app-scoped role.
+      - PGUSER=${LITELLM_USER:-litellm}
+      - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    command: ["sleep", "infinity"]
+    networks:
+      - vibe_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # No watchtower label — postgres:15 is pinned; update manually
+
+  # -----------------------------------------
   # Test Runner - Phase 3 Python test executor
   # Exposes POST /run → pip install + pytest + LLM fix loop
   # Internal only (no host port mapping needed)
