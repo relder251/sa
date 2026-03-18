@@ -21,21 +21,36 @@ docker exec "$KC_CONTAINER" \
 
 docker cp "$KC_CONTAINER:/tmp/kc-export/${REALM}-realm.json" "$OUTPUT"
 
-# Strip any embedded client secrets and confirm result
+# Strip client secrets and remove the service-credentials credential-vault client
 python3 -c "
 import json
 with open('$OUTPUT') as f:
     realm = json.load(f)
-stripped = []
+
+clients_before = len(realm.get('clients', []))
+clean_clients = []
+stripped_secrets = []
+removed_clients = []
+
 for c in realm.get('clients', []):
-    secret = c.get('secret', '')
-    if secret and len(secret) > 5:
+    # Remove service-credentials entirely — it stores all API keys as attributes
+    if c.get('clientId') == 'service-credentials':
+        removed_clients.append(c['clientId'])
+        continue
+    # Strip any embedded client secrets
+    if c.get('secret') and len(c['secret']) > 5:
         del c['secret']
-        stripped.append(c['clientId'])
+        stripped_secrets.append(c['clientId'])
+    clean_clients.append(c)
+
+realm['clients'] = clean_clients
 with open('$OUTPUT', 'w') as f:
     json.dump(realm, f, indent=2)
-if stripped:
-    print(f'Stripped secrets from clients: {stripped}')
+
+if removed_clients:
+    print(f'Removed credential-vault clients (contain API keys): {removed_clients}')
+if stripped_secrets:
+    print(f'Stripped secrets from clients: {stripped_secrets}')
 print('Secret check passed — safe to commit')
 "
 echo "Realm exported to $OUTPUT"
