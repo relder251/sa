@@ -11,6 +11,9 @@ LEAD_REVIEW_PASSWORD = os.environ.get("LEAD_REVIEW_PASSWORD", "")
 N8N_URL = os.environ.get("N8N_URL", f"{BASE_URL.rstrip('/')}:5678")
 WEBUI_URL = os.environ.get("WEBUI_URL", f"{BASE_URL.rstrip('/')}:3000")
 LEAD_REVIEW_URL = os.environ.get("LEAD_REVIEW_URL", f"{BASE_URL.rstrip('/')}:5003")
+LITELLM_URL = os.environ.get("LITELLM_URL", "https://litellm.private.sovereignadvisory.ai")
+JUPYTER_URL = os.environ.get("JUPYTER_URL", "https://jupyter.private.sovereignadvisory.ai")
+VAULT_URL = os.environ.get("VAULT_URL", "https://vault.private.sovereignadvisory.ai")
 
 
 @pytest.fixture(scope="session")
@@ -36,6 +39,21 @@ def lead_review_url() -> str:
 @pytest.fixture(scope="session")
 def lead_review_password() -> str:
     return LEAD_REVIEW_PASSWORD
+
+
+@pytest.fixture(scope="session")
+def litellm_url() -> str:
+    return LITELLM_URL.rstrip("/")
+
+
+@pytest.fixture(scope="session")
+def jupyter_url() -> str:
+    return JUPYTER_URL.rstrip("/")
+
+
+@pytest.fixture(scope="session")
+def vault_url() -> str:
+    return VAULT_URL.rstrip("/")
 
 
 @pytest.fixture(scope="function")
