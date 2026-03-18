@@ -832,6 +832,16 @@
             "node": "Wait for Review Decision",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "WhatsApp (Twilio)",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
