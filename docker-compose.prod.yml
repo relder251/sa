@@ -98,6 +98,12 @@ services:
       N8N_BASE_URL: http://n8n:5678
       PDF_OUTPUT_DIR: /data/output/lead_pdfs
       LITELLM_BASE_URL: http://litellm:4000
+      OIDC_ENABLED: "true"
+      KEYCLOAK_ISSUER: http://keycloak:8080/realms/agentic-sdlc
+      KEYCLOAK_EXTERNAL_URL: https://kc.sovereignadvisory.ai
+      KEYCLOAK_CLIENT_ID: lead-review
+      KEYCLOAK_CLIENT_SECRET: ${LEAD_REVIEW_OIDC_CLIENT_SECRET}
+      LEAD_REVIEW_PUBLIC_URL: https://sovereignadvisory.ai
     volumes:
       - ${SDLC_OUTPUT_DIR:-/opt/agentic-sdlc/output}:/data/output
       - ${SA_LOGO_PATH:-/opt/sovereignadvisory/www/logo.png}:/app/sovereign_advisory/logo.png:ro
