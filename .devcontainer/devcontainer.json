@@ -1,8 +1,10 @@
 {
   "name": "SA Stack — Test Tooling",
 
-  // Python 3.11 devcontainer base (pip is not system-managed here)
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  // Python 3.11 on Debian bookworm (stable). DO NOT use the untagged :3.11
+  // — it resolves to Debian trixie, which is incompatible with the
+  // docker-outside-of-docker feature that Codespaces injects automatically.
+  "image": "mcr.microsoft.com/devcontainers/python:3.11-bookworm",
 
   // Docker socket mount — for VS Code Remote Containers (local) only.
   // In Codespaces this mounts the Codespace's own Docker daemon (not the host VPS).
