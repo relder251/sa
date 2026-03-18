@@ -579,13 +579,13 @@ services:
   # Admin UI: http://localhost:8080  (admin / KEYCLOAK_ADMIN_PASSWORD)
   # Realm:    agentic-sdlc
   #
-  # NOTE: start-dev mode only (Phase 1). Switch to 'start' + TLS for prod exposure.
+  # Production mode: 'start' with KC_PROXY=edge (nginx handles TLS termination).
   # NOTE: Do NOT add watchtower label — major version upgrades require DB migration.
   # -----------------------------------------
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
     container_name: keycloak
-    command: start-dev
+    command: start
     environment:
       # Admin credentials
       - KEYCLOAK_ADMIN=admin
@@ -595,11 +595,12 @@ services:
       - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
       - KC_DB_USERNAME=${LITELLM_USER:-litellm}
       - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      # Bind to all interfaces
-      - KC_HOSTNAME=localhost
+      # Production mode: trust nginx TLS termination via KC_PROXY=edge
+      - KC_HOSTNAME=kc.sovereignadvisory.ai
+      - KC_HOSTNAME_STRICT=true
+      - KC_PROXY=edge
       - KC_HTTP_ENABLED=true
-      - KC_HOSTNAME_STRICT=false
-      - KC_HOSTNAME_STRICT_HTTPS=false
+      - KC_HEALTH_ENABLED=true
     ports:
       - "8080:8080"
     networks:
