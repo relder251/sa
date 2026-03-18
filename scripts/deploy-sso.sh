@@ -76,7 +76,7 @@ echo "--- checking/generating secrets ---"
 webui_secret="$(env_get OAUTH2_PROXY_COOKIE_SECRET_WEBUI)"
 if [[ -z "$webui_secret" ]]; then
   echo "  generating OAUTH2_PROXY_COOKIE_SECRET_WEBUI"
-  env_set OAUTH2_PROXY_COOKIE_SECRET_WEBUI "$(openssl rand -base64 32)"
+  env_set OAUTH2_PROXY_COOKIE_SECRET_WEBUI "$(openssl rand -hex 16)"
 else
   echo "  OAUTH2_PROXY_COOKIE_SECRET_WEBUI already set"
 fi

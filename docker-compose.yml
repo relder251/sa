@@ -84,7 +84,7 @@ services:
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
       # ── Keycloak OIDC SSO (enable after configuring Keycloak realm) ─────────
       - N8N_SSO_OIDC_ENABLED=true
-      - N8N_SSO_OIDC_ISSUER_URL=http://keycloak:8080/realms/agentic-sdlc
+      - N8N_SSO_OIDC_ISSUER_URL=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
       - N8N_SSO_OIDC_CLIENT_ID=n8n
       - N8N_SSO_OIDC_CLIENT_SECRET=${N8N_OIDC_CLIENT_SECRET}
       - N8N_SSO_OIDC_REDIRECT_URL=https://n8n.private.sovereignadvisory.ai/rest/sso/oidc/callback
@@ -630,7 +630,7 @@ services:
     container_name: oauth2_proxy_litellm
     command:
       - --provider=oidc
-      - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
+      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
       - --client-id=litellm
       - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
       - --redirect-url=https://litellm.private.sovereignadvisory.ai/oauth2/callback
@@ -663,7 +663,7 @@ services:
     container_name: oauth2_proxy_jupyter
     command:
       - --provider=oidc
-      - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
+      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
       - --client-id=jupyter
       - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
       - --redirect-url=https://jupyter.private.sovereignadvisory.ai/oauth2/callback
@@ -694,7 +694,7 @@ services:
     container_name: oauth2_proxy_webui
     command:
       - --provider=oidc
-      - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
+      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
       - --client-id=webui
       - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
       - --redirect-url=https://webui.private.sovereignadvisory.ai/oauth2/callback
