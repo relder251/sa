@@ -76,6 +76,13 @@ def test_n8n_redirects_to_keycloak_for_login(page: Page, n8n_url: str) -> None:
 
 # ── Web UI ────────────────────────────────────────────────────────────────────
 
+def test_webui_redirects_to_keycloak_for_login(page: Page, webui_url: str) -> None:
+    """Pipeline WebUI must redirect unauthenticated requests to Keycloak."""
+    page.goto(f"{webui_url}/")
+    page.wait_for_url("**/realms/agentic-sdlc/**", timeout=10_000)
+    assert "agentic-sdlc" in page.url
+
+
 def test_webui_loads(page: Page, webui_url: str) -> None:
     """Web UI homepage must load and contain 'Pipeline' text."""
     page.goto(webui_url, timeout=15000)
