@@ -632,11 +632,11 @@ services:
       - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
       - --client-id=litellm
       - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
-      - --redirect-url=http://localhost:4001/oauth2/callback
+      - --redirect-url=https://litellm.private.sovereignadvisory.ai/oauth2/callback
       - --upstream=http://litellm:4000
       - --http-address=0.0.0.0:4001
       - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=false
+      - --cookie-secure=true
       - --email-domain=*
       - --skip-provider-button=true
       - --insecure-oidc-allow-unverified-email=true
@@ -650,8 +650,6 @@ services:
         condition: service_healthy
       litellm:
         condition: service_healthy
-    profiles:
-      - oidc
 
   # -----------------------------------------
   # oauth2-proxy — JupyterLab (port 8889)
@@ -667,11 +665,11 @@ services:
       - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
       - --client-id=jupyter
       - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
-      - --redirect-url=http://localhost:8889/oauth2/callback
+      - --redirect-url=https://jupyter.private.sovereignadvisory.ai/oauth2/callback
       - --upstream=http://jupyter:8888
       - --http-address=0.0.0.0:8889
       - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=false
+      - --cookie-secure=true
       - --email-domain=*
       - --skip-provider-button=true
       - --insecure-oidc-allow-unverified-email=true
@@ -685,5 +683,31 @@ services:
         condition: service_healthy
       jupyter:
         condition: service_healthy
-    profiles:
-      - oidc
+
+  # -----------------------------------------
+  # oauth2-proxy — Pipeline WebUI (port 3001)
+  # Protects the custom pipeline dashboard with Keycloak SSO.
+  # -----------------------------------------
+  oauth2-proxy-webui:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2_proxy_webui
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=http://keycloak:8080/realms/agentic-sdlc
+      - --client-id=webui
+      - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
+      - --redirect-url=https://webui.private.sovereignadvisory.ai/oauth2/callback
+      - --upstream=http://webui:3000
+      - --http-address=0.0.0.0:3001
+      - --email-domain=*
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
+      - --cookie-secure=true
+      - --skip-provider-button=true
+      - --allowed-role=agentic-sdlc:admin
+      - --allowed-role=agentic-sdlc:user
+    networks:
+      - vibe_net
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    restart: unless-stopped
