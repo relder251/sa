@@ -1,0 +1,56 @@
+{
+  "name": "SA Stack — Test Tooling",
+
+  // Python 3.11 devcontainer base (pip is not system-managed here)
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+
+  // Option 3: forward local Docker socket so backup_test.sh and
+  // test_backup_container_is_running can reach the host stack.
+  // Works in VS Code Remote Containers (local) — NOT in Codespaces
+  // (Codespaces has its own Docker daemon, not the host's).
+  // Comment out the mounts block to disable.
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  "features": {
+    // Docker CLI (client only — uses the forwarded socket above)
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {},
+    // Gives us git, curl, jq out of the box
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false,
+      "configureZshAsDefaultShell": false
+    }
+  },
+
+  // Run after container creation: install Python test dependencies + Chromium
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Forward ports used by smoke tests when the stack is reachable
+  "forwardPorts": [4000, 5678, 3000, 5003, 8888],
+  "portsAttributes": {
+    "4000": { "label": "LiteLLM" },
+    "5678": { "label": "n8n" },
+    "3000": { "label": "Web UI" },
+    "5003": { "label": "Lead Review" },
+    "8888": { "label": "JupyterLab" }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-playwright.playwright",
+        "timonwong.shellcheck",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["tests"],
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  }
+}
