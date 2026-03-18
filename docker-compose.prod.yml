@@ -510,6 +510,7 @@ services:
       - --email-domain=*
       - --skip-provider-button=true
       - --allowed-role=agentic-sdlc:admin
+      - --code-challenge-method=S256
       - --skip-auth-route=^/webhook/
       - --skip-auth-route=^/webhook-test/
       - --skip-auth-route=^/healthz
@@ -533,6 +534,7 @@ services:
       - --cookie-secure=true
       - --email-domain=*
       - --skip-provider-button=true
+      - --code-challenge-method=S256
       - --allowed-role=agentic-sdlc:admin
     networks:
       - vibe_net
@@ -554,6 +556,7 @@ services:
       - --cookie-secure=true
       - --email-domain=*
       - --skip-provider-button=true
+      - --code-challenge-method=S256
       - --allowed-role=agentic-sdlc:admin
     networks:
       - vibe_net
@@ -575,6 +578,7 @@ services:
       - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
       - --cookie-secure=true
       - --skip-provider-button=true
+      - --code-challenge-method=S256
       - --allowed-role=agentic-sdlc:admin
       - --allowed-role=agentic-sdlc:user
     networks:
