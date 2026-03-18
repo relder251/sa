@@ -96,6 +96,15 @@ def test_webui_health(page: Page, webui_url: str) -> None:
         f"webui /health returned {response.status if response else 'None'}"
 
 
+# ── LiteLLM ──────────────────────────────────────────────────────────────────
+
+def test_litellm_redirects_to_keycloak_for_login(page: Page, litellm_url: str) -> None:
+    """LiteLLM UI must redirect unauthenticated requests to Keycloak."""
+    page.goto(f"{litellm_url}/")
+    page.wait_for_url("**/realms/agentic-sdlc/**", timeout=10_000)
+    assert "agentic-sdlc" in page.url
+
+
 # ── Backup container ──────────────────────────────────────────────────────────
 
 def test_backup_container_is_running() -> None:
