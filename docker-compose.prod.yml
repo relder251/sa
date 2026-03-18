@@ -517,9 +517,6 @@ services:
       - --allowed-role=agentic-sdlc:admin
     networks:
       - vibe_net
-    depends_on:
-      keycloak:
-        condition: service_healthy
     restart: unless-stopped
 
   # oauth2-proxy — JupyterLab (port 8889)
@@ -541,9 +538,6 @@ services:
       - --allowed-role=agentic-sdlc:admin
     networks:
       - vibe_net
-    depends_on:
-      keycloak:
-        condition: service_healthy
     restart: unless-stopped
 
   # oauth2-proxy — Pipeline WebUI (port 3001)
@@ -566,7 +560,4 @@ services:
       - --allowed-role=agentic-sdlc:user
     networks:
       - vibe_net
-    depends_on:
-      keycloak:
-        condition: service_healthy
     restart: unless-stopped
