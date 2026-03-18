@@ -1,7 +1,7 @@
 {
-  "updatedAt": "2026-03-16T20:06:53.980Z",
-  "createdAt": "2026-03-14T18:03:58.471Z",
-  "id": "sa-lead-pipeline-001",
+  "updatedAt": "2026-03-17T00:30:11.805Z",
+  "createdAt": "2026-03-12T21:58:41.147Z",
+  "id": "Wyc4UIvCYgByrAwP",
   "name": "SA Contact Lead Pipeline",
   "description": null,
   "active": true,
@@ -19,8 +19,7 @@
         "path": "sa-lead-intake",
         "options": {},
         "httpMethod": "POST",
-        "responseMode": "responseNode",
-        "webhookId": "sa-lead-pipeline-001"
+        "responseMode": "responseNode"
       },
       "typeVersion": 2
     },
@@ -49,13 +48,13 @@
       "parameters": {
         "query": "INSERT INTO sa_leads (first_name, last_name, email, domain, service_area, message, status) VALUES ($1,$2,$3,$4,$5,$6,'pending_research') RETURNING id",
         "options": {
-          "queryReplacement": "={{ [\n  $json.body.first_name,\n  $json.body.last_name,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service_area,\n  $json.body.message\n] }}"
+          "queryReplacement": "={{ [\n  $json.body.firstName,\n  $json.body.lastName,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service,\n  $json.body.message\n] }}"
         },
         "operation": "executeQuery"
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -83,7 +82,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'. Service: '+$('Webhook').item.json.body.service_area+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
+              "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'. Service: '+$('Webhook').item.json.body.service+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
             },
             {
               "name": "response_format",
@@ -120,7 +119,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -148,7 +147,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service_area+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
+              "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
             },
             {
               "name": "response_format",
@@ -185,7 +184,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -213,7 +212,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
+              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
             },
             {
               "name": "response_format",
@@ -250,7 +249,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -273,7 +272,7 @@
             {
               "key": "Name",
               "type": "title",
-              "titleValue": "={{ $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name }}"
+              "titleValue": "={{ $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName }}"
             },
             {
               "key": "Email",
@@ -300,7 +299,7 @@
       },
       "credentials": {
         "notionApi": {
-          "id": "OU0MF8tF4h6Tb0uW",
+          "id": "2sSLfYtu6ueKRh4A",
           "name": "SA Notion"
         }
       },
@@ -324,7 +323,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -348,7 +347,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -371,7 +370,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -386,17 +385,17 @@
         100
       ],
       "parameters": {
-        "message": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.first_name }} {{ $('Webhook').item.json.body.last_name }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service_area }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>",
         "options": {},
-        "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' \u2014 ' + $('Webhook').item.json.body.service_area }}",
+        "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' \u2014 ' + $('Webhook').item.json.body.service }}",
         "toEmail": "={{ $env.NOTIFY_EMAIL }}",
         "fromEmail": "relder@sovereignadvisory.ai",
-        "emailFormat": "html"
+        "emailFormat": "html",
+        "html": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.firstName }} {{ $('Webhook').item.json.body.lastName }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>"
       },
       "credentials": {
         "smtp": {
-          "id": "R7l3YzvGGiSf2PrS",
-          "name": "SA Neo.space SMTP"
+          "id": "Mlb3R0OkWXvE3pbV",
+          "name": "SA Resend SMTP"
         }
       },
       "typeVersion": 2,
@@ -404,26 +403,44 @@
     },
     {
       "id": "08d4d4f8-077a-4f4e-b86f-9d1de9f27e25",
-      "name": "SMS (Verizon email gateway)",
-      "type": "n8n-nodes-base.emailSend",
+      "name": "SMS (Twilio)",
+      "type": "n8n-nodes-base.httpRequest",
       "position": [
         2200,
         250
       ],
       "parameters": {
-        "message": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
-        "options": {},
-        "subject": "New SA Lead",
-        "toEmail": "={{ $env.NOTIFY_SMS_EMAIL }}",
-        "fromEmail": "relder@sovereignadvisory.ai"
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "={{ $env.TWILIO_SMS_FROM }}"
+            },
+            {
+              "name": "To",
+              "value": "={{ $env.NOTIFY_SMS_TO }}"
+            },
+            {
+              "name": "Body",
+              "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' (' + $('Webhook').item.json.body.service + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}"
+            }
+          ]
+        },
+        "options": {}
       },
       "credentials": {
-        "smtp": {
-          "id": "R7l3YzvGGiSf2PrS",
-          "name": "SA Neo.space SMTP"
+        "httpBasicAuth": {
+          "id": "saElGHc6VYC1QIaS",
+          "name": "SA Twilio"
         }
       },
-      "typeVersion": 2,
+      "typeVersion": 4,
       "onError": "continueRegularOutput"
     },
     {
@@ -435,7 +452,7 @@
         400
       ],
       "parameters": {
-        "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service_area + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+        "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}",
         "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
         "additionalFields": {
           "parse_mode": "Markdown"
@@ -443,7 +460,7 @@
       },
       "credentials": {
         "telegramApi": {
-          "id": "MEWPjUrMwjkJ9XWP",
+          "id": "xenO3FMYF5CSJt9m",
           "name": "SA Telegram Bot"
         }
       },
@@ -476,7 +493,7 @@
             },
             {
               "name": "Body",
-              "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}"
+              "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' (' + $('Webhook').item.json.body.service + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}"
             }
           ]
         },
@@ -484,7 +501,7 @@
       },
       "credentials": {
         "httpBasicAuth": {
-          "id": "DZ1NSVibAbM2WXlp",
+          "id": "saElGHc6VYC1QIaS",
           "name": "SA Twilio"
         }
       },
@@ -516,9 +533,100 @@
         350
       ],
       "parameters": {
-        "mode": "expression",
-        "numberOutputs": 4,
-        "output": "={{ ({'approve':0,'regenerate':1,'queue':2,'dnfu':3}[$json.query.action]) ?? 3 }}"
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": ".query.action",
+                    "rightValue": "approve",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": ".query.action",
+                    "rightValue": "regenerate",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": ".query.action",
+                    "rightValue": "queue",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": ".query.action",
+                    "rightValue": "dnfu",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": false
+            }
+          ]
+        },
+        "options": {}
       },
       "typeVersion": 3
     },
@@ -540,8 +648,8 @@
       },
       "credentials": {
         "smtp": {
-          "id": "R7l3YzvGGiSf2PrS",
-          "name": "SA Neo.space SMTP"
+          "id": "Mlb3R0OkWXvE3pbV",
+          "name": "SA Resend SMTP"
         }
       },
       "typeVersion": 2
@@ -563,7 +671,7 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
@@ -591,7 +699,7 @@
             },
             {
               "name": "messages",
-              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Original draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer notes:\\n'+($json.notes||'')}] }}"
+              "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content+'\\n\\nPrevious draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer feedback (you MUST incorporate this):\\n'+($json.query.notes||'(none provided)')+'\\n\\nWrite a revised outreach email that fully addresses the reviewer feedback above.'}] }}"
             },
             {
               "name": "response_format",
@@ -628,11 +736,24 @@
       },
       "credentials": {
         "postgres": {
-          "id": "72Gr5GGT0iOjYXjc",
+          "id": "sos8Np7Bc9oPABA7",
           "name": "SA PostgreSQL"
         }
       },
       "typeVersion": 2
+    },
+    {
+      "id": "4c535cdd-6116-4173-bdbb-d15587743e9e",
+      "name": "Format Notification Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        300
+      ],
+      "parameters": {
+        "jsCode": "function safeParseJSON(content) {\n  if (!content) return {};\n  var cleaned = content.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```\\s*$/i, '').trim();\n  try { return JSON.parse(cleaned); } catch(e) { return { _raw: String(content).substring(0, 200) }; }\n}\nvar webhook = $('Webhook').item.json.body || {};\nvar token = $('Create Review Token').item.json.token;\nvar baseUrl = $env.LEAD_REVIEW_BASE_URL;\nvar researchContent = $('Company Research (LLM)').item.json.choices[0].message.content;\nvar analysisContent = $('AI Lead Analysis (LLM)').item.json.choices[0].message.content;\nvar draftContent = $('Generate Email Draft (LLM)').item.json.choices[0].message.content;\nvar research = safeParseJSON(researchContent);\nvar analysis = safeParseJSON(analysisContent);\nvar draft = safeParseJSON(draftContent);\nvar convStarters = analysis.conversation_starters || [];\nvar questions = analysis.questions || [];\nreturn [{\n  json: {\n    first_name: webhook.firstName || '',\n    last_name: webhook.lastName || '',\n    email: webhook.email || '',\n    company_name: webhook.company_name || 'N/A',\n    service_area: webhook.service || '',\n    phone: webhook.phone || 'N/A',\n    review_url: baseUrl + '/' + token,\n    research_summary: research.summary || 'N/A',\n    research_industry: research.industry || 'N/A',\n    research_size: research.size || 'N/A',\n    research_funding: research.funding_stage || 'N/A',\n    research_products: research.key_products || 'N/A',\n    research_news: research.recent_news || 'N/A',\n    analysis_summary: analysis.summary || 'N/A',\n    analysis_approach: analysis.approach || 'N/A',\n    analysis_starters: convStarters.slice(0,3).join(' | ') || 'N/A',\n    analysis_questions: questions.slice(0,3).join(' | ') || 'N/A',\n    draft_subject: draft.subject || 'New Lead',\n    draft_body: draft.body_text || draft.body || 'N/A'\n  }\n}];"
+      }
     }
   ],
   "connections": {
@@ -819,27 +940,62 @@
       "main": [
         [
           {
+            "node": "Format Notification Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Notification Data": {
+      "main": [
+        [
+          {
             "node": "Email Notification",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Email Notification": {
+      "main": [
+        [
           {
-            "node": "SMS (Verizon email gateway)",
+            "node": "SMS (Twilio)",
             "type": "main",
             "index": 0
-          },
-          {
-            "node": "Wait for Review Decision",
-            "type": "main",
-            "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "SMS (Twilio)": {
+      "main": [
+        [
           {
             "node": "Telegram Notification",
             "type": "main",
             "index": 0
-          },
+          }
+        ]
+      ]
+    },
+    "Telegram Notification": {
+      "main": [
+        [
           {
             "node": "WhatsApp (Twilio)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp (Twilio)": {
+      "main": [
+        [
+          {
+            "node": "Wait for Review Decision",
             "type": "main",
             "index": 0
           }
@@ -859,35 +1015,35 @@
     "instanceId": ""
   },
   "pinData": null,
-  "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-  "activeVersionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-  "versionCounter": 23,
+  "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
+  "activeVersionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
+  "versionCounter": 191,
   "triggerCount": 1,
   "shared": [
     {
-      "updatedAt": "2026-03-14T18:03:58.471Z",
-      "createdAt": "2026-03-14T18:03:58.471Z",
+      "updatedAt": "2026-03-12T21:58:41.147Z",
+      "createdAt": "2026-03-12T21:58:41.147Z",
       "role": "workflow:owner",
-      "workflowId": "sa-lead-pipeline-001",
-      "projectId": "McH7zyUSuk3mIOB2",
+      "workflowId": "Wyc4UIvCYgByrAwP",
+      "projectId": "9nfbed6kWhG9AlzC",
       "project": {
-        "updatedAt": "2026-03-14T18:00:56.159Z",
-        "createdAt": "2026-03-10T13:02:13.755Z",
-        "id": "McH7zyUSuk3mIOB2",
+        "updatedAt": "2026-03-14T17:20:00.372Z",
+        "createdAt": "2026-03-12T21:41:24.639Z",
+        "id": "9nfbed6kWhG9AlzC",
         "name": "Unnamed Project",
         "type": "personal",
         "icon": null,
         "description": null,
-        "creatorId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+        "creatorId": "22098edd-6722-4a81-acf5-8996c4d72365"
       }
     }
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-03-16T20:06:54.076Z",
-    "createdAt": "2026-03-14T18:03:58.471Z",
-    "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-    "workflowId": "sa-lead-pipeline-001",
+    "updatedAt": "2026-03-17T00:29:27.169Z",
+    "createdAt": "2026-03-17T00:29:27.169Z",
+    "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
+    "workflowId": "Wyc4UIvCYgByrAwP",
     "nodes": [
       {
         "id": "4bb7cacc-08c8-4b64-9437-35dc4aa8b3ea",
@@ -901,8 +1057,7 @@
           "path": "sa-lead-intake",
           "options": {},
           "httpMethod": "POST",
-          "responseMode": "responseNode",
-          "webhookId": "sa-lead-pipeline-001"
+          "responseMode": "responseNode"
         },
         "typeVersion": 2
       },
@@ -931,13 +1086,13 @@
         "parameters": {
           "query": "INSERT INTO sa_leads (first_name, last_name, email, domain, service_area, message, status) VALUES ($1,$2,$3,$4,$5,$6,'pending_research') RETURNING id",
           "options": {
-            "queryReplacement": "={{ [\n  $json.body.first_name,\n  $json.body.last_name,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service_area,\n  $json.body.message\n] }}"
+            "queryReplacement": "={{ [\n  $json.body.firstName,\n  $json.body.lastName,\n  $json.body.email,\n  $json.body.email.split('@')[1] || '',\n  $json.body.service,\n  $json.body.message\n] }}"
           },
           "operation": "executeQuery"
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -965,7 +1120,7 @@
               },
               {
                 "name": "messages",
-                "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'. Service: '+$('Webhook').item.json.body.service_area+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
+                "value": "={{ [{role:'system',content:\"You are a business intelligence researcher. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (2-3 paragraphs), industry, size, funding_stage, key_products, recent_news.\"},{role:'user',content:'Research the company at domain: '+$('Webhook').item.json.body.email.split('@').pop()+'. Contact: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'. Service: '+$('Webhook').item.json.body.service+'. Message: '+$('Webhook').item.json.body.message+'. Focus on: business model, size, recent news, tech stack, leadership.'}] }}"
               },
               {
                 "name": "response_format",
@@ -1002,7 +1157,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1030,7 +1185,7 @@
               },
               {
                 "name": "messages",
-                "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service_area+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
+                "value": "={{ [{role:'system',content:\"You are a senior business advisor at Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: summary (string, 2-3 paragraphs), approach (string, 1-2 paragraphs), conversation_starters (array of 3 strings), questions (array of 3 strings), scenarios (array of 3 strings).\"},{role:'user',content:'Lead:\\nName: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nEmail: '+$('Webhook').item.json.body.email+'\\nDomain: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nService: '+$('Webhook').item.json.body.service+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nCompany Research:\\n'+$('Company Research (LLM)').item.json.choices[0].message.content}] }}"
               },
               {
                 "name": "response_format",
@@ -1067,7 +1222,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1095,7 +1250,7 @@
               },
               {
                 "name": "messages",
-                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.first_name+' '+$('Webhook').item.json.body.last_name+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
+                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content}] }}"
               },
               {
                 "name": "response_format",
@@ -1132,7 +1287,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1155,7 +1310,7 @@
               {
                 "key": "Name",
                 "type": "title",
-                "titleValue": "={{ $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name }}"
+                "titleValue": "={{ $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName }}"
               },
               {
                 "key": "Email",
@@ -1182,7 +1337,7 @@
         },
         "credentials": {
           "notionApi": {
-            "id": "OU0MF8tF4h6Tb0uW",
+            "id": "2sSLfYtu6ueKRh4A",
             "name": "SA Notion"
           }
         },
@@ -1206,7 +1361,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1230,7 +1385,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1253,7 +1408,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1268,17 +1423,17 @@
           100
         ],
         "parameters": {
-          "message": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.first_name }} {{ $('Webhook').item.json.body.last_name }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service_area }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>",
           "options": {},
-          "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' \u2014 ' + $('Webhook').item.json.body.service_area }}",
+          "subject": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' \u2014 ' + $('Webhook').item.json.body.service }}",
           "toEmail": "={{ $env.NOTIFY_EMAIL }}",
           "fromEmail": "relder@sovereignadvisory.ai",
-          "emailFormat": "html"
+          "emailFormat": "html",
+          "html": "=<p>New lead ready for review.</p><p><b>Name:</b> {{ $('Webhook').item.json.body.firstName }} {{ $('Webhook').item.json.body.lastName }}<br><b>Email:</b> {{ $('Webhook').item.json.body.email }}<br><b>Service:</b> {{ $('Webhook').item.json.body.service }}</p><p><a href='{{ $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}'>Review Lead</a></p>"
         },
         "credentials": {
           "smtp": {
-            "id": "R7l3YzvGGiSf2PrS",
-            "name": "SA Neo.space SMTP"
+            "id": "Mlb3R0OkWXvE3pbV",
+            "name": "SA Resend SMTP"
           }
         },
         "typeVersion": 2,
@@ -1286,26 +1441,44 @@
       },
       {
         "id": "08d4d4f8-077a-4f4e-b86f-9d1de9f27e25",
-        "name": "SMS (Verizon email gateway)",
-        "type": "n8n-nodes-base.emailSend",
+        "name": "SMS (Twilio)",
+        "type": "n8n-nodes-base.httpRequest",
         "position": [
           2200,
           250
         ],
         "parameters": {
-          "message": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
-          "options": {},
-          "subject": "New SA Lead",
-          "toEmail": "={{ $env.NOTIFY_SMS_EMAIL }}",
-          "fromEmail": "relder@sovereignadvisory.ai"
+          "url": "=https://api.twilio.com/2010-04-01/Accounts/{{ $env.TWILIO_ACCOUNT_SID }}/Messages.json",
+          "method": "POST",
+          "sendBody": true,
+          "contentType": "form-urlencoded",
+          "authentication": "genericCredentialType",
+          "genericAuthType": "httpBasicAuth",
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "From",
+                "value": "={{ $env.TWILIO_SMS_FROM }}"
+              },
+              {
+                "name": "To",
+                "value": "={{ $env.NOTIFY_SMS_TO }}"
+              },
+              {
+                "name": "Body",
+                "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' (' + $('Webhook').item.json.body.service + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}"
+              }
+            ]
+          },
+          "options": {}
         },
         "credentials": {
-          "smtp": {
-            "id": "R7l3YzvGGiSf2PrS",
-            "name": "SA Neo.space SMTP"
+          "httpBasicAuth": {
+            "id": "saElGHc6VYC1QIaS",
+            "name": "SA Twilio"
           }
         },
-        "typeVersion": 2,
+        "typeVersion": 4,
         "onError": "continueRegularOutput"
       },
       {
@@ -1317,7 +1490,7 @@
           400
         ],
         "parameters": {
-          "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service_area + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}",
+          "text": "={{ '\ud83d\udd14 *New SA Lead*\\n\\n*Prospect:* ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + '\\n*Email:* ' + $('Webhook').item.json.body.email + '\\n*Service:* ' + $('Webhook').item.json.body.service + '\\n\\n\ud83d\udd17 Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}",
           "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
           "additionalFields": {
             "parse_mode": "Markdown"
@@ -1325,7 +1498,7 @@
         },
         "credentials": {
           "telegramApi": {
-            "id": "MEWPjUrMwjkJ9XWP",
+            "id": "xenO3FMYF5CSJt9m",
             "name": "SA Telegram Bot"
           }
         },
@@ -1358,7 +1531,7 @@
               },
               {
                 "name": "Body",
-                "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.first_name + ' ' + $('Webhook').item.json.body.last_name + ' (' + $('Webhook').item.json.body.service_area + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/review/' + $('Create Review Token').item.json.token }}"
+                "value": "={{ 'New SA Lead: ' + $('Webhook').item.json.body.firstName + ' ' + $('Webhook').item.json.body.lastName + ' (' + $('Webhook').item.json.body.service + '). Review: ' + $env.LEAD_REVIEW_BASE_URL + '/' + $('Create Review Token').item.json.token }}"
               }
             ]
           },
@@ -1366,7 +1539,7 @@
         },
         "credentials": {
           "httpBasicAuth": {
-            "id": "DZ1NSVibAbM2WXlp",
+            "id": "saElGHc6VYC1QIaS",
             "name": "SA Twilio"
           }
         },
@@ -1398,9 +1571,100 @@
           350
         ],
         "parameters": {
-          "mode": "expression",
-          "numberOutputs": 4,
-          "output": "={{ ({'approve':0,'regenerate':1,'queue':2,'dnfu':3}[$json.query.action]) ?? 3 }}"
+          "mode": "rules",
+          "rules": {
+            "values": [
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": ".query.action",
+                      "rightValue": "approve",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "singleValue": true
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": false
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": ".query.action",
+                      "rightValue": "regenerate",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "singleValue": true
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": false
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": ".query.action",
+                      "rightValue": "queue",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "singleValue": true
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": false
+              },
+              {
+                "conditions": {
+                  "options": {
+                    "caseSensitive": true,
+                    "leftValue": "",
+                    "typeValidation": "strict"
+                  },
+                  "conditions": [
+                    {
+                      "leftValue": ".query.action",
+                      "rightValue": "dnfu",
+                      "operator": {
+                        "type": "string",
+                        "operation": "equals",
+                        "singleValue": true
+                      }
+                    }
+                  ],
+                  "combinator": "and"
+                },
+                "renameOutput": false
+              }
+            ]
+          },
+          "options": {}
         },
         "typeVersion": 3
       },
@@ -1422,8 +1686,8 @@
         },
         "credentials": {
           "smtp": {
-            "id": "R7l3YzvGGiSf2PrS",
-            "name": "SA Neo.space SMTP"
+            "id": "Mlb3R0OkWXvE3pbV",
+            "name": "SA Resend SMTP"
           }
         },
         "typeVersion": 2
@@ -1445,7 +1709,7 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
@@ -1473,7 +1737,7 @@
               },
               {
                 "name": "messages",
-                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \\u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Original draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer notes:\\n'+($json.notes||'')}] }}"
+                "value": "={{ [{role:'system',content:\"You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. Return ONLY a valid JSON object \u2014 no preamble, no explanation, no markdown. Your entire response must be pure JSON starting with { and ending with }. Fields: subject (string), body_text (plain text email, no HTML).\"},{role:'user',content:'Prospect: '+$('Webhook').item.json.body.firstName+' '+$('Webhook').item.json.body.lastName+'\\nCompany: '+$('Webhook').item.json.body.email.split('@').pop()+'\\nMessage: '+$('Webhook').item.json.body.message+'\\n\\nStrategic analysis:\\n'+$('AI Lead Analysis (LLM)').item.json.choices[0].message.content+'\\n\\nPrevious draft:\\n'+$('Generate Email Draft (LLM)').item.json.choices[0].message.content+'\\n\\nReviewer feedback (you MUST incorporate this):\\n'+($json.query.notes||'(none provided)')+'\\n\\nWrite a revised outreach email that fully addresses the reviewer feedback above.'}] }}"
               },
               {
                 "name": "response_format",
@@ -1510,11 +1774,24 @@
         },
         "credentials": {
           "postgres": {
-            "id": "72Gr5GGT0iOjYXjc",
+            "id": "sos8Np7Bc9oPABA7",
             "name": "SA PostgreSQL"
           }
         },
         "typeVersion": 2
+      },
+      {
+        "id": "4c535cdd-6116-4173-bdbb-d15587743e9e",
+        "name": "Format Notification Data",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          2100,
+          300
+        ],
+        "parameters": {
+          "jsCode": "function safeParseJSON(content) {\n  if (!content) return {};\n  var cleaned = content.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```\\s*$/i, '').trim();\n  try { return JSON.parse(cleaned); } catch(e) { return { _raw: String(content).substring(0, 200) }; }\n}\nvar webhook = $('Webhook').item.json.body || {};\nvar token = $('Create Review Token').item.json.token;\nvar baseUrl = $env.LEAD_REVIEW_BASE_URL;\nvar researchContent = $('Company Research (LLM)').item.json.choices[0].message.content;\nvar analysisContent = $('AI Lead Analysis (LLM)').item.json.choices[0].message.content;\nvar draftContent = $('Generate Email Draft (LLM)').item.json.choices[0].message.content;\nvar research = safeParseJSON(researchContent);\nvar analysis = safeParseJSON(analysisContent);\nvar draft = safeParseJSON(draftContent);\nvar convStarters = analysis.conversation_starters || [];\nvar questions = analysis.questions || [];\nreturn [{\n  json: {\n    first_name: webhook.firstName || '',\n    last_name: webhook.lastName || '',\n    email: webhook.email || '',\n    company_name: webhook.company_name || 'N/A',\n    service_area: webhook.service || '',\n    phone: webhook.phone || 'N/A',\n    review_url: baseUrl + '/' + token,\n    research_summary: research.summary || 'N/A',\n    research_industry: research.industry || 'N/A',\n    research_size: research.size || 'N/A',\n    research_funding: research.funding_stage || 'N/A',\n    research_products: research.key_products || 'N/A',\n    research_news: research.recent_news || 'N/A',\n    analysis_summary: analysis.summary || 'N/A',\n    analysis_approach: analysis.approach || 'N/A',\n    analysis_starters: convStarters.slice(0,3).join(' | ') || 'N/A',\n    analysis_questions: questions.slice(0,3).join(' | ') || 'N/A',\n    draft_subject: draft.subject || 'New Lead',\n    draft_body: draft.body_text || draft.body || 'N/A'\n  }\n}];"
+        }
       }
     ],
     "connections": {
@@ -1701,15 +1978,60 @@
         "main": [
           [
             {
+              "node": "Format Notification Data",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format Notification Data": {
+        "main": [
+          [
+            {
               "node": "Email Notification",
               "type": "main",
               "index": 0
-            },
+            }
+          ]
+        ]
+      },
+      "Email Notification": {
+        "main": [
+          [
             {
-              "node": "SMS (Verizon email gateway)",
+              "node": "SMS (Twilio)",
               "type": "main",
               "index": 0
-            },
+            }
+          ]
+        ]
+      },
+      "SMS (Twilio)": {
+        "main": [
+          [
+            {
+              "node": "Telegram Notification",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Telegram Notification": {
+        "main": [
+          [
+            {
+              "node": "WhatsApp (Twilio)",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "WhatsApp (Twilio)": {
+        "main": [
+          [
             {
               "node": "Wait for Review Decision",
               "type": "main",
@@ -1725,92 +2047,36 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-03-14T18:04:09.599Z",
-        "id": 42,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T19:41:52.840Z",
-        "id": 43,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "createdAt": "2026-03-18T19:37:04.889Z",
+        "id": 137,
+        "workflowId": "Wyc4UIvCYgByrAwP",
+        "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
         "event": "deactivated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
       },
       {
-        "createdAt": "2026-03-16T19:41:57.914Z",
-        "id": 44,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "createdAt": "2026-03-18T19:37:04.933Z",
+        "id": 138,
+        "workflowId": "Wyc4UIvCYgByrAwP",
+        "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
         "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
       },
       {
-        "createdAt": "2026-03-16T19:49:41.245Z",
-        "id": 45,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "createdAt": "2026-03-18T19:38:29.221Z",
+        "id": 139,
+        "workflowId": "Wyc4UIvCYgByrAwP",
+        "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
         "event": "deactivated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
       },
       {
-        "createdAt": "2026-03-16T19:49:41.308Z",
-        "id": 46,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
+        "createdAt": "2026-03-18T19:38:31.324Z",
+        "id": 140,
+        "workflowId": "Wyc4UIvCYgByrAwP",
+        "versionId": "1b3d5bf4-b541-40e4-8314-3b79a78a9215",
         "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T19:55:49.802Z",
-        "id": 47,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "deactivated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T19:55:49.849Z",
-        "id": 48,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T20:00:35.338Z",
-        "id": 49,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "deactivated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T20:00:35.382Z",
-        "id": 50,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T20:07:12.445Z",
-        "id": 51,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "deactivated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
-      },
-      {
-        "createdAt": "2026-03-16T20:07:12.493Z",
-        "id": 52,
-        "workflowId": "sa-lead-pipeline-001",
-        "versionId": "6fd2a4b6-78e6-45bb-8db2-0de7ee9713b0",
-        "event": "activated",
-        "userId": "a794a3d7-76bf-47ad-a281-d98a8ae666cf"
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
       }
     ]
   }
