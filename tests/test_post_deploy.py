@@ -96,6 +96,15 @@ def test_webui_health(page: Page, webui_url: str) -> None:
         f"webui /health returned {response.status if response else 'None'}"
 
 
+# ── JupyterLab ───────────────────────────────────────────────────────────────
+
+def test_jupyter_redirects_to_keycloak_for_login(page: Page, jupyter_url: str) -> None:
+    """JupyterLab must redirect unauthenticated requests to Keycloak."""
+    page.goto(f"{jupyter_url}/")
+    page.wait_for_url("**/realms/agentic-sdlc/**", timeout=10_000)
+    assert "agentic-sdlc" in page.url
+
+
 # ── LiteLLM ──────────────────────────────────────────────────────────────────
 
 def test_litellm_redirects_to_keycloak_for_login(page: Page, litellm_url: str) -> None:
