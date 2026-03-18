@@ -4,20 +4,14 @@
   // Python 3.11 devcontainer base (pip is not system-managed here)
   "image": "mcr.microsoft.com/devcontainers/python:3.11",
 
-  // Option 3: forward local Docker socket so backup_test.sh and
-  // test_backup_container_is_running can reach the host stack.
-  // Works in VS Code Remote Containers (local) — NOT in Codespaces
-  // (Codespaces has its own Docker daemon, not the host's).
-  // Comment out the mounts block to disable.
-  "mounts": [
-    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
-  ],
+  // Docker socket mount — for VS Code Remote Containers (local) only.
+  // In Codespaces this mounts the Codespace's own Docker daemon (not the host VPS).
+  // Uncomment if running locally with VS Code Remote Containers.
+  // "mounts": [
+  //   "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  // ],
 
   "features": {
-    // Docker CLI (client only — uses the forwarded socket above)
-    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
-      "moby": "false"
-    },
     // Gives us git, curl, jq out of the box
     "ghcr.io/devcontainers/features/common-utils:2": {
       "installZsh": false,
