@@ -1,5 +1,6 @@
 import os
 import pytest
+from playwright.sync_api import Browser
 
 
 BASE_URL = os.environ.get("BASE_URL", "http://localhost")
@@ -35,3 +36,12 @@ def lead_review_url() -> str:
 @pytest.fixture(scope="session")
 def lead_review_password() -> str:
     return LEAD_REVIEW_PASSWORD
+
+
+@pytest.fixture(scope="function")
+def page(browser: Browser):
+    """Fresh browser context per test — prevents sessionStorage/cookie bleed between tests."""
+    context = browser.new_context()
+    pg = context.new_page()
+    yield pg
+    context.close()

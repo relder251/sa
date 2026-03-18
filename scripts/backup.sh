@@ -35,20 +35,21 @@ echo "=== Backup starting: $DATE (dry-run: $DRY_RUN) ==="
 # --- Postgres: all databases via pg_dumpall ---
 # litellm is the bootstrap superuser (POSTGRES_USER in docker-compose.yml).
 # pg_dumpall requires superuser — do not replace with an application-scoped role.
+# Write to .tmp first; atomic rename on success prevents corrupt partial files.
 echo "--- postgres ---"
-run bash -c "pg_dumpall | gzip > \"$BACKUP_DIR/postgres_${DATE}.sql.gz\""
+run bash -c "pg_dumpall | gzip > \"$BACKUP_DIR/postgres_${DATE}.sql.gz.tmp\" && mv \"$BACKUP_DIR/postgres_${DATE}.sql.gz.tmp\" \"$BACKUP_DIR/postgres_${DATE}.sql.gz\""
 
 # --- Output directory ---
 echo "--- output ---"
-run tar -czf "$BACKUP_DIR/output_${DATE}.tar.gz" -C /data output
+run bash -c "tar -czf \"$BACKUP_DIR/output_${DATE}.tar.gz.tmp\" -C /data output && mv \"$BACKUP_DIR/output_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/output_${DATE}.tar.gz\""
 
 # --- Opportunities directory ---
 echo "--- opportunities ---"
-run tar -czf "$BACKUP_DIR/opportunities_${DATE}.tar.gz" -C /data opportunities
+run bash -c "tar -czf \"$BACKUP_DIR/opportunities_${DATE}.tar.gz.tmp\" -C /data opportunities && mv \"$BACKUP_DIR/opportunities_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/opportunities_${DATE}.tar.gz\""
 
 # --- SSL certificates ---
 echo "--- ssl ---"
-run tar -czf "$BACKUP_DIR/ssl_${DATE}.tar.gz" -C / ssl
+run bash -c "tar -czf \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" -C / ssl && mv \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/ssl_${DATE}.tar.gz\""
 
 if $DRY_RUN; then
   echo "=== Dry-run complete — no files written ==="
