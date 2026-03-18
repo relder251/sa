@@ -82,11 +82,11 @@ services:
       - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
       # ── Keycloak OIDC SSO (enable after configuring Keycloak realm) ─────────
-      - N8N_SSO_OIDC_ENABLED=${N8N_SSO_OIDC_ENABLED:-false}
+      - N8N_SSO_OIDC_ENABLED=true
       - N8N_SSO_OIDC_ISSUER_URL=http://keycloak:8080/realms/agentic-sdlc
       - N8N_SSO_OIDC_CLIENT_ID=n8n
-      - N8N_SSO_OIDC_CLIENT_SECRET=${N8N_OIDC_CLIENT_SECRET:-}
-      - N8N_SSO_OIDC_REDIRECT_URL=http://localhost:5678/rest/oauth2-credential/callback
+      - N8N_SSO_OIDC_CLIENT_SECRET=${N8N_OIDC_CLIENT_SECRET}
+      - N8N_SSO_OIDC_REDIRECT_URL=https://n8n.private.sovereignadvisory.ai/rest/sso/oidc/callback
     depends_on:
       postgres:
         condition: service_healthy
