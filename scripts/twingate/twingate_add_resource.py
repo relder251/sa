@@ -171,7 +171,7 @@ def create_resource(
     ) {
       resourceCreate(
         name: $name
-        address: { value: $address }
+        address: $address
         remoteNetworkId: $remoteNetworkId
         groupIds: $groupIds
         protocols: {
@@ -185,7 +185,6 @@ def create_resource(
         entity {
           id
           name
-          address { value }
           remoteNetwork { id name }
         }
       }
@@ -241,7 +240,7 @@ def main() -> int:
             "result": "ok",
             "id": entity["id"],
             "name": entity["name"],
-            "address": entity["address"]["value"],
+            "address": cfg.address,
             "remote_network": entity["remoteNetwork"]["name"],
             "remote_network_id": entity["remoteNetwork"]["id"],
             "group": group["name"] if group else None,
