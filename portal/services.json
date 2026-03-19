@@ -62,13 +62,13 @@
     },
     {
       "id": "pipeline",
-      "name": "Lead Pipeline",
-      "url": "https://sovereignadvisory.ai/review/",
-      "description": "Lead review & pipeline board",
+      "name": "Pipeline WebUI",
+      "url": "https://webui.private.sovereignadvisory.ai",
+      "description": "Agentic SDLC pipeline interface",
       "icon": "🎯",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 2
+      "ssoTier": 1
     },
     {
       "id": "litellm",
@@ -86,16 +86,6 @@
       "url": "https://jupyter.private.sovereignadvisory.ai",
       "description": "Interactive dev notebooks",
       "icon": "📓",
-      "category": "ai",
-      "favorite": false,
-      "ssoTier": 1
-    },
-    {
-      "id": "webui",
-      "name": "Open WebUI",
-      "url": "https://webui.private.sovereignadvisory.ai",
-      "description": "LLM chat interface",
-      "icon": "💬",
       "category": "ai",
       "favorite": false,
       "ssoTier": 1
