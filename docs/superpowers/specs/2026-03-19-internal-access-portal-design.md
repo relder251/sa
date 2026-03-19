@@ -22,25 +22,27 @@ A self-hosted internal access portal at `home.private.sovereignadvisory.ai` that
 
 ## Architecture
 
-Two Nginx containers are involved — do not conflate them:
+### Two Nginx containers — do not conflate them
 
 | Container | Role |
 |---|---|
-| `sa-nginx-private` | Existing edge reverse proxy; routes `*.private.sovereignadvisory.ai` traffic to service-specific oauth2-proxy containers |
-| `portal` (new) | Dedicated Nginx container that serves the portal static files for `home.private.sovereignadvisory.ai` |
+| `sa_nginx_private` | Existing external container (not defined in `docker-compose.yml`); acts as TLS-terminating edge proxy for `*.private.sovereignadvisory.ai`; routes to service-specific oauth2-proxy containers on `vibe_net` |
+| `portal` (new) | New `nginx:alpine` container added to `docker-compose.yml`; serves the portal static files; sits behind `oauth2_proxy_portal` |
 
-Request flow:
+### Request flow
 
 ```
 Browser → Twingate (home.private.sovereignadvisory.ai)
-        → sa-nginx-private (TLS termination, routes to oauth2_proxy_portal)
+        → sa_nginx_private (TLS termination, routes to oauth2_proxy_portal:4180)
         → oauth2_proxy_portal (authenticates against Keycloak agentic-sdlc realm)
-        → portal (Nginx, serves static HTML/JS/CSS + proxies /api/ to n8n)
+        → portal:80 (serves static HTML/JS/CSS; proxies /api/ calls to n8n)
 ```
 
-Clicking a card for an **internal service** follows the same pattern for that service's own subdomain (each has its own `oauth2_proxy_<name>` container). Clicking a card for an **external service** opens the URL directly in a new tab; Vaultwarden autofill handles credentials.
+`sa_nginx_private` needs a new server block for `home.private.sovereignadvisory.ai` that proxies to `oauth2_proxy_portal:4180` (see Nginx Configuration section).
 
-The portal itself is a **static HTML/CSS/JS application** served by the `portal` Nginx container. Dynamic state (service registry, categories) is stored in a `services.json` file that the portal fetches on load. All mutations to `services.json` go through an **n8n provisioning webhook** — the portal never writes config directly.
+Clicking a card for an **internal service** follows the same pattern for that service's own subdomain — each has its own `oauth2_proxy_<name>` container or native OIDC integration. Clicking a card for an **external service** opens the URL in a new tab; Vaultwarden autofill handles credentials.
+
+The portal itself is a **static HTML/CSS/JS application** served by the `portal` container. Dynamic state (service registry, categories) is stored in a `services.json` file that the portal fetches on load. All mutations to `services.json` go through **n8n provisioning webhooks** — the portal never writes config directly.
 
 ### Components
 
@@ -49,11 +51,14 @@ The portal itself is a **static HTML/CSS/JS application** served by the `portal`
 | `portal/index.html` | Main application (sidebar + grid UI) |
 | `portal/services.json` | Source of truth for registered services and categories (writable by n8n) |
 | `portal/assets/` | CSS, fonts, icons |
-| `nginx/conf.d/portal.conf` | Nginx vhost for portal container: serves static files, proxies `/api/` to n8n |
-| `docker-compose.yml` | `portal` service and `oauth2_proxy_portal` service (with full env vars) |
-| `docker-compose.override.yml` | New `oauth2_proxy_<name>` containers appended by n8n provisioning workflow |
+| `nginx/conf.d/portal.conf` | Nginx vhost config for the `portal` container: serves static files, proxies `/api/` to n8n |
+| `nginx-private/conf.d/home.conf` | New server block in `sa_nginx_private` config: routes `home.private.sovereignadvisory.ai` to `oauth2_proxy_portal:4180` |
+| `docker-compose.yml` | `portal` service and `oauth2_proxy_portal` service (with full env vars); also `portal` volume mount added to n8n service |
+| `docker-compose.override.yml` | New `oauth2_proxy_<name>` containers appended by n8n provisioning workflow; auto-merged by Docker Compose (same directory as `docker-compose.yml`) |
 | n8n workflow: `portal-provision` | Handles Add Service webhook: Keycloak + oauth2-proxy + Nginx + Twingate + services.json |
-| n8n workflow: `portal-update` | Handles Edit/Delete service webhook: updates services.json |
+| n8n workflow: `portal-update` | Handles Edit service webhook: updates services.json |
+| n8n workflow: `portal-delete` | Handles Delete service webhook: removes entry from services.json |
+| n8n workflow: `portal-update-categories` | Handles category mutations: replaces categories array in services.json |
 
 ---
 
@@ -119,22 +124,26 @@ Categories are user-extensible (see Add Category below).
 
 ### Initial service registry
 
-> **Note on Pipeline Board:** The Pipeline Board subdomain (`pipeline.private.sovereignadvisory.ai`) was removed from the Nginx and Twingate configuration in commit `44ff980`. It is included in the portal registry as a card but will be treated as an external/Tier 3 service (URL opens directly) until Nginx and Twingate resources are re-provisioned for it.
+> **Notes on initial SSO tiers:**
+> - **n8n**: Has `N8N_SSO_OIDC_ENABLED=true` in `docker-compose.yml` (full Keycloak OIDC config). `ssoTier: 1`.
+> - **LiteLLM**: `oauth2_proxy_litellm` container already defined in `docker-compose.yml`. `ssoTier: 1`.
+> - **JupyterLab**: `oauth2_proxy_jupyter` container already defined in `docker-compose.yml`. `ssoTier: 1`.
+> - **Vaultwarden**: Has native `SSO_ENABLED=true` OIDC integration in `docker-compose.yml` (no oauth2-proxy needed). `ssoTier: 1`.
+> - **Pipeline Board**: Subdomain removed from `sa_nginx_private` and Twingate in commit `44ff980`. Portal card links to `pipeline.private.sovereignadvisory.ai` but opens without SSO passthrough until infra is re-provisioned. `ssoTier: 3`.
+> - All external SaaS services: `ssoTier: 3` (Vaultwarden autofill).
 
 | Service | Category | URL | SSO Tier |
 |---|---|---|---|
-| n8n | Automation | `https://n8n.private.sovereignadvisory.ai` | 3 |
-| Pipeline Board | Automation | `https://pipeline.private.sovereignadvisory.ai` | 3 (infra not provisioned) |
-| LiteLLM | AI / Models | `https://litellm.private.sovereignadvisory.ai` | 1 (pending oauth2-proxy) |
-| JupyterLab | AI / Models | `https://jupyter.private.sovereignadvisory.ai` | 1 (pending oauth2-proxy) |
-| Vaultwarden | Security | `https://vault.private.sovereignadvisory.ai` | 1 (pending oauth2-proxy) |
+| n8n | Automation | `https://n8n.private.sovereignadvisory.ai` | 1 |
+| Pipeline Board | Automation | `https://pipeline.private.sovereignadvisory.ai` | 3 (infra removed) |
+| LiteLLM | AI / Models | `https://litellm.private.sovereignadvisory.ai` | 1 |
+| JupyterLab | AI / Models | `https://jupyter.private.sovereignadvisory.ai` | 1 |
+| Vaultwarden | Security | `https://vault.private.sovereignadvisory.ai` | 1 (native OIDC) |
 | Keycloak | Security | `https://kc.sovereignadvisory.ai` | 3 |
 | Twingate | Infrastructure | `https://www.twingate.com/dashboard` | 3 |
 | Cloudflare | Infrastructure | `https://dash.cloudflare.com` | 3 |
 | Hostinger | Infrastructure | `https://hpanel.hostinger.com` | 3 |
 | Notion | Productivity | `https://notion.so` | 3 |
-
-Services showing "pending oauth2-proxy" become Tier 1 once their `oauth2_proxy_<name>` containers are provisioned via the Add Service wizard or manual setup. Until then they are accessible but will prompt for their own login.
 
 ---
 
@@ -146,28 +155,26 @@ Authentication to the portal is handled by **oauth2-proxy + Keycloak** (agentic-
 
 `isInternal` is a **URL-derived signal** used only during provisioning. It answers: "does this URL belong to the `*.private.sovereignadvisory.ai` domain?" If yes, the provisioning workflow creates the full oauth2-proxy + Nginx + Twingate + Keycloak stack for the service.
 
-`ssoTier` is a **capability label** stored in `services.json` and set by the provisioning workflow. It answers: "what kind of authentication experience does the user get right now?" A service may have `isInternal: true` but `ssoTier: 3` if its oauth2-proxy container has not yet been provisioned (e.g., n8n community edition, Pipeline Board without infra).
+`ssoTier` is a **capability label** stored in `services.json` and set by the provisioning workflow. It answers: "what kind of authentication experience does the user get right now?" A service may have `isInternal: true` but `ssoTier: 3` if its infrastructure has not been provisioned (e.g., Pipeline Board).
 
-### Tier 1 — Full SSO (internal services behind oauth2-proxy)
-Services provisioned through the Add Service wizard get their own `oauth2-proxy` container configured against the same Keycloak realm. The Keycloak session cookie is shared across all `*.private.sovereignadvisory.ai` subdomains (set as `cookie_domain = .sovereignadvisory.ai` in each oauth2-proxy config). Clicking the card opens the service with no second authentication prompt.
+### Tier 1 — Full SSO
 
-**Applies to:** LiteLLM, JupyterLab, Vaultwarden (web UI), and any future internal service provisioned via the wizard.
+Services get Tier 1 access via one of two paths:
+
+- **oauth2-proxy pattern** (n8n, LiteLLM, JupyterLab, future wizard-provisioned services): Each service has its own `oauth2_proxy_<name>` container on `vibe_net`. `sa_nginx_private` routes the service's subdomain to this proxy, which validates the Keycloak session and forwards to the upstream. The shared `OAUTH2_PROXY_COOKIE_SECRET` and `cookie-domain=.sovereignadvisory.ai` (where applicable) means the Keycloak session is recognised across subdomains.
+- **Native OIDC pattern** (Vaultwarden): The service integrates directly with Keycloak OIDC without an oauth2-proxy container. `SSO_ENABLED=true` in `docker-compose.yml`.
 
 ### Tier 2 — Header injection (token-accepting services)
-For services that accept `Authorization: Bearer` or `X-Auth-Request-User` / `X-Auth-Request-Email` headers, `sa-nginx-private` uses `auth_request` to forward the Keycloak session and injects headers. The user gets transparent access without a second prompt.
+For services that accept `Authorization: Bearer` or `X-Auth-Request-User` / `X-Auth-Request-Email` headers, `sa_nginx_private` injects these from the oauth2-proxy session using `auth_request`. Transparent access without a second prompt.
 
 **Applies to:** JupyterLab (token-based), LiteLLM admin UI.
 
 ### Tier 3 — Vaultwarden autofill assist
-For services that have their own login UI and cannot federate with Keycloak, the portal opens the service URL in a new tab and the Vaultwarden browser extension detects the login form and autofills credentials stored in Vaultwarden. The `credentialHint` field in `services.json` optionally links to the relevant Vaultwarden item URI.
+For services that cannot federate with Keycloak, the portal opens the service URL in a new tab. The Vaultwarden browser extension detects the login form and autofills stored credentials. The optional `credentialHint` field in `services.json` links to the relevant Vaultwarden item URI.
 
-**Applies to:**
-- **n8n community edition** — enterprise OIDC not included; autofill via Vaultwarden
-- **Pipeline Board** — infrastructure not provisioned; opens directly
-- **Keycloak admin console** — is the IdP itself; cannot proxy its own auth
-- **Cloudflare, Hostinger, Notion, Twingate** — external SaaS with independent auth
+**Applies to:** Pipeline Board (infra removed), Keycloak admin console (is the IdP itself), Cloudflare, Hostinger, Notion, Twingate.
 
-> **Note:** The Tier 3 gap for n8n is addressable in future via the n8n Enterprise license (~$50/mo). The Notion SAML SSO option (Business plan) would move it to Tier 1. These are tracked as future upgrade paths, not blockers.
+> **Note:** Tier 3 for Pipeline Board is temporary — re-running the Add Service wizard for `pipeline.private.sovereignadvisory.ai` will restore Tier 1. Keycloak and external SaaS are permanently Tier 3.
 
 ---
 
@@ -188,49 +195,47 @@ The detection result sets `isInternal` which controls Step 3 provisioning plan a
 Tile picker showing all current categories. Includes `＋ New` dashed tile that expands an inline form:
 - Emoji icon picker + category name input + Add button
 - Creates category in the registry, adds it to the sidebar, auto-selects it
-- New categories persist in `services.json`
+- New categories persist in `services.json` via `portal-update-categories`
 
 ### Step 3 — Review
 Displays a checklist of what will be provisioned. Content differs by `isInternal`:
 
 **Internal:**
-1. Keycloak OIDC Client — create confidential client in `agentic-sdlc` realm, set redirect URI to `https://<subdomain>.private.sovereignadvisory.ai/oauth2/callback`, assign `portal-user` role
-2. oauth2-proxy container — generate config block from template, append to `docker-compose.override.yml`
-3. Nginx reverse proxy rule — add upstream + location block to `conf.d/<name>.conf`, reload `sa-nginx-private`
+1. Keycloak OIDC Client — create confidential client in `agentic-sdlc` realm, set redirect URI to `https://<subdomain>.private.sovereignadvisory.ai/oauth2/callback`, assign `portal-user` realm role
+2. oauth2-proxy container — generate config block from template, append to `docker-compose.override.yml`, run `docker compose up -d`
+3. Nginx reverse proxy rule — write `nginx-private/conf.d/<name>.conf`, run `docker exec sa_nginx_private nginx -s reload`
 4. Twingate resource — register private DNS alias via Twingate API
 5. Portal card — service appears in selected category with live status
 
 **External:**
 1. Portal card — link card added to the portal
-2. Vaultwarden entry (optional) — credential record linked from the card via `credentialHint` field
+2. Vaultwarden credential hint (optional) — `credentialHint` field linked from the card
 
 ### Step 4 — Deploy
-The portal POSTs to the n8n provisioning webhook (`/api/portal-provision`, which Nginx proxies to n8n at `/webhook/portal-provision`). The step shows a **cosmetic** progress bar that advances on a fixed timer (roughly matching expected provisioning duration — ~30s for internal, instant for external). The portal does not poll n8n for intermediate status; it waits for the HTTP response (n8n returns only when all steps complete or on error). On success response, the progress bar completes, displays service name + "Service is live and accessible via SSO", and the modal closes. The new card is injected into the grid using the `card` object from the webhook response.
+The portal POSTs to `/api/portal-provision` (Nginx proxies to `http://n8n:5678/webhook/portal-provision`). The step shows a **cosmetic** progress bar advancing on a fixed timer (~30s for internal, ~2s for external). The portal does not poll n8n — it waits for the HTTP response; n8n returns only when all provisioning steps complete or on error. On success, the bar completes, shows "Service is live", and the modal closes with the new card injected from the `card` object in the response.
 
 If n8n returns an error, Step 4 shows the error message and a "Try again" button.
-
-The n8n workflow is responsible for all side-effects (Keycloak API, Docker, Nginx, Twingate API, `services.json` update). The portal is stateless — it only fires the webhook and reflects the result.
 
 ---
 
 ## Edit Service
 
-A `✎ edit` button appears bottom-left on each card on hover. Opens a single-page modal (no steps) pre-populated with the card's current values:
+A `✎ edit` button appears bottom-left on each card on hover. Opens a single-page modal pre-populated with the card's current values:
 
 - Display Name, Service URL, Description, Icon (emoji)
 - Category tile picker (same component as wizard step 2, current category pre-selected)
 - **Save Changes** — fires `POST /api/portal-update` with updated fields, refreshes card in place
-- **Remove** (red, left-aligned) — confirms then fires `POST /api/portal-delete`, removes card from grid and sidebar counts update
+- **Remove** (red, left-aligned) — confirms then fires `POST /api/portal-delete`, removes card from grid; sidebar counts update
+
+Infrastructure (oauth2-proxy container, Nginx config, Twingate resource) is **not** torn down on delete — manual cleanup required to avoid accidental data loss.
 
 ---
 
 ## Add Category
 
-Available in two places:
-1. Wizard Step 2 — `＋ New` tile
-2. Edit modal category picker — same `＋ New` tile
+Available in wizard Step 2 and the Edit modal's category picker via the `＋ New` dashed tile.
 
-Flow: enter emoji + name → creates entry in `categories` registry → adds sidebar filter button → adds tile in current picker. Category persists to `services.json` via a `POST /api/portal-update-categories` call, which **replaces the entire `categories` array** in `services.json` with the new array sent in the payload. The portal sends the full current categories list (including any new entry) in every call to this endpoint.
+Flow: enter emoji + name → creates entry in categories registry → adds sidebar filter button → adds tile in current picker. Calls `POST /api/portal-update-categories` with the **full current categories array** (including the new entry). The webhook **replaces** the entire `categories` array in `services.json`.
 
 Auto-assigns a harmonious tag color from a rotating palette of muted hues.
 
@@ -255,115 +260,163 @@ Auto-assigns a harmonious tag color from a rotating palette of muted hues.
       "id": "n8n",
       "name": "n8n",
       "url": "https://n8n.private.sovereignadvisory.ai",
-      "description": "Workflow automation · 6 active",
+      "description": "Workflow automation",
       "icon": "⚡",
       "category": "automation",
       "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "url": "https://dash.cloudflare.com",
+      "description": "DNS & CDN management",
+      "icon": "🌐",
+      "category": "infra",
+      "favorite": false,
       "ssoTier": 3,
-      "credentialHint": "bitwarden://sovereignadvisory/n8n"
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/cloudflare"
     }
   ]
 }
 ```
 
 Field notes:
-- `ssoTier` (1/2/3) is set by the provisioning workflow and used by the portal to annotate card tooltips indicating auth method.
-- `credentialHint` (optional, Tier 3 only) — a URI or URL pointing to the relevant Vaultwarden credential entry. Shown as a tooltip on the card to help users identify which saved credential applies. For Tier 1/2 services this field is omitted.
+- `ssoTier` (1/2/3): set by provisioning workflow; used by the portal to annotate card tooltips.
+- `credentialHint` (optional, Tier 3 only): URL or URI pointing to the Vaultwarden entry. Shown as a tooltip on the card. Omitted for Tier 1/2 services.
 
 ---
 
 ## n8n Provisioning Workflows
 
-### Infrastructure access for n8n workflows
+### Infrastructure access for n8n
 
-n8n needs two capabilities to execute provisioning steps:
+**Write access to `services.json` and `docker-compose.override.yml`:** The `portal/` directory is bind-mounted into n8n as `./portal:/data/portal` (added to n8n service in `docker-compose.yml`). n8n uses "Write File" or "Code" nodes to read and update these files.
 
-1. **Write access to `services.json` and `docker-compose.override.yml`**: These files are bind-mounted into n8n at `/data/portal/services.json` and `/data/portal/docker-compose.override.yml`. n8n uses the "Write Binary File" or "Write File" nodes to update them.
+**Docker and Nginx control:** n8n uses the Docker socket (`/var/run/docker.sock`) which is the established pattern in this stack (used by Watchtower, Certbot, and Ofelia). An `Execute Command` node calls scripts in `/data/scripts/` (already mounted read-only from `./scripts`). Scripts required:
+- `scripts/portal_docker_up.sh <service_name>` — runs `docker compose up -d oauth2_proxy_<name>`
+- `scripts/portal_nginx_reload.sh` — runs `docker exec sa_nginx_private nginx -s reload`
 
-2. **Docker and Nginx control**: n8n runs `docker compose up -d` and `nginx -s reload` via a privileged sidecar container (`n8n-docker-proxy`) or by mounting the Docker socket. The `Execute Command` node in n8n calls scripts placed at `/data/scripts/` which are also bind-mounted from the host. This avoids running n8n itself as root.
+The Docker socket is added to n8n's volume list in `docker-compose.yml`.
+
+### `docker-compose.override.yml` bootstrapping
+
+The file lives at `./docker-compose.override.yml` (same directory as `docker-compose.yml`; Docker Compose auto-merges it). If it does not exist, the provisioning workflow creates it with:
+
+```yaml
+services: {}
+```
+
+Subsequent provisioning steps append new service blocks. The workflow reads the existing file, parses it as YAML, merges the new service block, and writes back.
 
 ### `portal-provision` webhook
 **Trigger:** `POST /webhook/portal-provision`
-**Payload:** `{ name, url, description, icon, category, isInternal }`
+**Payload:** `{ name, url, description, icon, category, isInternal, credentialHint? }`
 
-**For internal services, steps:**
-1. Call Keycloak Admin API → create confidential OIDC client in `agentic-sdlc` realm, set redirect URI to `https://<subdomain>/oauth2/callback`, assign `portal-user` realm role
-2. Generate `oauth2-proxy` config block from template, append service block to `docker-compose.override.yml`
-3. Execute `docker compose up -d oauth2_proxy_<name>` via Docker sidecar
-4. Write Nginx location block to `conf.d/<name>.conf`, execute `nginx -s reload` on `sa-nginx-private`
-5. Call Twingate API → create resource with private DNS alias `<subdomain>.private.sovereignadvisory.ai`
-6. Append service entry to `services.json`, set `ssoTier: 1`
+**For internal services:**
+1. Call Keycloak Admin API → create confidential OIDC client in `agentic-sdlc` realm, redirect URI `https://<subdomain>/oauth2/callback`, assign `portal-user` realm role. Uses the `keycloak-admin` service account (stored in n8n credentials store; same account used by existing provisioning scripts).
+2. Generate oauth2-proxy config block from existing `oauth2_proxy_litellm` template, append to `docker-compose.override.yml`
+3. Run `scripts/portal_docker_up.sh <name>` via Execute Command node
+4. Write `nginx-private/conf.d/<name>.conf` (location block), run `scripts/portal_nginx_reload.sh`
+5. Call Twingate API → create resource for `<subdomain>.private.sovereignadvisory.ai`
+6. Append service entry to `portal/services.json`, set `ssoTier: 1`
 7. Return `{ success: true, card: { ... } }`
 
-**For external services, steps:**
-1. Append service entry to `services.json`, set `ssoTier: 3`
+**For external services:**
+1. Append service entry to `portal/services.json`, set `ssoTier: 3`, include `credentialHint` if provided
 2. Return `{ success: true, card: { ... } }`
 
 ### `portal-update` webhook
 **Trigger:** `POST /webhook/portal-update`
 **Payload:** `{ id, fields: { name?, url?, description?, icon?, category? } }`
-Updates the matching entry in `services.json` by merging `fields` into the existing service object (partial update — only provided keys are changed).
+Partial update: merges `fields` into the matching service entry in `portal/services.json`.
 
 ### `portal-delete` webhook
 **Trigger:** `POST /webhook/portal-delete`
 **Payload:** `{ id }`
-Removes entry from `services.json`. Does **not** automatically tear down infrastructure (oauth2-proxy container, Nginx config, Twingate resource) — those require a separate manual cleanup step to avoid accidental data loss.
+Removes the matching entry from `portal/services.json`. Does not tear down infrastructure.
 
 ### `portal-update-categories` webhook
 **Trigger:** `POST /webhook/portal-update-categories`
 **Payload:** `{ categories: [...] }`
-**Replaces** the entire `categories` array in `services.json` with the provided array. The portal always sends the complete current categories list in every call (no incremental patching).
+**Replaces** the entire `categories` array in `portal/services.json` with the provided array.
 
 ---
 
-## Docker Compose
+## Docker Compose Changes
 
-New oauth2-proxy services added to `docker-compose.override.yml` (not the base `docker-compose.yml`) to keep the base file clean.
-
-The portal and its oauth2-proxy in `docker-compose.yml`:
+### New services (added to `docker-compose.yml`)
 
 ```yaml
 services:
   portal:
     image: nginx:alpine
-    networks:
-      - private
+    container_name: portal
     volumes:
       - ./portal:/usr/share/nginx/html:ro
       - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/portal.conf:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  oauth2_proxy_portal:
-    image: quay.io/oauth2-proxy/oauth2-proxy:latest
+  oauth2-proxy-portal:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2_proxy_portal
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
+      - --client-id=portal
+      - --client-secret=${PORTAL_OIDC_CLIENT_SECRET}
+      - --redirect-url=https://home.private.sovereignadvisory.ai/oauth2/callback
+      - --upstream=http://portal:80
+      - --http-address=0.0.0.0:4185
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=true
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --insecure-oidc-allow-unverified-email=true
+      - --code-challenge-method=S256
     networks:
-      - private
-    environment:
-      OAUTH2_PROXY_PROVIDER: oidc
-      OAUTH2_PROXY_OIDC_ISSUER_URL: https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      OAUTH2_PROXY_CLIENT_ID: portal
-      OAUTH2_PROXY_CLIENT_SECRET: "${PORTAL_CLIENT_SECRET}"
-      OAUTH2_PROXY_REDIRECT_URL: https://home.private.sovereignadvisory.ai/oauth2/callback
-      OAUTH2_PROXY_UPSTREAMS: http://portal:80/
-      OAUTH2_PROXY_COOKIE_SECRET: "${PORTAL_COOKIE_SECRET}"
-      OAUTH2_PROXY_COOKIE_DOMAIN: .sovereignadvisory.ai
-      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
-      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
-      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
-      OAUTH2_PROXY_CODE_CHALLENGE_METHOD: S256
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      portal:
+        condition: service_started
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 ```
 
-`PORTAL_CLIENT_SECRET` and `PORTAL_COOKIE_SECRET` are added to `.env`.
+### n8n service additions (patch to existing n8n service)
 
-Each new oauth2-proxy added by the provisioning workflow follows the same env var pattern, templated with the service's subdomain, client ID, and secrets generated at provision time.
+Add to n8n's `volumes` list:
+```yaml
+      - ./portal:/data/portal          # read+write for services.json
+      - /var/run/docker.sock:/var/run/docker.sock  # for docker compose up
+```
 
-Networks: all portal-related containers join the existing `private` Docker network so they can reach `sa-nginx-private` and n8n.
+### New env vars (added to `.env`)
+
+```
+PORTAL_OIDC_CLIENT_SECRET=<generated>
+```
+
+`OAUTH2_PROXY_COOKIE_SECRET` already exists in `.env` (shared with other oauth2-proxy containers).
+
+### `docker-compose.override.yml` (initial state, committed to repo)
+
+```yaml
+services: {}
+```
 
 ---
 
-## Nginx Config (portal.conf)
+## Nginx Configuration
+
+### `nginx/conf.d/portal.conf` (served by `portal` container)
 
 ```nginx
 server {
@@ -375,7 +428,6 @@ server {
     try_files $uri $uri/ /index.html;
   }
 
-  # Proxy n8n webhook calls from the portal
   location /api/ {
     proxy_pass http://n8n:5678/webhook/;
     proxy_set_header Host $host;
@@ -383,27 +435,45 @@ server {
 }
 ```
 
-The portal calls `/api/portal-provision` etc., which Nginx proxies to n8n webhook paths (`/webhook/portal-provision`, etc.).
+### `nginx-private/conf.d/home.conf` (added to `sa_nginx_private` config)
+
+```nginx
+server {
+  listen 443 ssl;
+  server_name home.private.sovereignadvisory.ai;
+
+  ssl_certificate     /etc/letsencrypt/live/private.sovereignadvisory.ai/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/private.sovereignadvisory.ai/privkey.pem;
+
+  location / {
+    proxy_pass http://oauth2_proxy_portal:4185;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+  }
+}
+```
 
 ---
 
 ## Keycloak Configuration
 
 - **Realm:** `agentic-sdlc` (existing)
-- **Client type:** Confidential (requires `client_secret`)
-- **Client ID convention:** matches service name (e.g., `portal`, `litellm`, `jupyter`)
-- **Redirect URI pattern:** `https://<subdomain>.private.sovereignadvisory.ai/oauth2/callback`
-- **PKCE:** S256 required (already enforced on existing clients)
-- **Realm role:** `portal-user` — all authenticated users are assigned this role; portal clients require it
+- **Client type:** Confidential (requires `client_secret`) — matches the pattern of `litellm`, `jupyter`, `webui` clients
+- **Client ID:** `portal`
+- **Redirect URI:** `https://home.private.sovereignadvisory.ai/oauth2/callback`
+- **PKCE:** S256 required (`--code-challenge-method=S256` in oauth2-proxy command)
 - **Client scopes:** `openid`, `email`, `profile`
+- **Service account for provisioning:** `keycloak-admin` service account in the `agentic-sdlc` realm (or master realm admin); credentials stored in n8n credentials store under the name `keycloak-admin-api`
 
-The provisioning workflow calls the Keycloak Admin REST API using a service account with realm-admin rights. Credentials stored in n8n credentials store.
+The `portal` Keycloak client must be created before the portal is deployed (bootstrap step in implementation plan).
 
 ---
 
 ## Twingate Resource
 
-A Twingate resource at `home.private.sovereignadvisory.ai` pointing to the `oauth2_proxy_portal` container on port 4180, registered via the existing `twingate_add_resource` script pattern. `sa-nginx-private` routes traffic from the Twingate network to `oauth2_proxy_portal`.
+A Twingate resource for `home.private.sovereignadvisory.ai` pointing to `oauth2_proxy_portal` on port 4185, registered via the existing `twingate_add_resource` script pattern. `sa_nginx_private` is already accessible within the Twingate network.
 
 ---
 
@@ -411,7 +481,7 @@ A Twingate resource at `home.private.sovereignadvisory.ai` pointing to the `oaut
 
 - Mobile/responsive design (internal tool, desktop-only)
 - Multi-user role differentiation (all authenticated users see the same portal)
-- Service health monitoring / uptime polling (live dot is static for now; can be wired to a healthcheck endpoint in a future iteration)
+- Service health monitoring / uptime polling (live dot is static for now)
 - Automatic infrastructure teardown on service delete
 - Notion/Cloudflare SAML federation (future upgrade path, not a blocker)
 
@@ -421,8 +491,8 @@ A Twingate resource at `home.private.sovereignadvisory.ai` pointing to the `oaut
 
 1. Navigating to `home.private.sovereignadvisory.ai` redirects to Keycloak login if not authenticated, then lands on the portal
 2. All 10 initial services are visible and clickable as portal cards
-3. **Tier 1 SSO criterion (deferred):** Clicking LiteLLM, JupyterLab, or Vaultwarden opens the service with no second login prompt — this requires each service's `oauth2_proxy_<name>` container to be provisioned first. This criterion is validated after the provisioning workflow is tested, not at portal launch.
-4. Clicking n8n opens it and Vaultwarden autofills credentials (Tier 3)
-5. The Add Service wizard completes end-to-end for an internal URL and the card appears in the grid
-6. Edit service changes name/category and the card updates immediately
-7. Add Category creates a new sidebar filter and the category is selectable in the wizard
+3. Clicking n8n, LiteLLM, or JupyterLab opens the service with no second login prompt (Tier 1 — these already have oauth2-proxy or OIDC configured)
+4. Clicking Cloudflare or Notion opens in a new tab; Vaultwarden extension autofills credentials (Tier 3)
+5. The Add Service wizard completes end-to-end for an **external** URL (simpler path, no infra provisioning): submitting the form creates a new card in the portal grid. Smoke-test URL: `https://notion.so/test-service`
+6. Edit service changes name/category and the card updates immediately (verified by changing an existing card and reloading `services.json`)
+7. Add Category creates a new sidebar filter and the category is selectable in the wizard (verified by adding a "Design" category and confirming it appears in sidebar and wizard step 2)
