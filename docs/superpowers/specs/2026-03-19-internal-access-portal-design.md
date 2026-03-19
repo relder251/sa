@@ -51,7 +51,7 @@ The portal itself is a **static HTML/CSS/JS application** served by the `portal`
 | `portal/index.html` | Main application (sidebar + grid UI) |
 | `portal/services.json` | Source of truth for registered services and categories (writable by n8n) |
 | `portal/assets/` | CSS, fonts, icons |
-| `nginx/conf.d/portal.conf` | Nginx vhost config for the `portal` container: serves static files, proxies `/api/` to n8n |
+| `nginx/conf.d/portal.conf` | Nginx vhost config for the `portal` container: serves static files, proxies `/api/` to n8n, proxies `/api/litellm-health` to LiteLLM |
 | `nginx-private/conf.d/home.conf` | New server block in `sa_nginx_private` config: routes `home.private.sovereignadvisory.ai` to `oauth2_proxy_portal:4180` |
 | `docker-compose.yml` | `portal` service and `oauth2_proxy_portal` service (with full env vars); also `portal` volume mount added to n8n service |
 | `docker-compose.override.yml` | New `oauth2_proxy_<name>` containers appended by n8n provisioning workflow; auto-merged by Docker Compose (same directory as `docker-compose.yml`) |
@@ -110,12 +110,19 @@ The portal uses the Sovereign Advisory brand palette pulled directly from `sover
 - ↗ arrow (bottom-right, copper on hover)
 - Hover: raises 2px, copper border glow, top-edge copper gradient
 
+**AI Provider cards** additionally show an API access badge (top-left):
+- `API ✓` (green) — LiteLLM reports this provider healthy with a valid key
+- `API —` (muted grey) — provider not configured in LiteLLM; web UI still accessible and useful
+
+The badge is informational only. Clicking the card always opens the provider's web frontend in a new tab regardless of API status. The distinction between web product and API product is intentional: e.g., ChatGPT (chat.openai.com) is the web UI; OpenAI is the API provider name in LiteLLM — a user without an OpenAI API key can still use ChatGPT via the browser.
+
 ### Default categories
 
 | Key | Label | Icon | Tag color |
 |---|---|---|---|
 | `automation` | Automation | ⚡ | Green `#6ee7a0` |
 | `ai` | AI / Models | 🤖 | Indigo `#a5b4fc` |
+| `providers` | AI Providers | 🧠 | Amber `#fcd34d` |
 | `security` | Security | 🔐 | Red `#fca5a5` |
 | `productivity` | Productivity | 📝 | Violet `#c4b5fd` |
 | `infra` | Infrastructure | 🌐 | Sky `#7dd3fc` |
@@ -144,6 +151,12 @@ Categories are user-extensible (see Add Category below).
 | Cloudflare | Infrastructure | `https://dash.cloudflare.com` | 3 |
 | Hostinger | Infrastructure | `https://hpanel.hostinger.com` | 3 |
 | Notion | Productivity | `https://notion.so` | 3 |
+| Claude | AI Providers | `https://claude.ai` | 3 |
+| ChatGPT | AI Providers | `https://chat.openai.com` | 3 |
+| Gemini | AI Providers | `https://gemini.google.com` | 3 |
+| Grok | AI Providers | `https://grok.x.ai` | 3 |
+
+> **AI Provider cards** carry an additional `apiProvider` field linking them to a LiteLLM provider name (e.g., `"anthropic"`, `"openai"`, `"gemini"`, `"xai"`). The portal fetches LiteLLM provider health at load time and overlays the API badge. Web UI access is independent of API status.
 
 ---
 
@@ -284,6 +297,23 @@ Auto-assigns a harmonious tag color from a rotating palette of muted hues.
 Field notes:
 - `ssoTier` (1/2/3): set by provisioning workflow; used by the portal to annotate card tooltips.
 - `credentialHint` (optional, Tier 3 only): URL or URI pointing to the Vaultwarden entry. Shown as a tooltip on the card. Omitted for Tier 1/2 services.
+- `apiProvider` (optional, AI Provider cards only): LiteLLM provider name string (e.g., `"anthropic"`, `"openai"`, `"gemini"`, `"xai"`). When present, the portal checks this name against the LiteLLM health response and renders the API badge. Omitted for non-provider cards.
+
+Example AI Provider entry:
+```json
+{
+  "id": "claude",
+  "name": "Claude",
+  "url": "https://claude.ai",
+  "description": "Anthropic's AI assistant",
+  "icon": "🤖",
+  "category": "providers",
+  "favorite": false,
+  "ssoTier": 3,
+  "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/anthropic",
+  "apiProvider": "anthropic"
+}
+```
 
 ---
 
@@ -432,6 +462,13 @@ server {
     proxy_pass http://n8n:5678/webhook/;
     proxy_set_header Host $host;
   }
+
+  # LiteLLM provider health — used by portal for API access badges
+  location /api/litellm-health {
+    proxy_pass http://litellm:4000/health/services;
+    proxy_set_header Host $host;
+    proxy_set_header Authorization "Bearer ${LITELLM_API_KEY}";
+  }
 }
 ```
 
@@ -477,6 +514,56 @@ A Twingate resource for `home.private.sovereignadvisory.ai` pointing to `oauth2_
 
 ---
 
+## AI Provider API Status Badges
+
+### Data source
+
+On portal load, the frontend fetches `GET /api/litellm-health` (Nginx proxies to `http://litellm:4000/health/services` with the LiteLLM API key injected). The response is a JSON object keyed by provider name indicating healthy/unhealthy status. Example response shape:
+
+```json
+{
+  "healthy_providers": ["anthropic", "gemini"],
+  "unhealthy_providers": ["openai", "xai"]
+}
+```
+
+The frontend matches each card's `apiProvider` field against `healthy_providers` to determine badge state.
+
+### Badge rendering
+
+| State | Badge | Meaning |
+|---|---|---|
+| `apiProvider` in `healthy_providers` | `API ✓` (green) | LiteLLM has a valid, working key for this provider |
+| `apiProvider` in `unhealthy_providers` | `API ✗` (red/muted) | Key exists but provider is reporting errors |
+| `apiProvider` absent from health response | `API —` (grey) | Provider not configured in LiteLLM |
+| Card has no `apiProvider` field | No badge | Not an AI provider card |
+
+### Web UI independence
+
+The card click target is always the provider's **web frontend URL** (e.g., `https://claude.ai`), not the API endpoint. This is intentional:
+- A user without an Anthropic API key can still use Claude via the browser.
+- ChatGPT (`chat.openai.com`) and the OpenAI API are separate products — the card links to the chat UI; the badge reflects API availability.
+- Grok similarly: `grok.x.ai` is the web UI; `xai` is the LiteLLM provider name.
+
+The API badge is purely informational — it does not gate access to the card.
+
+### Provider name mapping
+
+| Card name | `apiProvider` value | Web UI URL |
+|---|---|---|
+| Claude | `anthropic` | `https://claude.ai` |
+| ChatGPT | `openai` | `https://chat.openai.com` |
+| Gemini | `gemini` | `https://gemini.google.com` |
+| Grok | `xai` | `https://grok.x.ai` |
+
+Additional providers can be added by setting `apiProvider` to the LiteLLM provider name string in `services.json`.
+
+### Error handling
+
+If `/api/litellm-health` returns a non-200 or times out (e.g., LiteLLM is down), all API badges are hidden — cards remain fully functional as web UI links. No error state is shown to the user.
+
+---
+
 ## Out of Scope
 
 - Mobile/responsive design (internal tool, desktop-only)
@@ -496,3 +583,4 @@ A Twingate resource for `home.private.sovereignadvisory.ai` pointing to `oauth2_
 5. The Add Service wizard completes end-to-end for an **external** URL (simpler path, no infra provisioning): submitting the form creates a new card in the portal grid. Smoke-test URL: `https://notion.so/test-service`
 6. Edit service changes name/category and the card updates immediately (verified by changing an existing card and reloading `services.json`)
 7. Add Category creates a new sidebar filter and the category is selectable in the wizard (verified by adding a "Design" category and confirming it appears in sidebar and wizard step 2)
+8. AI Provider cards display `API ✓` for providers with active LiteLLM keys (e.g., Anthropic/Claude) and `API —` for unconfigured providers; clicking any provider card opens its web UI regardless of badge state
