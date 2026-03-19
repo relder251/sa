@@ -1,26 +1,207 @@
 {
   "categories": [
-    { "key": "automation", "label": "Automation", "icon": "⚡", "color": "rgba(74,222,128,0.08)", "text": "#6ee7a0", "border": "rgba(74,222,128,0.15)" },
-    { "key": "ai", "label": "AI / Models", "icon": "🤖", "color": "rgba(165,180,252,0.08)", "text": "#a5b4fc", "border": "rgba(165,180,252,0.15)" },
-    { "key": "providers", "label": "AI Providers", "icon": "🧠", "color": "rgba(252,211,77,0.08)", "text": "#fcd34d", "border": "rgba(252,211,77,0.15)" },
-    { "key": "security", "label": "Security", "icon": "🔐", "color": "rgba(248,113,113,0.08)", "text": "#fca5a5", "border": "rgba(248,113,113,0.15)" },
-    { "key": "productivity", "label": "Productivity", "icon": "📝", "color": "rgba(196,181,253,0.08)", "text": "#c4b5fd", "border": "rgba(196,181,253,0.15)" },
-    { "key": "infra", "label": "Infrastructure", "icon": "🌐", "color": "rgba(125,211,252,0.08)", "text": "#7dd3fc", "border": "rgba(125,211,252,0.15)" }
+    {
+      "key": "automation",
+      "label": "Automation",
+      "icon": "⚙️",
+      "color": "rgba(99,102,241,0.15)",
+      "text": "#fff",
+      "border": "rgba(99,102,241,0.4)"
+    },
+    {
+      "key": "ai",
+      "label": "AI / LLM",
+      "icon": "🤖",
+      "color": "rgba(168,85,247,0.15)",
+      "text": "#fff",
+      "border": "rgba(168,85,247,0.4)"
+    },
+    {
+      "key": "providers",
+      "label": "AI Providers",
+      "icon": "🧠",
+      "color": "rgba(59,130,246,0.15)",
+      "text": "#fff",
+      "border": "rgba(59,130,246,0.4)"
+    },
+    {
+      "key": "security",
+      "label": "Security",
+      "icon": "🔐",
+      "color": "rgba(239,68,68,0.15)",
+      "text": "#fff",
+      "border": "rgba(239,68,68,0.4)"
+    },
+    {
+      "key": "productivity",
+      "label": "Productivity",
+      "icon": "📝",
+      "color": "rgba(16,185,129,0.15)",
+      "text": "#fff",
+      "border": "rgba(16,185,129,0.4)"
+    },
+    {
+      "key": "infra",
+      "label": "Infrastructure",
+      "icon": "🌐",
+      "color": "rgba(245,158,11,0.15)",
+      "text": "#fff",
+      "border": "rgba(245,158,11,0.4)"
+    }
   ],
   "services": [
-    { "id": "n8n", "name": "n8n", "url": "https://n8n.private.sovereignadvisory.ai", "description": "Workflow automation", "icon": "⚡", "category": "automation", "favorite": false, "ssoTier": 1 },
-    { "id": "pipeline", "name": "Pipeline Board", "url": "https://pipeline.private.sovereignadvisory.ai", "description": "Lead pipeline management", "icon": "🎯", "category": "automation", "favorite": false, "ssoTier": 3 },
-    { "id": "litellm", "name": "LiteLLM", "url": "https://litellm.private.sovereignadvisory.ai", "description": "AI proxy · 4 model tiers", "icon": "🤖", "category": "ai", "favorite": false, "ssoTier": 1 },
-    { "id": "jupyter", "name": "JupyterLab", "url": "https://jupyter.private.sovereignadvisory.ai", "description": "Interactive dev notebooks", "icon": "📓", "category": "ai", "favorite": false, "ssoTier": 1 },
-    { "id": "claude", "name": "Claude", "url": "https://claude.ai", "description": "Anthropic AI assistant", "icon": "🧠", "category": "providers", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/anthropic", "apiProvider": "anthropic" },
-    { "id": "chatgpt", "name": "ChatGPT", "url": "https://chat.openai.com", "description": "OpenAI chat interface", "icon": "💬", "category": "providers", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/openai", "apiProvider": "openai" },
-    { "id": "gemini", "name": "Gemini", "url": "https://gemini.google.com", "description": "Google AI assistant", "icon": "✨", "category": "providers", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/gemini", "apiProvider": "gemini" },
-    { "id": "grok", "name": "Grok", "url": "https://grok.x.ai", "description": "xAI assistant", "icon": "⚡", "category": "providers", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/xai", "apiProvider": "xai" },
-    { "id": "vaultwarden", "name": "Vaultwarden", "url": "https://vault.private.sovereignadvisory.ai", "description": "Credentials & secrets vault", "icon": "🔐", "category": "security", "favorite": false, "ssoTier": 1 },
-    { "id": "keycloak", "name": "Keycloak", "url": "https://kc.sovereignadvisory.ai", "description": "Identity & SSO admin", "icon": "🔑", "category": "security", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/keycloak" },
-    { "id": "notion", "name": "Notion", "url": "https://notion.so", "description": "Workspace & docs", "icon": "📝", "category": "productivity", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/notion" },
-    { "id": "twingate", "name": "Twingate", "url": "https://www.twingate.com/dashboard", "description": "Private network access", "icon": "🛡️", "category": "infra", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/twingate" },
-    { "id": "cloudflare", "name": "Cloudflare", "url": "https://dash.cloudflare.com", "description": "DNS & CDN management", "icon": "🌐", "category": "infra", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/cloudflare" },
-    { "id": "hostinger", "name": "Hostinger", "url": "https://hpanel.hostinger.com", "description": "Domain & hosting", "icon": "🖥️", "category": "infra", "favorite": false, "ssoTier": 3, "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger" }
+    {
+      "id": "n8n",
+      "name": "n8n",
+      "url": "https://n8n.private.sovereignadvisory.ai",
+      "description": "Workflow automation",
+      "icon": "⚡",
+      "category": "automation",
+      "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "pipeline",
+      "name": "Pipeline Board",
+      "url": "https://pipeline.private.sovereignadvisory.ai",
+      "description": "Lead pipeline management",
+      "icon": "🎯",
+      "category": "automation",
+      "favorite": false,
+      "ssoTier": 3
+    },
+    {
+      "id": "litellm",
+      "name": "LiteLLM",
+      "url": "https://litellm.private.sovereignadvisory.ai",
+      "description": "AI proxy · 4 model tiers",
+      "icon": "🤖",
+      "category": "ai",
+      "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "jupyter",
+      "name": "JupyterLab",
+      "url": "https://jupyter.private.sovereignadvisory.ai",
+      "description": "Interactive dev notebooks",
+      "icon": "📓",
+      "category": "ai",
+      "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "url": "https://claude.ai",
+      "description": "Anthropic AI assistant",
+      "icon": "🧠",
+      "category": "providers",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/anthropic",
+      "apiProvider": "anthropic"
+    },
+    {
+      "id": "chatgpt",
+      "name": "ChatGPT",
+      "url": "https://chat.openai.com",
+      "description": "OpenAI chat interface",
+      "icon": "💬",
+      "category": "providers",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/openai",
+      "apiProvider": "openai"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "url": "https://gemini.google.com",
+      "description": "Google AI assistant",
+      "icon": "✨",
+      "category": "providers",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/gemini",
+      "apiProvider": "gemini"
+    },
+    {
+      "id": "grok",
+      "name": "Grok",
+      "url": "https://grok.x.ai",
+      "description": "xAI assistant",
+      "icon": "⚡",
+      "category": "providers",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/xai",
+      "apiProvider": "xai"
+    },
+    {
+      "id": "vaultwarden",
+      "name": "Vaultwarden",
+      "url": "https://vault.private.sovereignadvisory.ai",
+      "description": "Credentials & secrets vault",
+      "icon": "🔐",
+      "category": "security",
+      "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "keycloak",
+      "name": "Keycloak",
+      "url": "https://kc.sovereignadvisory.ai",
+      "description": "Identity & SSO admin",
+      "icon": "🔑",
+      "category": "security",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/keycloak"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "url": "https://notion.so",
+      "description": "Workspace & docs",
+      "icon": "📝",
+      "category": "productivity",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/notion"
+    },
+    {
+      "id": "twingate",
+      "name": "Twingate",
+      "url": "https://www.twingate.com/dashboard",
+      "description": "Private network access",
+      "icon": "🛡️",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/twingate"
+    },
+    {
+      "id": "cloudflare",
+      "name": "Cloudflare",
+      "url": "https://dash.cloudflare.com",
+      "description": "DNS & CDN management",
+      "icon": "🌐",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/cloudflare"
+    },
+    {
+      "id": "hostinger",
+      "name": "Hostinger",
+      "url": "https://hpanel.hostinger.com",
+      "description": "Domain & hosting",
+      "icon": "🖥️",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 3,
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger"
+    }
   ]
 }
