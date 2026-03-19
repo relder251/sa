@@ -253,6 +253,14 @@ services:
       - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
       - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://ollama:11434}
       - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
+      # Keycloak SSO for LiteLLM UI
+      - GENERIC_CLIENT_ID=litellm
+      - GENERIC_CLIENT_SECRET=${LITELLM_OIDC_CLIENT_SECRET}
+      - GENERIC_AUTHORIZATION_ENDPOINT=https://kc.sovereignadvisory.ai/realms/agentic-sdlc/protocol/openid-connect/auth
+      - GENERIC_TOKEN_ENDPOINT=https://kc.sovereignadvisory.ai/realms/agentic-sdlc/protocol/openid-connect/token
+      - GENERIC_USERINFO_ENDPOINT=https://kc.sovereignadvisory.ai/realms/agentic-sdlc/protocol/openid-connect/userinfo
+      - GENERIC_REDIRECT_URI=https://litellm.private.sovereignadvisory.ai/ui/oauth/callback
+      - GENERIC_CLIENT_NAME=Keycloak SSO
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]

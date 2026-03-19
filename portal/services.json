@@ -62,9 +62,9 @@
     },
     {
       "id": "pipeline",
-      "name": "Pipeline WebUI",
+      "name": "Open WebUI",
       "url": "https://webui.private.sovereignadvisory.ai",
-      "description": "Agentic SDLC pipeline interface",
+      "description": "Automated development pipeline interface",
       "icon": "🎯",
       "category": "automation",
       "favorite": false,
@@ -151,7 +151,7 @@
     {
       "id": "keycloak-admin",
       "name": "Keycloak Admin",
-      "url": "https://kc.private.sovereignadvisory.ai/admin/agentic-sdlc/console/",
+      "url": "https://kc.private.sovereignadvisory.ai/admin/",
       "description": "Realm admin — manage clients, users & SSO",
       "icon": "🔑",
       "category": "security",
@@ -162,7 +162,7 @@
     {
       "id": "keycloak-account",
       "name": "Keycloak Account",
-      "url": "https://kc.private.sovereignadvisory.ai/realms/agentic-sdlc/account/",
+      "url": "https://kc.sovereignadvisory.ai/realms/agentic-sdlc/account/",
       "description": "User self-service — profile, sessions & MFA",
       "icon": "👤",
       "category": "security",
