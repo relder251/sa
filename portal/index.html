@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SA Portal — Internal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300&family=Raleway:wght@200;300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:            #0b0f1c;
+  --bg-card:       #0e1324;
+  --bg-hover:      #121830;
+  --bg-sidebar:    #090d19;
+  --copper:        #d4924a;
+  --copper-light:  #f0a535;
+  --copper-pale:   rgba(240, 165, 53, 0.10);
+  --copper-border: rgba(240, 165, 53, 0.28);
+  --text:          #f0ece4;
+  --text-2:        #ddd5c8;
+  --text-3:        #a09aaf;
+  --border:        rgba(240, 165, 53, 0.18);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --font-d:        'Cormorant Garamond', Georgia, serif;
+  --font-b:        'Raleway', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-b);
+  font-weight: 300;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Topbar ─────────────────────────────────────── */
+.topbar {
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+.logo {
+  font-family: var(--font-d);
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: 0.12em;
+  color: var(--copper-light);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logo-hex { font-size: 20px; opacity: 0.9; }
+.logo-sub {
+  font-family: var(--font-b);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-left: 2px;
+  padding-top: 1px;
+}
+.topbar-right { display: flex; align-items: center; gap: 14px; }
+.status-indicator { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text-3); font-weight: 400; letter-spacing: 0.04em; }
+.status-dot { width: 7px; height: 7px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 6px #4ade8077; }
+.user-chip {
+  background: var(--copper-pale);
+  border: 1px solid var(--copper-border);
+  border-radius: 2px;
+  padding: 4px 12px 4px 8px;
+  font-size: 12px;
+  color: var(--text-2);
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.04em;
+}
+.avatar {
+  width: 22px; height: 22px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, var(--copper) 0%, var(--copper-light) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  color: #0b0f1c;
+  letter-spacing: 0.05em;
+}
+
+/* ── Layout ─────────────────────────────────────── */
+.layout { display: flex; flex: 1; overflow: hidden; }
+
+/* ── Sidebar ─────────────────────────────────────── */
+.sidebar {
+  width: 196px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border-subtle);
+  padding: 20px 10px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+.sidebar-label {
+  font-family: var(--font-b);
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 0 10px;
+  margin: 14px 0 6px;
+}
+.sidebar-label:first-child { margin-top: 0; }
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-b);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all 0.2s;
+  position: relative;
+}
+.filter-btn:hover { background: var(--bg-hover); color: var(--text-2); }
+.filter-btn.active { background: var(--copper-pale); color: var(--copper-light); }
+.filter-btn.active::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 15%; bottom: 15%;
+  width: 2px;
+  background: var(--copper);
+  border-radius: 0 2px 2px 0;
+}
+.filter-icon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
+.filter-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.filter-count {
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-3);
+  border-radius: 2px;
+  padding: 1px 6px;
+  flex-shrink: 0;
+}
+.filter-btn.active .filter-count {
+  background: var(--copper-pale);
+  color: var(--copper);
+}
+
+/* ── Recent items ────────────────────────────────── */
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border-radius: 2px;
+  color: var(--text-3);
+  font-family: var(--font-b);
+  font-size: 11px;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  letter-spacing: 0.03em;
+}
+.recent-item:hover { background: var(--bg-hover); color: var(--text-2); }
+.recent-icon { font-size: 12px; width: 18px; text-align: center; flex-shrink: 0; }
+.recent-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recent-time { font-size: 10px; color: rgba(160,154,175,0.5); flex-shrink: 0; }
+
+.sidebar-divider { border: none; border-top: 1px solid var(--border-subtle); margin: 8px 0; }
+
+/* ── Main ────────────────────────────────────────── */
+.main { flex: 1; padding: 28px; overflow-y: auto; }
+.main-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.main-title {
+  font-family: var(--font-d);
+  font-size: 20px;
+  font-weight: 400;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+.service-count { font-size: 11px; color: var(--text-3); font-weight: 400; letter-spacing: 0.06em; }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+
+/* ── Cards ───────────────────────────────────────── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  padding: 20px 16px 16px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease, ease);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--copper-border), transparent);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.card:hover {
+  border-color: var(--copper-border);
+  background: var(--bg-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(212, 146, 74, 0.12);
+}
+.card:hover::before { opacity: 1; }
+.card.hidden { display: none; }
+
+/* Star */
+.star-btn {
+  position: absolute;
+  top: 10px; right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: rgba(160,154,175,0.4);
+  padding: 3px;
+  line-height: 1;
+  transition: all 0.15s;
+  z-index: 2;
+}
+.star-btn:hover { color: var(--copper-light); transform: scale(1.2); }
+.star-btn.starred { color: var(--copper); }
+
+.card-icon { font-size: 24px; margin-bottom: 2px; padding-right: 20px; }
+.card-name {
+  font-family: var(--font-b);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  letter-spacing: 0.04em;
+}
+.card-desc { font-size: 11px; color: var(--text-3); line-height: 1.5; font-weight: 300; }
+.card-footer { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+.card-tag {
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 7px;
+  border-radius: 2px;
+}
+.tag-automation { background: rgba(74, 222, 128, 0.08); color: #6ee7a0; border: 1px solid rgba(74,222,128,0.15); }
+.tag-ai { background: rgba(129, 140, 248, 0.08); color: #a5b4fc; border: 1px solid rgba(129,140,248,0.15); }
+.tag-security { background: rgba(248, 113, 113, 0.08); color: #fca5a5; border: 1px solid rgba(248,113,113,0.15); }
+.tag-productivity { background: rgba(167, 139, 250, 0.08); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.15); }
+.tag-infra { background: rgba(56, 189, 248, 0.08); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.15); }
+.card-status { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-3); }
+.live-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; }
+
+/* Open arrow */
+.card-arrow { position: absolute; bottom: 14px; right: 14px; font-size: 11px; color: rgba(160,154,175,0.3); transition: all 0.2s; }
+.card:hover .card-arrow { color: var(--copper); }
+
+/* Edit button on card */
+.card-edit {
+  position: absolute; bottom: 10px; left: 12px;
+  background: none; border: none; cursor: pointer;
+  font-size: 11px; color: transparent;
+  padding: 2px 4px; border-radius: 2px;
+  transition: all 0.15s; z-index: 2;
+  font-family: var(--font-b); letter-spacing: 0.04em;
+}
+.card:hover .card-edit { color: var(--text-3); }
+.card-edit:hover { color: var(--copper-light) !important; background: var(--copper-pale); }
+
+/* Empty state */
+.empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
+.empty-icon { font-size: 32px; margin-bottom: 14px; opacity: 0.4; }
+.empty p { font-size: 12px; font-weight: 400; letter-spacing: 0.04em; }
+
+/* ── Add Service button ──────────────────────────── */
+.add-btn {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--copper-pale);
+  border: 1px solid var(--copper-border);
+  color: var(--copper-light);
+  font-family: var(--font-b);
+  font-size: 12px; font-weight: 500;
+  letter-spacing: 0.06em;
+  padding: 6px 14px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.add-btn:hover { background: rgba(240,165,53,0.18); border-color: var(--copper-light); }
+.add-btn-icon { font-size: 16px; line-height: 1; }
+
+/* ── Modal overlay ───────────────────────────────── */
+.modal-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(11,15,28,0.85);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+
+.modal {
+  background: #0e1324;
+  border: 1px solid var(--copper-border);
+  border-radius: 4px;
+  width: 520px;
+  max-width: 95vw;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+  overflow: hidden;
+}
+.modal-header {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title {
+  font-family: var(--font-d);
+  font-size: 18px; font-weight: 400;
+  color: var(--text); letter-spacing: 0.04em;
+}
+.modal-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 18px; line-height: 1;
+  transition: color 0.15s; padding: 2px;
+}
+.modal-close:hover { color: var(--text); }
+
+/* Steps indicator */
+.steps {
+  display: flex; align-items: center; gap: 0;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+.step {
+  display: flex; align-items: center; gap: 8px;
+  font-family: var(--font-b); font-size: 11px; font-weight: 400;
+  color: var(--text-3); letter-spacing: 0.06em;
+  flex: 1;
+}
+.step.active { color: var(--copper-light); }
+.step.done { color: var(--copper); }
+.step-num {
+  width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid currentColor;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; flex-shrink: 0;
+}
+.step.done .step-num { background: var(--copper); border-color: var(--copper); color: #0b0f1c; }
+.step-line { flex: 1; height: 1px; background: var(--border-subtle); margin: 0 8px; }
+.step:last-child .step-line { display: none; }
+
+/* Form */
+.modal-body { padding: 24px; }
+.form-row { margin-bottom: 18px; }
+.form-label {
+  display: block;
+  font-family: var(--font-b); font-size: 10px; font-weight: 500;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-3); margin-bottom: 7px;
+}
+.form-input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 2px;
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--font-b); font-size: 13px; font-weight: 300;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.form-input:focus { border-color: var(--copper-border); }
+.form-input::placeholder { color: var(--text-3); opacity: 0.6; }
+.form-row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+/* Emoji picker */
+.emoji-row { display: flex; gap: 8px; align-items: center; }
+.emoji-preview {
+  width: 42px; height: 42px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 2px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.emoji-input { flex: 1; }
+
+/* Category tiles */
+.cat-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.cat-tile {
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-3);
+  font-family: var(--font-b); font-size: 12px; font-weight: 400;
+  cursor: pointer; transition: all 0.15s;
+}
+.cat-tile:hover { border-color: var(--copper-border); color: var(--text-2); }
+.cat-tile.selected { border-color: var(--copper); background: var(--copper-pale); color: var(--copper-light); }
+
+/* Provision plan */
+.provision-list { display: flex; flex-direction: column; gap: 10px; }
+.provision-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+}
+.provision-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
+.provision-info { flex: 1; }
+.provision-name { font-size: 12px; font-weight: 500; color: var(--text-2); margin-bottom: 2px; }
+.provision-desc { font-size: 11px; color: var(--text-3); line-height: 1.4; }
+.provision-badge {
+  font-size: 9px; font-weight: 500; letter-spacing: 0.08em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 2px;
+  flex-shrink: 0; margin-top: 2px;
+}
+.badge-auto { background: rgba(74,222,128,0.1); color: #6ee7a0; border: 1px solid rgba(74,222,128,0.2); }
+.badge-link { background: rgba(56,189,248,0.1); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.2); }
+
+/* Progress */
+.progress-list { display: flex; flex-direction: column; gap: 8px; }
+.progress-item {
+  display: flex; align-items: center; gap: 12px;
+  font-family: var(--font-b); font-size: 12px; color: var(--text-3);
+}
+.progress-item.done { color: var(--text-2); }
+.progress-item.active { color: var(--copper-light); }
+.p-icon { width: 18px; text-align: center; font-size: 13px; flex-shrink: 0; }
+.p-bar-wrap { flex: 1; height: 2px; background: rgba(255,255,255,0.06); border-radius: 1px; overflow: hidden; }
+.p-bar { height: 100%; background: var(--copper); border-radius: 1px; transition: width 0.4s ease; }
+
+/* Footer */
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.btn-secondary {
+  background: none; border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-3); font-family: var(--font-b); font-size: 12px;
+  font-weight: 400; letter-spacing: 0.06em;
+  padding: 7px 16px; border-radius: 2px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-secondary:hover { border-color: rgba(255,255,255,0.2); color: var(--text-2); }
+.btn-primary {
+  background: var(--copper); border: none;
+  color: #0b0f1c; font-family: var(--font-b); font-size: 12px;
+  font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 8px 20px; border-radius: 2px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-primary:hover { background: var(--copper-light); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.modal-step { display: none; }
+.modal-step.active { display: block; }
+
+/* ── API Provider badges ─────────────────────────── */
+.api-badge {
+  position: absolute;
+  top: 10px; left: 10px;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 999px;
+  letter-spacing: 0.04em;
+  background: rgba(160,154,175,0.15);
+  color: #a09aaf;
+  pointer-events: none;
+  z-index: 2;
+}
+.api-badge.healthy {
+  background: rgba(74,222,128,0.15);
+  color: #6ee7a0;
+}
+.api-badge.unhealthy {
+  background: rgba(248,113,113,0.12);
+  color: #fca5a5;
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <span class="logo-hex">⬡</span>
+    SOVEREIGN ADVISORY
+    <span class="logo-sub">Internal Portal</span>
+  </div>
+  <div class="topbar-right">
+    <div class="status-indicator"><span class="status-dot"></span> All systems operational</div>
+    <button class="add-btn" onclick="openWizard()"><span class="add-btn-icon">＋</span> Add Service</button>
+    <div class="user-chip"><div class="avatar">RE</div>relder</div>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+
+    <div class="sidebar-label">Quick Access</div>
+    <button class="filter-btn" id="btn-favorites" onclick="setFilter('favorites', this)">
+      <span class="filter-icon">★</span>
+      <span class="filter-label">Favorites</span>
+      <span class="filter-count" id="count-favorites">2</span>
+    </button>
+    <button class="filter-btn" id="btn-recent" onclick="setFilter('recent', this)">
+      <span class="filter-icon">🕐</span>
+      <span class="filter-label">Recently Used</span>
+    </button>
+
+    <div id="recent-list">
+      <button class="recent-item" onclick="openService('n8n')"><span class="recent-icon">⚡</span><span class="recent-name">n8n</span><span class="recent-time">2m ago</span></button>
+      <button class="recent-item" onclick="openService('litellm')"><span class="recent-icon">🤖</span><span class="recent-name">LiteLLM</span><span class="recent-time">1h ago</span></button>
+      <button class="recent-item" onclick="openService('vaultwarden')"><span class="recent-icon">🔐</span><span class="recent-name">Vaultwarden</span><span class="recent-time">3h ago</span></button>
+    </div>
+
+    <hr class="sidebar-divider">
+
+    <div class="sidebar-label">Categories</div>
+    <button class="filter-btn active" id="btn-all" onclick="setFilter('all', this)">
+      <span class="filter-icon">⊞</span>
+      <span class="filter-label">All Services</span>
+      <span class="filter-count" id="count-all">0</span>
+    </button>
+    <div id="cat-sidebar-list"></div>
+
+  </div>
+
+  <div class="main">
+    <div class="main-header">
+      <span class="main-title" id="main-title">All Services</span>
+      <span class="service-count" id="service-count">10 services</span>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+    <div class="empty hidden" id="empty-state" style="display:none">
+      <div class="empty-icon">★</div>
+      <p>No favorites yet — click ☆ on any service card to pin it here.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Edit Service Modal ────────────────────────── -->
+<div class="modal-overlay" id="edit-overlay" onclick="editOverlayClose(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Edit Service</span>
+      <button class="modal-close" onclick="closeEdit()">✕</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:0;">
+      <div class="form-row">
+        <label class="form-label">Display Name</label>
+        <input class="form-input" id="edit-name" type="text">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Service URL</label>
+        <input class="form-input" id="edit-url" type="text">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Description</label>
+        <input class="form-input" id="edit-desc" type="text">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Icon (emoji)</label>
+        <div class="emoji-row">
+          <div class="emoji-preview" id="edit-emoji-preview">📦</div>
+          <input class="form-input emoji-input" id="edit-emoji" type="text" maxlength="2" oninput="document.getElementById('edit-emoji-preview').textContent=this.value||'📦'">
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Category</label>
+        <div class="cat-grid" id="edit-cat-grid"></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <button class="btn-secondary" style="color:#f87171;border-color:rgba(248,113,113,0.2);" onclick="deleteService()">Remove</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-secondary" onclick="closeEdit()">Cancel</button>
+        <button class="btn-primary" onclick="saveEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Service Wizard Modal ─────────────────── -->
+<div class="modal-overlay" id="wizard-overlay" onclick="overlayClose(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="wizard-title">Add a Service</span>
+      <button class="modal-close" onclick="closeWizard()">✕</button>
+    </div>
+
+    <div class="steps" id="wizard-steps">
+      <div class="step active" id="step-ind-1"><div class="step-num">1</div> Details<div class="step-line"></div></div>
+      <div class="step" id="step-ind-2"><div class="step-num">2</div> Category<div class="step-line"></div></div>
+      <div class="step" id="step-ind-3"><div class="step-num">3</div> Review<div class="step-line"></div></div>
+      <div class="step" id="step-ind-4"><div class="step-num">4</div> Deploy</div>
+    </div>
+
+    <!-- Step 1: Details -->
+    <div class="modal-step active" id="modal-step-1">
+      <div class="modal-body">
+        <div class="form-row">
+          <label class="form-label">Service URL</label>
+          <input class="form-input" id="svc-url" type="text" placeholder="https://tool.private.sovereignadvisory.ai  or  https://app.example.com" oninput="detectType()">
+          <div id="url-hint" style="font-size:11px;color:var(--text-3);margin-top:6px;min-height:16px;"></div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Display Name</label>
+          <input class="form-input" id="svc-name" type="text" placeholder="e.g. Grafana">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Description</label>
+          <input class="form-input" id="svc-desc" type="text" placeholder="Short description shown on the card">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Icon (emoji)</label>
+          <div class="emoji-row">
+            <div class="emoji-preview" id="emoji-preview">📦</div>
+            <input class="form-input emoji-input" id="svc-emoji" type="text" maxlength="2" placeholder="Paste an emoji" oninput="updateEmoji(this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="closeWizard()">Cancel</button>
+        <button class="btn-primary" onclick="goStep(2)">Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Category -->
+    <div class="modal-step" id="modal-step-2">
+      <div class="modal-body">
+        <div class="form-row">
+          <label class="form-label">Category</label>
+          <div class="cat-grid" id="wizard-cat-grid">
+            <button class="cat-tile" onclick="selectCat('automation',this)">⚡ Automation</button>
+            <button class="cat-tile" onclick="selectCat('ai',this)">🤖 AI / Models</button>
+            <button class="cat-tile" onclick="selectCat('security',this)">🔐 Security</button>
+            <button class="cat-tile" onclick="selectCat('productivity',this)">📝 Productivity</button>
+            <button class="cat-tile" onclick="selectCat('infra',this)">🌐 Infrastructure</button>
+            <button class="cat-tile" id="new-cat-btn" onclick="showNewCatForm()" style="border-style:dashed;opacity:0.7;">＋ New</button>
+          </div>
+          <div id="new-cat-form" style="display:none;margin-top:14px;">
+            <div style="font-size:10px;font-weight:500;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-3);margin-bottom:8px;">New Category</div>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <div class="emoji-preview" id="new-cat-emoji-preview" style="width:36px;height:36px;font-size:18px;">🏷️</div>
+              <input class="form-input" id="new-cat-emoji" type="text" maxlength="2" placeholder="Icon" style="width:70px;" oninput="document.getElementById('new-cat-emoji-preview').textContent=this.value||'🏷️'">
+              <input class="form-input" id="new-cat-name" type="text" placeholder="Category name" style="flex:1;">
+              <button class="btn-primary" style="padding:8px 14px;white-space:nowrap;" onclick="createCategory()">Add</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="goStep(1)">← Back</button>
+        <button class="btn-primary" id="btn-step2-next" onclick="goStep(3)" disabled>Next →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Review -->
+    <div class="modal-step" id="modal-step-3">
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--text-3);margin-bottom:16px;line-height:1.6;">
+          Based on the URL, here's what will be provisioned automatically:
+        </p>
+        <div class="provision-list" id="provision-list"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" onclick="goStep(2)">← Back</button>
+        <button class="btn-primary" onclick="goStep(4)">Deploy</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Deploying -->
+    <div class="modal-step" id="modal-step-4">
+      <div class="modal-body">
+        <div class="progress-list" id="progress-list"></div>
+        <div id="deploy-done" style="display:none;margin-top:20px;text-align:center;">
+          <div style="font-size:32px;margin-bottom:10px;">✓</div>
+          <div style="font-family:var(--font-d);font-size:18px;color:var(--copper-light);margin-bottom:6px;" id="done-name"></div>
+          <div style="font-size:12px;color:var(--text-3);">Service is live and accessible via SSO.</div>
+        </div>
+      </div>
+      <div class="modal-footer" id="deploy-footer">
+        <span style="font-size:11px;color:var(--text-3);">Triggered via n8n provisioning workflow…</span>
+        <button class="btn-primary" id="btn-done" style="display:none" onclick="finishWizard()">Done</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+// ── Labels map (extended dynamically from categories) ─
+const labels = { all: 'All Services', favorites: 'Favorites', recent: 'Recently Used' };
+let currentFilter = 'all';
+const recentOrder = [];
+let currentServices = [];
+
+// ── Category registry — populated from services.json ─
+const categories = {};
+
+// ── Portal data loading ───────────────────────────────
+async function loadPortal() {
+  try {
+    const res = await fetch('./services.json');
+    const data = await res.json();
+    // Build categories object keyed by `key`
+    (data.categories || []).forEach(cat => {
+      categories[cat.key] = cat;
+      labels[cat.key] = cat.label;
+    });
+    buildSidebarCategories(data.categories || []);
+    buildWizardCategoryTiles(data.categories || []);
+    renderCards(data.services || []);
+    loadApiStatus();
+  } catch (err) {
+    console.error('Failed to load services.json:', err);
+  }
+}
+
+function buildSidebarCategories(cats) {
+  const container = document.getElementById('cat-sidebar-list');
+  container.innerHTML = '';
+  cats.forEach(cat => {
+    const count = 0; // updated by updateCounts() after renderCards
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.id = 'btn-' + cat.key;
+    btn.dataset.sidebarCat = cat.key;
+    btn.onclick = () => setFilter(cat.key, btn);
+    btn.innerHTML = `<span class="filter-icon">${cat.icon}</span><span class="filter-label">${cat.label}</span><span class="filter-count" id="count-${cat.key}">0</span>`;
+    container.appendChild(btn);
+  });
+}
+
+function buildWizardCategoryTiles(cats) {
+  const grid = document.getElementById('wizard-cat-grid');
+  // Remove existing hardcoded tiles (keep the "+ New" button)
+  const newBtn = document.getElementById('new-cat-btn');
+  grid.innerHTML = '';
+  cats.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-tile';
+    btn.onclick = () => selectCat(cat.key, btn);
+    btn.textContent = cat.icon + ' ' + cat.label;
+    grid.appendChild(btn);
+  });
+  if (newBtn) grid.appendChild(newBtn);
+}
+
+function renderCards(services) {
+  currentServices = services;
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  services.forEach(svc => {
+    const cat = categories[svc.category] || { text: '#a09aaf', color: 'rgba(160,154,175,0.08)', border: 'rgba(160,154,175,0.15)', label: svc.category };
+    const card = document.createElement('a');
+    card.className = 'card';
+    card.href = svc.url;
+    card.target = '_blank';
+    card.rel = 'noopener noreferrer';
+    card.dataset.id = svc.id;
+    card.dataset.category = svc.category;
+    card.dataset.ssoTier = svc.ssoTier;
+    card.dataset.apiProvider = svc.apiProvider || '';
+    card.dataset.url = svc.url;
+    card.dataset.name = svc.name;
+    card.dataset.description = svc.description || '';
+    card.dataset.icon = svc.icon;
+    if (svc.favorite) card.dataset.favorite = 'true';
+    card.addEventListener('click', (e) => {
+      // allow edit/star buttons to handle their own events
+      if (e.target.closest('.card-edit') || e.target.closest('.card-star')) return;
+      handleCardClick(svc.id);
+    });
+    card.innerHTML = `
+      ${svc.apiProvider ? '<span class="api-badge" data-provider="' + svc.apiProvider + '">API —</span>' : ''}
+      <button class="star-btn${svc.favorite ? ' starred' : ''}" onclick="toggleFavorite(event,this)" title="${svc.favorite ? 'Remove from favorites' : 'Add to favorites'}">${svc.favorite ? '★' : '☆'}</button>
+      <div class="card-icon">${svc.icon}</div>
+      <div class="card-name">${svc.name}</div>
+      ${svc.description ? '<div class="card-desc">' + svc.description + '</div>' : ''}
+      <div class="card-footer">
+        <span class="card-tag" style="background:${cat.color};color:${cat.text};border:1px solid ${cat.border}">${cat.label || svc.category}</span>
+        <span class="card-status"><span class="live-dot"></span> live</span>
+      </div>
+      <button class="card-edit" onclick="openEdit(event,this.closest('.card'))">✎ edit</button>
+      <span class="card-arrow">↗</span>
+    `;
+    grid.appendChild(card);
+  });
+  applyFilter(currentFilter);
+  updateCounts();
+}
+
+// ── API Status badges ─────────────────────────────────
+async function loadApiStatus() {
+  try {
+    const res = await fetch('/api/litellm-health');
+    if (!res.ok) return;
+    const data = await res.json();
+    const healthy = new Set(data.healthy_providers || []);
+    const unhealthy = new Set(data.unhealthy_providers || []);
+    document.querySelectorAll('.api-badge[data-provider]').forEach(badge => {
+      const p = badge.dataset.provider;
+      if (healthy.has(p)) {
+        badge.textContent = 'API ✓';
+        badge.classList.add('healthy');
+      } else if (unhealthy.has(p)) {
+        badge.textContent = 'API ✗';
+        badge.classList.add('unhealthy');
+      }
+    });
+  } catch (e) {
+    document.querySelectorAll('.api-badge').forEach(b => b.style.display = 'none');
+  }
+}
+
+// ── Filter & counts ───────────────────────────────────
+function setFilter(cat, btn) {
+  currentFilter = cat;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilter(cat);
+}
+
+function applyFilter(cat) {
+  if (cat !== undefined) currentFilter = cat;
+  const cards = document.querySelectorAll('.card');
+  let visible = 0;
+  cards.forEach(c => {
+    let show = false;
+    if (currentFilter === 'all') show = true;
+    else if (currentFilter === 'favorites') show = c.dataset.favorite === 'true';
+    else if (currentFilter === 'recent') show = recentOrder.includes(c.dataset.id);
+    else show = c.dataset.category === currentFilter;
+    c.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+
+  if (currentFilter === 'recent') {
+    const grid = document.getElementById('grid');
+    recentOrder.forEach(id => {
+      const card = document.querySelector(`.card[data-id="${id}"]`);
+      if (card) grid.appendChild(card);
+    });
+  }
+
+  document.getElementById('main-title').textContent = labels[currentFilter] || currentFilter;
+  document.getElementById('service-count').textContent = visible + ' service' + (visible !== 1 ? 's' : '');
+  const es = document.getElementById('empty-state');
+  es.style.display = visible > 0 ? 'none' : 'block';
+}
+
+function updateCounts() {
+  const allCount = document.querySelectorAll('.card').length;
+  const allEl = document.getElementById('count-all');
+  if (allEl) allEl.textContent = allCount;
+  Object.keys(categories).forEach(key => {
+    const el = document.getElementById('count-' + key);
+    if (el) el.textContent = document.querySelectorAll(`.card[data-category="${key}"]`).length;
+  });
+  const favCount = document.querySelectorAll('.card[data-favorite="true"]').length;
+  const favEl = document.getElementById('count-favorites');
+  if (favEl) favEl.textContent = favCount;
+}
+
+function toggleFavorite(e, btn) {
+  e.preventDefault();
+  e.stopPropagation();
+  const card = btn.closest('.card');
+  const isFav = card.dataset.favorite === 'true';
+  card.dataset.favorite = isFav ? 'false' : 'true';
+  btn.classList.toggle('starred', !isFav);
+  btn.textContent = isFav ? '☆' : '★';
+  btn.title = isFav ? 'Add to favorites' : 'Remove from favorites';
+  updateCounts();
+  if (currentFilter === 'favorites') applyFilter();
+}
+
+// Keep backward-compatible toggleStar for any remaining references
+function toggleStar(e, id) {
+  e.stopPropagation();
+  const card = document.querySelector(`.card[data-id="${id}"]`);
+  if (card) {
+    const btn = card.querySelector('.star-btn');
+    toggleFavorite(e, btn);
+  }
+}
+
+function handleCardClick(id) {
+  const idx = recentOrder.indexOf(id);
+  if (idx > -1) recentOrder.splice(idx, 1);
+  recentOrder.unshift(id);
+  if (recentOrder.length > 5) recentOrder.pop();
+  if (currentFilter === 'recent') applyFilter();
+}
+
+function openService(id) {
+  setFilter('recent', document.getElementById('btn-recent'));
+}
+
+// ── Category helpers ──────────────────────────────────
+function getCatTagStyle(cat) {
+  const c = categories[cat];
+  if (!c) return '';
+  return `background:${c.color};color:${c.text};border:1px solid ${c.border};`;
+}
+
+function refreshSidebarCategories() {
+  const container = document.getElementById('cat-sidebar-list');
+  if (!container) return;
+  container.querySelectorAll('[data-sidebar-cat]').forEach(el => el.remove());
+  Object.entries(categories).forEach(([key, cat]) => {
+    if (container.querySelector(`[data-sidebar-cat="${key}"]`)) return;
+    const count = document.querySelectorAll(`.card[data-category="${key}"]`).length;
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn';
+    btn.id = 'btn-' + key;
+    btn.dataset.sidebarCat = key;
+    btn.onclick = () => setFilter(key, btn);
+    btn.innerHTML = `<span class="filter-icon">${cat.icon}</span><span class="filter-label">${cat.label}</span><span class="filter-count" id="count-${key}">${count}</span>`;
+    container.appendChild(btn);
+  });
+}
+
+// ── Edit service ──────────────────────────────────────
+let editingCard = null;
+
+function openEdit(e, card) {
+  e.preventDefault();
+  e.stopPropagation();
+  editingCard = card;
+  document.getElementById('edit-name').value = card.querySelector('.card-name').textContent;
+  document.getElementById('edit-url').value = card.dataset.url || '';
+  const descEl = card.querySelector('.card-desc');
+  document.getElementById('edit-desc').value = descEl ? descEl.textContent : '';
+  const emoji = card.querySelector('.card-icon').textContent;
+  document.getElementById('edit-emoji').value = emoji;
+  document.getElementById('edit-emoji-preview').textContent = emoji;
+  const grid = document.getElementById('edit-cat-grid');
+  grid.innerHTML = '';
+  Object.entries(categories).forEach(([key, cat]) => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-tile' + (card.dataset.category === key ? ' selected' : '');
+    btn.textContent = cat.icon + ' ' + cat.label;
+    btn.onclick = () => { grid.querySelectorAll('.cat-tile').forEach(t=>t.classList.remove('selected')); btn.classList.add('selected'); };
+    grid.appendChild(btn);
+  });
+  document.getElementById('edit-overlay').classList.add('open');
+}
+
+function closeEdit() {
+  document.getElementById('edit-overlay').classList.remove('open');
+  editingCard = null;
+}
+
+function editOverlayClose(e) {
+  if (e.target === document.getElementById('edit-overlay')) closeEdit();
+}
+
+async function saveEdit() {
+  if (!editingCard) return;
+  const id = editingCard.dataset.id;
+  const name = document.getElementById('edit-name').value.trim() || editingCard.querySelector('.card-name').textContent;
+  const url = document.getElementById('edit-url').value.trim();
+  const desc = document.getElementById('edit-desc').value.trim();
+  const emoji = document.getElementById('edit-emoji').value || editingCard.querySelector('.card-icon').textContent;
+  const selectedTile = document.querySelector('#edit-cat-grid .cat-tile.selected');
+  const newCatLabel = selectedTile ? selectedTile.textContent.trim() : '';
+  const newCat = Object.entries(categories).find(([,v]) => (v.icon + ' ' + v.label) === newCatLabel)?.[0] || editingCard.dataset.category;
+  const cat = categories[newCat];
+
+  try {
+    await fetch('/api/portal-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat } })
+    });
+    await loadPortal();
+  } catch (err) {
+    // Optimistic local update on fetch failure
+    editingCard.querySelector('.card-name').textContent = name;
+    const descEl = editingCard.querySelector('.card-desc');
+    if (descEl) descEl.textContent = desc;
+    editingCard.querySelector('.card-icon').textContent = emoji;
+    if (url) editingCard.dataset.url = url;
+    editingCard.dataset.category = newCat;
+    if (cat) {
+      const tag = editingCard.querySelector('.card-tag');
+      tag.textContent = cat.label;
+      tag.className = 'card-tag';
+      tag.style.cssText = getCatTagStyle(newCat);
+    }
+    if (currentFilter !== 'all' && currentFilter !== 'favorites' && currentFilter !== 'recent') applyFilter();
+    refreshSidebarCategories();
+  }
+  closeEdit();
+}
+
+async function deleteService() {
+  if (!editingCard) return;
+  const name = editingCard.querySelector('.card-name').textContent;
+  if (!confirm('Remove "' + name + '" from the portal?')) return;
+  const id = editingCard.dataset.id;
+  try {
+    await fetch('/api/portal-delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    });
+    await loadPortal();
+  } catch (err) {
+    editingCard.remove();
+    refreshSidebarCategories();
+    updateCounts();
+  }
+  closeEdit();
+}
+
+// ── Category persistence ──────────────────────────────
+async function persistCategories() {
+  await fetch('/api/portal-update-categories', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ categories: Object.values(categories) })
+  });
+}
+
+// ── New Category ──────────────────────────────────────
+function showNewCatForm() {
+  document.getElementById('new-cat-form').style.display = 'block';
+  document.getElementById('new-cat-btn').style.display = 'none';
+  document.getElementById('new-cat-name').focus();
+}
+
+function createCategory() {
+  const name = document.getElementById('new-cat-name').value.trim();
+  const icon = document.getElementById('new-cat-emoji').value.trim() || '🏷️';
+  if (!name) return;
+  const key = name.toLowerCase().replace(/\s+/g, '-');
+  const hues = [200,160,280,40,340,20];
+  const hue = hues[Object.keys(categories).length % hues.length];
+  categories[key] = {
+    key, label: name, icon,
+    color: `hsla(${hue},60%,70%,0.08)`,
+    text:  `hsla(${hue},80%,80%,1)`,
+    border:`hsla(${hue},60%,70%,0.2)`
+  };
+  labels[key] = name;
+  const grid = document.getElementById('wizard-cat-grid');
+  const btn = document.createElement('button');
+  btn.className = 'cat-tile';
+  btn.onclick = () => selectCat(key, btn);
+  btn.textContent = icon + ' ' + name;
+  grid.insertBefore(btn, document.getElementById('new-cat-btn'));
+  refreshSidebarCategories();
+  persistCategories().catch(() => {});
+  selectCat(key, btn);
+  document.getElementById('new-cat-form').style.display = 'none';
+  document.getElementById('new-cat-btn').style.display = '';
+  document.getElementById('new-cat-name').value = '';
+  document.getElementById('new-cat-emoji').value = '';
+  document.getElementById('new-cat-emoji-preview').textContent = '🏷️';
+  document.getElementById('btn-step2-next').disabled = false;
+}
+
+// ── Wizard ────────────────────────────────────────────
+let wizardStep = 1;
+let selectedCat = null;
+let isInternal = false;
+
+function openWizard() {
+  wizardStep = 1; selectedCat = null; isInternal = false;
+  document.getElementById('svc-url').value = '';
+  document.getElementById('svc-name').value = '';
+  document.getElementById('svc-desc').value = '';
+  document.getElementById('svc-emoji').value = '';
+  document.getElementById('emoji-preview').textContent = '📦';
+  document.getElementById('url-hint').textContent = '';
+  document.querySelectorAll('.cat-tile').forEach(t => t.classList.remove('selected'));
+  document.getElementById('btn-step2-next').disabled = true;
+  renderStep(1);
+  document.getElementById('wizard-overlay').classList.add('open');
+}
+
+function closeWizard() {
+  document.getElementById('wizard-overlay').classList.remove('open');
+}
+
+function overlayClose(e) {
+  if (e.target === document.getElementById('wizard-overlay')) closeWizard();
+}
+
+function updateEmoji(v) {
+  document.getElementById('emoji-preview').textContent = v || '📦';
+}
+
+function detectType() {
+  const url = document.getElementById('svc-url').value.trim();
+  isInternal = url.includes('.private.sovereignadvisory.ai');
+  const hint = document.getElementById('url-hint');
+  if (!url) { hint.textContent = ''; return; }
+  hint.innerHTML = isInternal
+    ? '🔒 <span style="color:#6ee7a0">Internal service — SSO, Nginx, Twingate will be auto-provisioned</span>'
+    : '🌐 <span style="color:#7dd3fc">External service — portal card + Vaultwarden credential link</span>';
+}
+
+function selectCat(cat, el) {
+  selectedCat = cat;
+  document.querySelectorAll('.cat-tile').forEach(t => t.classList.remove('selected'));
+  el.classList.add('selected');
+  document.getElementById('btn-step2-next').disabled = false;
+}
+
+function goStep(n) {
+  wizardStep = n;
+  if (n === 3) buildReview();
+  if (n === 4) startDeploy();
+  renderStep(n);
+}
+
+function renderStep(n) {
+  document.querySelectorAll('.modal-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('modal-step-' + n).classList.add('active');
+  const inds = document.querySelectorAll('.step');
+  inds.forEach((ind, i) => {
+    ind.classList.remove('active', 'done');
+    if (i + 1 < n) ind.classList.add('done');
+    else if (i + 1 === n) ind.classList.add('active');
+  });
+  document.querySelectorAll('.step.done .step-num').forEach(el => { if (!el.textContent.includes('✓')) el.textContent = '✓'; });
+}
+
+function buildReview() {
+  const steps = isInternal ? [
+    { icon: '🔑', name: 'Keycloak OIDC Client', desc: 'Create client, set redirect URIs, assign roles', badge: 'auto' },
+    { icon: '🛡️', name: 'oauth2-proxy container', desc: 'Generate config, add to docker-compose, restart', badge: 'auto' },
+    { icon: '🌐', name: 'Nginx reverse proxy rule', desc: 'Add upstream + location block for the new subdomain', badge: 'auto' },
+    { icon: '🔒', name: 'Twingate resource', desc: 'Register private DNS entry in zero-trust network', badge: 'auto' },
+    { icon: '⬡',  name: 'Portal card', desc: 'Service appears in "' + (selectedCat||'All Services') + '" with live status', badge: 'auto' },
+  ] : [
+    { icon: '⬡',  name: 'Portal card', desc: 'External link card added to the portal', badge: 'link' },
+    { icon: '🔐', name: 'Vaultwarden entry (optional)', desc: 'Credential record linked from the service card', badge: 'link' },
+  ];
+  document.getElementById('provision-list').innerHTML = steps.map(s => `
+    <div class="provision-item">
+      <div class="provision-icon">${s.icon}</div>
+      <div class="provision-info">
+        <div class="provision-name">${s.name}</div>
+        <div class="provision-desc">${s.desc}</div>
+      </div>
+      <div class="provision-badge badge-${s.badge}">${s.badge === 'auto' ? 'Auto' : 'Link'}</div>
+    </div>`).join('');
+}
+
+async function startDeploy() {
+  const name = document.getElementById('svc-name').value || 'New Service';
+  const url = document.getElementById('svc-url').value.trim();
+  const emoji = document.getElementById('svc-emoji').value || '📦';
+  const desc = document.getElementById('svc-desc').value || '';
+  const cat = selectedCat || 'infra';
+
+  document.getElementById('done-name').textContent = name + ' is ready';
+  const steps = isInternal
+    ? ['Authenticating with Keycloak API','Creating OIDC client','Generating oauth2-proxy config','Updating Nginx','Registering Twingate resource','Adding portal card']
+    : ['Adding portal card','Linking Vaultwarden entry'];
+
+  const list = document.getElementById('progress-list');
+  list.innerHTML = steps.map((s,i) => `
+    <div class="progress-item" id="pi-${i}">
+      <div class="p-icon" id="pic-${i}">○</div>
+      <span>${s}</span>
+      <div class="p-bar-wrap"><div class="p-bar" id="pb-${i}" style="width:0%"></div></div>
+    </div>`).join('');
+
+  document.getElementById('deploy-done').style.display = 'none';
+  document.getElementById('btn-done').style.display = 'none';
+  document.querySelector('#deploy-footer span').style.display = '';
+
+  // Fire provision request
+  let provisionOk = false;
+  let provisionErr = null;
+  try {
+    const provRes = await fetch('/api/portal-provision', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, url, description: desc, icon: emoji, category: cat, internal: isInternal })
+    });
+    provisionOk = provRes.ok;
+    if (!provisionOk) provisionErr = 'Server returned ' + provRes.status;
+  } catch (e) {
+    provisionErr = e.message;
+  }
+
+  let i = 0;
+  function tick() {
+    if (i >= steps.length) {
+      if (provisionErr) {
+        // Show error state
+        document.getElementById('deploy-done').style.display = 'block';
+        document.getElementById('deploy-done').innerHTML = `
+          <div style="font-size:28px;margin-bottom:10px;">⚠</div>
+          <div style="font-family:var(--font-d);font-size:16px;color:#fca5a5;margin-bottom:6px;">Provision failed</div>
+          <div style="font-size:11px;color:var(--text-3);margin-bottom:14px;">${provisionErr}</div>
+          <button class="btn-primary" onclick="goStep(4)" style="font-size:11px;padding:6px 14px;">Try again</button>`;
+        document.getElementById('btn-done').style.display = 'none';
+      } else {
+        document.getElementById('deploy-done').style.display = 'block';
+        document.getElementById('btn-done').style.display = 'inline-block';
+      }
+      document.querySelector('#deploy-footer span').style.display = 'none';
+      return;
+    }
+    const el = document.getElementById('pi-' + i);
+    const bar = document.getElementById('pb-' + i);
+    const icon = document.getElementById('pic-' + i);
+    el.classList.add('active');
+    icon.textContent = '◎';
+    let pct = 0;
+    const fill = setInterval(() => {
+      pct += 8;
+      bar.style.width = Math.min(pct, 100) + '%';
+      if (pct >= 100) {
+        clearInterval(fill);
+        el.classList.remove('active');
+        el.classList.add('done');
+        icon.textContent = '✓';
+        i++;
+        setTimeout(tick, 200);
+      }
+    }, 40);
+  }
+  setTimeout(tick, 300);
+}
+
+async function finishWizard() {
+  closeWizard();
+  await loadPortal();
+}
+
+// ── Init ──────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', loadPortal);
+</script>
+</body>
+</html>
