@@ -603,7 +603,6 @@ services:
       - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
       # Production mode: trust nginx TLS termination via KC_PROXY=edge
       - KC_HOSTNAME=kc.sovereignadvisory.ai
-      - KC_HOSTNAME_ADMIN=kc.private.sovereignadvisory.ai
       - KC_HOSTNAME_STRICT=true
       - KC_PROXY=edge
       - KC_HTTP_ENABLED=true
