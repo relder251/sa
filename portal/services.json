@@ -3,50 +3,50 @@
     {
       "key": "automation",
       "label": "Automation",
-      "icon": "⚙️",
-      "color": "rgba(99,102,241,0.15)",
-      "text": "#fff",
-      "border": "rgba(99,102,241,0.4)"
+      "icon": "⚡",
+      "color": "rgba(74,222,128,0.08)",
+      "text": "#6ee7a0",
+      "border": "rgba(74,222,128,0.15)"
     },
     {
       "key": "ai",
-      "label": "AI / LLM",
+      "label": "AI & Dev",
       "icon": "🤖",
-      "color": "rgba(168,85,247,0.15)",
-      "text": "#fff",
-      "border": "rgba(168,85,247,0.4)"
+      "color": "rgba(129,140,248,0.08)",
+      "text": "#a5b4fc",
+      "border": "rgba(129,140,248,0.15)"
     },
     {
       "key": "providers",
       "label": "AI Providers",
       "icon": "🧠",
-      "color": "rgba(59,130,246,0.15)",
-      "text": "#fff",
-      "border": "rgba(59,130,246,0.4)"
+      "color": "rgba(252,211,77,0.08)",
+      "text": "#fcd34d",
+      "border": "rgba(252,211,77,0.15)"
     },
     {
       "key": "security",
       "label": "Security",
       "icon": "🔐",
-      "color": "rgba(239,68,68,0.15)",
-      "text": "#fff",
-      "border": "rgba(239,68,68,0.4)"
+      "color": "rgba(248,113,113,0.08)",
+      "text": "#fca5a5",
+      "border": "rgba(248,113,113,0.15)"
     },
     {
       "key": "productivity",
       "label": "Productivity",
-      "icon": "📝",
-      "color": "rgba(16,185,129,0.15)",
-      "text": "#fff",
-      "border": "rgba(16,185,129,0.4)"
+      "icon": "📋",
+      "color": "rgba(52,211,153,0.08)",
+      "text": "#6ee7b7",
+      "border": "rgba(52,211,153,0.15)"
     },
     {
       "key": "infra",
       "label": "Infrastructure",
-      "icon": "🌐",
-      "color": "rgba(245,158,11,0.15)",
-      "text": "#fff",
-      "border": "rgba(245,158,11,0.4)"
+      "icon": "⚙️",
+      "color": "rgba(56,189,248,0.08)",
+      "text": "#7dd3fc",
+      "border": "rgba(56,189,248,0.15)"
     }
   ],
   "services": [
@@ -54,7 +54,7 @@
       "id": "n8n",
       "name": "n8n",
       "url": "https://n8n.private.sovereignadvisory.ai",
-      "description": "Workflow automation",
+      "description": "Workflow automation · 6 active",
       "icon": "⚡",
       "category": "automation",
       "favorite": false,

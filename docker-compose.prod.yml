@@ -178,6 +178,7 @@ services:
       - N8N_RUNNERS_ENABLED=false
       - N8N_TRUST_PROXY=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
       - N8N_SECURE_COOKIE=true
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
