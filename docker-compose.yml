@@ -70,7 +70,7 @@ services:
       - N8N_SECURE_COOKIE=false
       - N8N_TRUST_PROXY=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
       # ── SA Lead Pipeline variables (accessible as $env.VAR in workflows) ──────
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
@@ -83,6 +83,8 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
+      # ── Portal provisioning secrets ──────────────────────────────────────────
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
       # ── Keycloak OIDC SSO (enable after configuring Keycloak realm) ─────────
       - N8N_SSO_OIDC_ENABLED=true
       - N8N_SSO_OIDC_ISSUER_URL=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
