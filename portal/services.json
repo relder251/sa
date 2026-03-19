@@ -62,18 +62,18 @@
     },
     {
       "id": "pipeline",
-      "name": "Pipeline Board",
-      "url": "https://pipeline.private.sovereignadvisory.ai",
-      "description": "Lead pipeline management",
+      "name": "Lead Pipeline",
+      "url": "https://sovereignadvisory.ai/review/",
+      "description": "Lead review & pipeline board",
       "icon": "🎯",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 3
+      "ssoTier": 2
     },
     {
       "id": "litellm",
       "name": "LiteLLM",
-      "url": "https://litellm.private.sovereignadvisory.ai",
+      "url": "https://litellm.private.sovereignadvisory.ai/ui",
       "description": "AI proxy · 4 model tiers",
       "icon": "🤖",
       "category": "ai",
@@ -86,6 +86,16 @@
       "url": "https://jupyter.private.sovereignadvisory.ai",
       "description": "Interactive dev notebooks",
       "icon": "📓",
+      "category": "ai",
+      "favorite": false,
+      "ssoTier": 1
+    },
+    {
+      "id": "webui",
+      "name": "Open WebUI",
+      "url": "https://webui.private.sovereignadvisory.ai",
+      "description": "LLM chat interface",
+      "icon": "💬",
       "category": "ai",
       "favorite": false,
       "ssoTier": 1
@@ -149,15 +159,25 @@
       "ssoTier": 1
     },
     {
-      "id": "keycloak",
-      "name": "Keycloak",
-      "url": "https://kc.sovereignadvisory.ai",
-      "description": "Identity & SSO admin",
+      "id": "keycloak-admin",
+      "name": "Keycloak Admin",
+      "url": "https://kc.private.sovereignadvisory.ai/admin/agentic-sdlc/console/",
+      "description": "Realm admin — manage clients, users & SSO",
       "icon": "🔑",
       "category": "security",
       "favorite": false,
-      "ssoTier": 3,
+      "ssoTier": 2,
       "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/keycloak"
+    },
+    {
+      "id": "keycloak-account",
+      "name": "Keycloak Account",
+      "url": "https://kc.private.sovereignadvisory.ai/realms/agentic-sdlc/account/",
+      "description": "User self-service — profile, sessions & MFA",
+      "icon": "👤",
+      "category": "security",
+      "favorite": false,
+      "ssoTier": 1
     },
     {
       "id": "notion",
@@ -173,8 +193,8 @@
     {
       "id": "twingate",
       "name": "Twingate",
-      "url": "https://www.twingate.com/dashboard",
-      "description": "Private network access",
+      "url": "https://relder.twingate.com/resources",
+      "description": "Private network access — resource dashboard",
       "icon": "🛡️",
       "category": "infra",
       "favorite": false,
