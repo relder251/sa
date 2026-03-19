@@ -151,7 +151,7 @@
     {
       "id": "keycloak-admin",
       "name": "Keycloak Admin",
-      "url": "https://kc.private.sovereignadvisory.ai/admin/",
+      "url": "https://kc.sovereignadvisory.ai/admin/",
       "description": "Realm admin — manage clients, users & SSO",
       "icon": "🔑",
       "category": "security",
