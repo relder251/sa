@@ -70,6 +70,7 @@ services:
       - N8N_SECURE_COOKIE=false
       - N8N_TRUST_PROXY=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os
       # ── SA Lead Pipeline variables (accessible as $env.VAR in workflows) ──────
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
