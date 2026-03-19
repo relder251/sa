@@ -825,7 +825,7 @@ function renderCards(services) {
     });
     card.innerHTML = `
       ${svc.apiProvider ? '<span class="api-badge" data-provider="' + svc.apiProvider + '">API —</span>' : ''}
-      <button class="star-btn${svc.favorite ? ' starred' : ''}" onclick="toggleFavorite(event,this)" title="${svc.favorite ? 'Remove from favorites' : 'Add to favorites'}">${svc.favorite ? '★' : '☆'}</button>
+      <button class="card-star star-btn${svc.favorite ? ' starred' : ''}" onclick="toggleFavorite(event,this)" title="${svc.favorite ? 'Remove from favorites' : 'Add to favorites'}">${svc.favorite ? '★' : '☆'}</button>
       <div class="card-icon">${svc.icon}</div>
       <div class="card-name">${svc.name}</div>
       ${svc.description ? '<div class="card-desc">' + svc.description + '</div>' : ''}
