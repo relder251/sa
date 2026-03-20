@@ -59,6 +59,7 @@ def run_phase8(
     DEPLOY_SSH_HOST = os.environ.get("DEPLOY_SSH_HOST", "")
     DEPLOY_SSH_USER = os.environ.get("DEPLOY_SSH_USER", "")
     DEPLOY_SSH_KEY_PATH = os.environ.get("DEPLOY_SSH_KEY_PATH", "")
+    DEPLOY_PORT = os.environ.get("DEPLOY_PORT", "8000").strip()
 
     def L(msg):
         if log_fn:
@@ -111,7 +112,7 @@ def run_phase8(
                 [
                     "docker", "run", "-d",
                     "--name", container_name,
-                    "-p", "0:8000",
+                    "-p", f"0:{DEPLOY_PORT}",
                     image,
                 ],
                 timeout=60,
@@ -234,7 +235,7 @@ def run_phase8(
             if rc != 0:
                 raise RuntimeError(f"docker compose up failed: {out}")
 
-            endpoint = f"http://{DEPLOY_SSH_HOST}:8000"
+            endpoint = f"http://{DEPLOY_SSH_HOST}:{DEPLOY_PORT}"
             L(f"  SSH deployment successful — endpoint: {endpoint}")
             report_lines.append(
                 f"## Result\n"
