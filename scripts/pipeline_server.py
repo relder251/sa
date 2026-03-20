@@ -402,6 +402,29 @@ def run_postprocess(project_dir: Path) -> list:
         if len(filtered) != len(lines):
             req_file.write_text("\n".join(filtered))
 
+    # Loosen exact-pinned versions (pkg==X.Y.Z → pkg>=X.Y) so pip can resolve
+    # non-existent LLM-hallucinated patch versions (e.g. fastapi==2.0.6).
+    if req_file.exists():
+        content = req_file.read_text()
+        lines = content.split("\n")
+        new_lines = []
+        changed = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                new_lines.append(line)
+                continue
+            m = re.match(r"^([A-Za-z0-9_\-\.]+)==(\d+\.\d+)(\.\d+.*)?$", stripped)
+            if m:
+                pkg_name, major_minor = m.group(1), m.group(2)
+                new_lines.append(f"{pkg_name}>={major_minor}")
+                fixes.append(f'requirements.txt: loosened {stripped} → {pkg_name}>={major_minor}')
+                changed = True
+            else:
+                new_lines.append(line)
+        if changed:
+            req_file.write_text("\n".join(new_lines))
+
     if req_file.exists():
         content = req_file.read_text()
         lines = content.split("\n")
