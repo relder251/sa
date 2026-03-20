@@ -73,6 +73,9 @@ def run_pytest(project_dir: Path, venv_dir: Path):
         return True, 'No tests/ directory — skipped', []
 
     pytest_bin = venv_dir / 'bin' / 'pytest'
+    if not pytest_bin.exists():
+        return False, 'pytest binary missing — pip install likely failed', ['pip install failed: pytest not installed']
+
     env = os.environ.copy()
     env['PYTHONPATH'] = str(project_dir)
     env['HOME'] = '/tmp'
@@ -222,6 +225,28 @@ def run_postprocess(project_dir: Path):
                 filtered.append(line)
         if len(filtered) != len(lines):
             req_file.write_text('\n'.join(filtered))
+
+    # Loosen exact patch pins (pkg==X.Y.Z → pkg>=X.Y) to avoid pip failures when
+    # LLM hallucinates non-existent patch versions (e.g. fastapi==2.0.6)
+    if req_file.exists():
+        lines = req_file.read_text().split('\n')
+        new_lines = []
+        changed = False
+        for line in lines:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                new_lines.append(line)
+                continue
+            m = re.match(r'^([A-Za-z0-9_\-\.]+)==(\d+\.\d+)(\.\d+.*)?$', stripped)
+            if m and m.group(3):  # only loosen if there's a patch component
+                pkg_name, major_minor = m.group(1), m.group(2)
+                new_lines.append(f'{pkg_name}>={major_minor}')
+                fixes.append(f'requirements.txt: loosened {stripped} → {pkg_name}>={major_minor}')
+                changed = True
+            else:
+                new_lines.append(line)
+        if changed:
+            req_file.write_text('\n'.join(new_lines))
 
     # Pin flask>=3.0 if flask is present without a version pin >= 3
     # Prevents ImportError from werkzeug.urls.url_quote removal in werkzeug 3.0

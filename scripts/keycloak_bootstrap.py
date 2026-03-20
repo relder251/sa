@@ -116,7 +116,17 @@ def create_group(token, group_name, role_ids):
     return gid
 
 
-def create_client(token, client_id, redirect_uris, web_origins=["*"]):
+def create_client(token, client_id, redirect_uris, web_origins=None):
+    if web_origins is None:
+        # Derive allowed origins from redirect URIs (strip path/wildcard)
+        from urllib.parse import urlparse
+        web_origins = list({
+            f"{p.scheme}://{p.netloc}"
+            for u in redirect_uris
+            if "://" in u
+            for p in [urlparse(u)]
+            if p.netloc
+        })
     r = requests.get(f"{KC_BASE}/admin/realms/{REALM}/clients",
                      headers=headers(token), params={"clientId": client_id})
     existing = r.json()
