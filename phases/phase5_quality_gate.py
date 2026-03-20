@@ -6,6 +6,7 @@ Returns: { passed: bool, blocked: bool, block_reason: str|None, report: str }
 import json
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 from phases.utils import call_llm as _call_llm_base, read_source_files as _read_source_files
@@ -128,8 +129,8 @@ def run_phase5(
     # ── Mypy ─────────────────────────────────────────────────────────────────
     if shutil.which("mypy"):
         L("  Running mypy type check ...")
+        mypy_report_dir = tempfile.mkdtemp(prefix=f"mypy_{name}_")
         try:
-            mypy_report_dir = f"/tmp/mypy_report_{name}"
             r = subprocess.run(
                 [
                     "mypy",
@@ -166,6 +167,8 @@ def run_phase5(
             L(f"  mypy error: {e}")
             warnings.append(f"mypy error: {e}")
             report_lines.append(f"## Mypy\n- Error: {e}\n")
+        finally:
+            shutil.rmtree(mypy_report_dir, ignore_errors=True)
     else:
         L("  mypy not installed — skipping")
         warnings.append("mypy not installed")
