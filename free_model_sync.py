@@ -303,10 +303,14 @@ def register_model(model: FreeModel, dry_run: bool = False) -> bool:
         return False
 
 
-def deregister_model(model_name: str, dry_run: bool = False) -> bool:
-    """Remove a stale free model from LiteLLM."""
+def deregister_model(model_name: str, model_id: str, dry_run: bool = False) -> bool:
+    """Remove a stale free model from LiteLLM using its DB UUID."""
+    if not model_id:
+        log.warning(f"  ⚠️  Cannot remove {model_name}: no DB id available (skipping)")
+        return False
+
     if dry_run:
-        log.info(f"[DRY RUN] Would REMOVE: {model_name}")
+        log.info(f"[DRY RUN] Would REMOVE: {model_name} (id={model_id})")
         return True
 
     try:
@@ -316,7 +320,7 @@ def deregister_model(model_name: str, dry_run: bool = False) -> bool:
                 "Authorization": f"Bearer {LITELLM_API_KEY}",
                 "Content-Type": "application/json",
             },
-            json={"id": model_name},
+            json={"id": model_id},
             timeout=10,
         )
         resp.raise_for_status()
@@ -372,6 +376,13 @@ def sync(dry_run: bool = False, verbose: bool = False):
         log.error("LITELLM_API_KEY not set — cannot call management API")
         sys.exit(1)
 
+    # Pre-flight: verify LiteLLM is reachable before making multiple API calls
+    try:
+        requests.get(f"{LITELLM_BASE_URL}/health", timeout=5).raise_for_status()
+    except requests.RequestException as e:
+        log.error(f"LiteLLM unreachable at {LITELLM_BASE_URL}: {e}")
+        sys.exit(1)
+
     log.info("=" * 60)
     log.info("Starting free model sync")
     log.info("=" * 60)
@@ -402,10 +413,10 @@ def sync(dry_run: bool = False, verbose: bool = False):
     log.info(f"To add:    {len(to_add)}")
     log.info(f"To remove: {len(to_remove)}")
 
-    # 4. Apply removals first
+    # 4. Apply removals first (pass DB uuid, not model_name)
     removed = 0
     for name in to_remove:
-        if deregister_model(name, dry_run=dry_run):
+        if deregister_model(name, model_id=current[name], dry_run=dry_run):
             removed += 1
 
     # 5. Apply additions
