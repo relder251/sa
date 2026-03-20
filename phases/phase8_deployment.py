@@ -199,7 +199,13 @@ def run_phase8(
         if DEPLOY_SSH_KEY_PATH:
             ssh_opts += ["-i", DEPLOY_SSH_KEY_PATH]
 
+        DOCKER_REGISTRY = re.sub(r'\s*#.*', '', os.environ.get("DOCKER_REGISTRY", "")).strip()
+
         L(f"  SSH deployment to {ssh_target}:{remote_path} ...")
+        if DOCKER_REGISTRY:
+            L(f"  DOCKER_REGISTRY is set ({DOCKER_REGISTRY}) — remote will use pre-pushed image (docker compose up -d)")
+        else:
+            L("  DOCKER_REGISTRY not set — remote will build image locally (docker compose up -d --build)")
 
         try:
             # Create remote directory
@@ -220,16 +226,22 @@ def run_phase8(
                 raise RuntimeError(f"SCP failed: {out}")
             L("  Files copied")
 
-            # Run docker compose up -d on remote
+            # Run docker compose up -d on remote.
+            # When DOCKER_REGISTRY is set the image was pushed in phase 7 — use it directly.
+            # When DOCKER_REGISTRY is unset the image was never pushed, so build on the remote host.
             project_subdir = project_dir.name
+            if DOCKER_REGISTRY:
+                compose_cmd = f"cd {remote_path}/{project_subdir} && docker compose up -d 2>&1 || docker-compose up -d 2>&1"
+            else:
+                compose_cmd = f"cd {remote_path}/{project_subdir} && docker compose up -d --build 2>&1 || docker-compose up -d --build 2>&1"
             rc, out = _run(
                 [
                     "ssh",
                 ] + ssh_opts + [
                     ssh_target,
-                    f"cd {remote_path}/{project_subdir} && docker compose up -d 2>&1 || docker-compose up -d 2>&1",
+                    compose_cmd,
                 ],
-                timeout=120,
+                timeout=300,
             )
             L(f"  docker compose: rc={rc} {out[:300]}")
             if rc != 0:
