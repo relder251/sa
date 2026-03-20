@@ -109,7 +109,7 @@ model_list:
 
   - model_name: _claude-sonnet
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20251001
+      model: anthropic/claude-sonnet-4-5-20250929
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: _claude-haiku
@@ -326,7 +326,7 @@ model_list:
 
   - model_name: cloud/chat
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20251001
+      model: anthropic/claude-sonnet-4-5-20250929
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/chat
@@ -356,7 +356,7 @@ model_list:
 
   - model_name: cloud/code
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20251001
+      model: anthropic/claude-sonnet-4-5-20250929
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/code
@@ -441,6 +441,8 @@ router_settings:
     - cloud/chat:    ["free/chat",   "hybrid/chat"]
     - cloud/code:    ["free/code",   "hybrid/code"]
     - cloud/reason:  ["free/reason", "hybrid/reason"]
+    # Cloud search: degrade to hybrid chat if Perplexity is down
+    - cloud/search:  ["hybrid/chat",  "free/chat"]
     # Free tier: degrade to hybrid if free models are all down
     - free/fast:     ["hybrid/fast",  "hybrid/chat"]
     - free/chat:     ["hybrid/chat"]
