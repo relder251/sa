@@ -97,6 +97,19 @@ body {
   color: #0b0f1c;
   letter-spacing: 0.05em;
 }
+.sign-out-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  color: var(--text-3);
+  font-size: 15px;
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+}
+.sign-out-btn:hover { background: rgba(255,255,255,0.08); color: var(--copper-light); }
 
 /* ── Layout ─────────────────────────────────────── */
 .layout { display: flex; min-height: calc(100vh - 54px); }
@@ -542,7 +555,8 @@ body {
   <div class="topbar-right">
     <div class="status-indicator"><span class="status-dot"></span> All systems operational</div>
     <button class="add-btn" onclick="openWizard()"><span class="add-btn-icon">＋</span> Add Service</button>
-    <div class="user-chip"><div class="avatar">RE</div>relder</div>
+    <div class="user-chip" id="user-chip"><div class="avatar" id="user-avatar">?</div><span id="user-name">…</span></div>
+    <a class="sign-out-btn" href="/oauth2/sign_out" title="Sign out / switch user">⏻</a>
   </div>
 </div>
 
@@ -764,18 +778,19 @@ const categories = {};
 async function loadPortal() {
   try {
     const res = await fetch('./services.json');
-    const data = await res.json();
-    // Build categories object keyed by `key`
-    (data.categories || []).forEach(cat => {
-      categories[cat.key] = cat;
-      labels[cat.key] = cat.label;
-    });
-    buildSidebarCategories(data.categories || []);
-    buildWizardCategoryTiles(data.categories || []);
-    renderCards(data.services || []);
+    const base = await res.json();
+    // Merge localStorage overrides (user edits persist in browser)
+    const savedServices = JSON.parse(localStorage.getItem('portal_services') || 'null');
+    const savedCats     = JSON.parse(localStorage.getItem('portal_categories') || 'null');
+    const cats = savedCats     || base.categories || [];
+    const svcs = savedServices || base.services   || [];
+    cats.forEach(cat => { categories[cat.key] = cat; labels[cat.key] = cat.label; });
+    buildSidebarCategories(cats);
+    buildWizardCategoryTiles(cats);
+    renderCards(svcs);
     loadApiStatus();
   } catch (err) {
-    console.error('Failed to load services.json:', err);
+    console.error('Failed to load portal:', err);
   }
 }
 
@@ -1027,39 +1042,44 @@ async function saveEdit() {
   if (!editingCard) return;
   const id = editingCard.dataset.id;
   const name = document.getElementById('edit-name').value.trim() || editingCard.querySelector('.card-name').textContent;
-  const url = document.getElementById('edit-url').value.trim();
+  const url  = document.getElementById('edit-url').value.trim();
   const desc = document.getElementById('edit-desc').value.trim();
   const emoji = document.getElementById('edit-emoji').value || editingCard.querySelector('.card-icon').textContent;
   const selectedTile = document.querySelector('#edit-cat-grid .cat-tile.selected');
-  const newCatLabel = selectedTile ? selectedTile.textContent.trim() : '';
+  const newCatLabel  = selectedTile ? selectedTile.textContent.trim() : '';
   const newCat = Object.entries(categories).find(([,v]) => (v.icon + ' ' + v.label) === newCatLabel)?.[0] || editingCard.dataset.category;
   const cat = categories[newCat];
 
-  try {
-    const res = await fetch('/api/portal-update', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat } })
-    });
-    if (!res.ok) { alert('Failed to save changes. Please try again.'); return; }
-    await loadPortal();
-  } catch (err) {
-    // Optimistic local update on fetch failure
-    editingCard.querySelector('.card-name').textContent = name;
-    const descEl = editingCard.querySelector('.card-desc');
-    if (descEl) descEl.textContent = desc;
-    editingCard.querySelector('.card-icon').textContent = emoji;
-    if (url) editingCard.dataset.url = url;
-    editingCard.dataset.category = newCat;
-    if (cat) {
-      const tag = editingCard.querySelector('.card-tag');
-      tag.textContent = cat.label;
-      tag.className = 'card-tag';
-      tag.style.cssText = getCatTagStyle(newCat);
-    }
-    if (currentFilter !== 'all' && currentFilter !== 'favorites' && currentFilter !== 'recent') applyFilter();
-    refreshSidebarCategories();
+  // 1. Update in-memory list
+  const svc = currentServices.find(s => s.id === id);
+  if (svc) Object.assign(svc, { name, url, description: desc, icon: emoji, category: newCat });
+
+  // 2. Persist to localStorage
+  localStorage.setItem('portal_services', JSON.stringify(currentServices));
+
+  // 3. Apply UI update
+  editingCard.querySelector('.card-name').textContent = name;
+  const descEl = editingCard.querySelector('.card-desc');
+  if (descEl) descEl.textContent = desc;
+  editingCard.querySelector('.card-icon').textContent = emoji;
+  if (url) editingCard.dataset.url = url;
+  editingCard.dataset.category = newCat;
+  if (cat) {
+    const tag = editingCard.querySelector('.card-tag');
+    tag.textContent = cat.label;
+    tag.className = 'card-tag';
+    tag.style.cssText = getCatTagStyle(newCat);
   }
+  if (currentFilter !== 'all' && currentFilter !== 'favorites' && currentFilter !== 'recent') applyFilter();
+  refreshSidebarCategories();
+
+  // 4. Fire-and-forget n8n sync (non-blocking, silently ignored)
+  fetch('/api/portal-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat } })
+  }).catch(() => {});
+
   closeEdit();
 }
 
@@ -1068,29 +1088,39 @@ async function deleteService() {
   const name = editingCard.querySelector('.card-name').textContent;
   if (!confirm('Remove "' + name + '" from the portal?')) return;
   const id = editingCard.dataset.id;
-  try {
-    const res = await fetch('/api/portal-delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    });
-    if (!res.ok) { alert('Failed to delete service. Please try again.'); return; }
-    await loadPortal();
-  } catch (err) {
-    editingCard.remove();
-    refreshSidebarCategories();
-    updateCounts();
-  }
+
+  // 1. Remove from in-memory list
+  const idx = currentServices.findIndex(s => s.id === id);
+  if (idx > -1) currentServices.splice(idx, 1);
+
+  // 2. Persist to localStorage
+  localStorage.setItem('portal_services', JSON.stringify(currentServices));
+
+  // 3. Update UI immediately
+  editingCard.remove();
+  refreshSidebarCategories();
+  updateCounts();
+
+  // 4. Fire-and-forget n8n sync
+  fetch('/api/portal-delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  }).catch(() => {});
+
   closeEdit();
 }
 
 // ── Category persistence ──────────────────────────────
-async function persistCategories() {
-  await fetch('/api/portal-update-categories', {
+function persistCategories() {
+  const cats = Object.values(categories);
+  localStorage.setItem('portal_categories', JSON.stringify(cats));
+  // Fire-and-forget n8n sync
+  fetch('/api/portal-update-categories', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ categories: Object.values(categories) })
-  });
+    body: JSON.stringify({ categories: cats })
+  }).catch(() => {});
 }
 
 // ── New Category ──────────────────────────────────────
@@ -1121,9 +1151,7 @@ function createCategory() {
   btn.textContent = icon + ' ' + name;
   grid.insertBefore(btn, document.getElementById('new-cat-btn'));
   refreshSidebarCategories();
-  persistCategories().catch(() => {
-    alert('Category saved locally, but failed to persist to server. Changes may be lost on refresh.');
-  });
+  persistCategories();
   selectCat(key, btn);
   document.getElementById('new-cat-form').style.display = 'none';
   document.getElementById('new-cat-btn').style.display = '';
@@ -1261,6 +1289,15 @@ async function startDeploy() {
     provisionErr = e.message;
   }
 
+  // Save new service to localStorage regardless of provision result
+  const newSvc = {
+    id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 30) + '-' + Date.now(),
+    name, url, description: desc, icon: emoji, category: cat, favorite: false, ssoTier: isInternal ? 1 : 3
+  };
+  const existing = JSON.parse(localStorage.getItem('portal_services') || 'null') || currentServices;
+  existing.push(newSvc);
+  localStorage.setItem('portal_services', JSON.stringify(existing));
+
   let i = 0;
   function tick() {
     if (i >= steps.length) {
@@ -1307,8 +1344,25 @@ async function finishWizard() {
   await loadPortal();
 }
 
+// ── User info ─────────────────────────────────────────
+async function loadUser() {
+  try {
+    const res = await fetch('/oauth2/userinfo');
+    if (!res.ok) return;
+    const info = await res.json();
+    // oauth2-proxy returns: { user, email, groups, ... }
+    const email = info.email || info.user || '';
+    const display = info.preferred_username || info.nickname || email.split('@')[0] || email;
+    const initials = display.slice(0, 2).toUpperCase();
+    document.getElementById('user-avatar').textContent = initials;
+    document.getElementById('user-name').textContent = display;
+  } catch (e) {
+    // Keep placeholder if userinfo unavailable
+  }
+}
+
 // ── Init ──────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', loadPortal);
+document.addEventListener('DOMContentLoaded', () => { loadPortal(); loadUser(); });
 </script>
 </body>
 </html>
