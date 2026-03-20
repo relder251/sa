@@ -69,9 +69,23 @@
 | Check | Result |
 |---|---|
 | n8n import path `/data/workflows/<name>` | ✅ Matches `./workflows:/data/workflows` volume mount in docker-compose.yml |
+| `docker exec n8n ls /data/workflows/` | ✅ All 6 workflow files visible inside container |
+
+### Functional validation — live tests
+| Test | Method | Result |
+|---|---|---|
+| Pre-flight: `docker` in PATH | `command -v docker` | ✅ Found |
+| Pre-flight: `curl` in PATH | `command -v curl` | ✅ Found |
+| Pre-flight: Docker daemon running | `docker info` | ✅ Running |
+| Pre-flight: `.env` exists | `[[ -f .env ]]` | ✅ Found |
+| n8n health endpoint | `curl -s http://localhost:5678/healthz` | ✅ `{"status":"ok"}` |
+| Ollama health endpoint | `curl -s http://localhost:11434/` | ✅ Responds |
+| Import path construction | Loop `basename` + `/data/workflows/` | ✅ All 6 paths correct |
+| End-to-end import (one workflow) | `docker exec n8n n8n import:workflow --input=/data/workflows/litellm_test.json` | ✅ `Successfully imported 1 workflow.` |
+| `mkdir -p` targets | All 6 dirs checked against live filesystem | ✅ No conflicts; all safe |
 
 ---
 
 ## Final State
 
-`phase_1_setup.sh` is now robust against the most common failure modes: missing environment, Docker not running, slow container startup, and incomplete workflow import. All 6 workflows are imported on fresh setup. No behavioral changes to the happy path.
+`phase_1_setup.sh` is now robust against the most common failure modes: missing environment, Docker not running, slow container startup, and incomplete workflow import. All 6 workflows are imported on fresh setup. All pre-flight checks, health loops, and import logic validated live against the running stack. No behavioral changes to the happy path.
