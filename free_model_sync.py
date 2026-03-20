@@ -339,13 +339,23 @@ FREE_TIER_GROUPS = {
     "free/fast":   "fast",
 }
 
-def sync_tier_groups(all_free: list[FreeModel], dry_run: bool = False):
+def sync_tier_groups(all_free: list[FreeModel], current: dict[str, str], dry_run: bool = False):
     """
     Register/update the convenience group aliases (free/chat, free/code, etc.)
     that round-robin across all free models with matching tags.
-    These are separate model_name entries that all point to tagged models.
+
+    Uses delete-then-recreate to prevent duplicate entries from accumulating
+    across 6-hour sync cycles: all existing entries for each group alias are
+    deregistered first, then the fresh set is registered.
     """
     for group_name, tag in FREE_TIER_GROUPS.items():
+        # Deregister all existing entries for this group alias before re-registering
+        stale_entries = {k: v for k, v in current.items() if k == group_name}
+        if stale_entries:
+            log.info(f"Group {group_name}: removing {len(stale_entries)} stale entry(ies) before refresh")
+            for name, model_id in stale_entries.items():
+                deregister_model(name, model_id=model_id, dry_run=dry_run)
+
         matching = [m for m in all_free if tag in m.tags]
         if not matching:
             log.warning(f"No free models found for group {group_name}")
@@ -427,7 +437,7 @@ def sync(dry_run: bool = False, verbose: bool = False):
 
     # 6. Sync convenience tier groups (free/chat, free/code, etc.)
     log.info("Syncing free tier group aliases...")
-    sync_tier_groups(discovered, dry_run=dry_run)
+    sync_tier_groups(discovered, current, dry_run=dry_run)
 
     # 7. Summary
     log.info("=" * 60)
