@@ -81,7 +81,7 @@ class RunOpportunityRequest(BaseModel):
 
 class RunRequest(BaseModel):
     project_dir: str = "/data/output/project"
-    report_path: str = "/data/output/phase3_report.md"
+    report_path: str = "/data/output/phase4_report.md"
 
 
 class ApprovalSignalRequest(BaseModel):
@@ -607,7 +607,7 @@ async def run_opportunity(body: RunOpportunityRequest):
     project_dir = Path(body.project_dir or str(project_base / "project"))
     plan_path = Path(body.plan_path or str(project_base / "project_plan.md"))
     code_path = Path(body.code_output_path or str(project_base / "execution_output.md"))
-    report_path = Path(body.report_path or str(project_base / "phase3_report.md"))
+    report_path = Path(body.report_path or str(project_base / "phase4_report.md"))
 
     project_base.mkdir(parents=True, exist_ok=True)
     project_dir.mkdir(parents=True, exist_ok=True)

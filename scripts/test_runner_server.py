@@ -357,7 +357,7 @@ def run_opportunity():
     project_dir  = Path(data.get('project_dir',  str(project_base / 'project')))
     plan_path    = Path(data.get('plan_path',     str(project_base / 'project_plan.md')))
     code_path    = Path(data.get('code_output_path', str(project_base / 'execution_output.md')))
-    report_path  = Path(data.get('report_path',   str(project_base / 'phase3_report.md')))
+    report_path  = Path(data.get('report_path',   str(project_base / 'phase4_report.md')))
 
     project_dir.mkdir(parents=True, exist_ok=True)
 
@@ -481,7 +481,7 @@ def health():
 @app.route('/run', methods=['POST'])
 def run():
     project_dir = Path(request.json.get('project_dir', '/data/output/project'))
-    report_path = Path(request.json.get('report_path',  '/data/output/phase3_report.md'))
+    report_path = Path(request.json.get('report_path',  '/data/output/phase4_report.md'))
 
     log        = []
     iterations = []

@@ -26,7 +26,7 @@ def _read_endpoint_from_report(project_base: Path) -> str | None:
 
 def _read_iterations_from_report(project_base: Path) -> int:
     """Try to parse iteration count from phase3/phase4 report."""
-    for report_name in ("phase3_report.md", "phase4_report.md"):
+    for report_name in ("phase4_report.md", "phase3_report.md"):
         report_path = project_base / report_name
         if report_path.exists():
             content = report_path.read_text(errors="replace")
