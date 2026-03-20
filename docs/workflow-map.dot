@@ -1,0 +1,177 @@
+// Agentic SDLC — Service Topology (Graphviz DOT)
+// Generate SVG: dot -Tsvg workflow-map.dot -o workflow-map.svg
+
+digraph AgenticSDLC {
+  rankdir=LR;
+  label="Agentic SDLC Service Topology";
+  labelloc=t;
+  fontname="Helvetica";
+  fontsize=16;
+  compound=true;
+  nodesep=0.5;
+  ranksep=1.2;
+
+  // Default node style
+  node [fontname="Helvetica", fontsize=11, style=filled];
+  edge [fontname="Helvetica", fontsize=9];
+
+  // ── SHARED SERVICES ─────────────────────────────────────────────────────────
+  subgraph cluster_shared {
+    label="Shared Stack (docker-compose.yml)";
+    style=filled;
+    color="#e8eef8";
+    fontname="Helvetica Bold";
+    fontsize=13;
+
+    // Data stores
+    postgres [label="postgres\n(litellm_db)\nport 5432", shape=cylinder, fillcolor="#ffd9b3", color="#c06000"];
+    pg_data [label="pg_data\nvolume", shape=cylinder, fillcolor="#ffe8cc", color="#c06000", style="filled,dashed"];
+
+    // Core services
+    litellm [label="litellm\nport 4000\nlitellm_config.yaml", shape=box, fillcolor="#d0e8ff", color="#0055cc"];
+    n8n [label="n8n\nport 5678\nworkflows / output / scripts", shape=box, fillcolor="#d0e8ff", color="#0055cc"];
+    ollama [label="ollama\nport 11434\nollama_data vol\nKEEP_ALIVE=10m", shape=box, fillcolor="#d0e8ff", color="#0055cc"];
+    jupyter [label="jupyter\nport 8888\nnotebooks / output", shape=box, fillcolor="#d0e8ff", color="#0055cc"];
+    keycloak [label="keycloak\nport 8080\nrealm: agentic-sdlc\nKC_PROXY=edge", shape=box, fillcolor="#ffe0d0", color="#cc4400"];
+    vaultwarden [label="vaultwarden\nport 80\nvaultwarden_data vol", shape=box, fillcolor="#d0e8ff", color="#0055cc"];
+    pipeline_server [label="pipeline-server\nport 5002\nPhases 1-10 orchestrator", shape=box, fillcolor="#d0ffe0", color="#005522"];
+    test_runner [label="test-runner\nport 5001\npytest + LLM fix loop", shape=box, fillcolor="#d0ffe0", color="#005522"];
+    webui [label="webui\nport 3000\nPipeline dashboard", shape=box, fillcolor="#d0ffe0", color="#005522"];
+    lead_review [label="lead-review\nport 5003\nHITM review portal", shape=box, fillcolor="#d0ffe0", color="#005522"];
+    portal [label="portal\nport 80\nInternal access portal", shape=box, fillcolor="#d0ffe0", color="#005522"];
+    free_model_sync [label="free-model-sync\nDiscovers free models\nOpenRouter / Groq / Gemini", shape=box, fillcolor="#ffe0ff", color="#660088"];
+    backup [label="backup\ndaily pg_dumpall + tar\n./backup volume", shape=box, fillcolor="#ffe0ff", color="#660088"];
+    watchtower [label="watchtower\nnightly 03:00\nrolling restart", shape=box, fillcolor="#f0f0f0", color="#444444"];
+    ofelia [label="ofelia\ncron scheduler\nofelia.ini", shape=box, fillcolor="#f0f0f0", color="#444444"];
+    certbot_dns [label="certbot-dns\nDNS-01 Cloudflare\nwildcard cert", shape=box, fillcolor="#f0f0f0", color="#444444"];
+
+    // oauth2-proxy instances
+    op_n8n [label="oauth2-proxy-n8n\nport 5679\nPKCE S256", shape=box, fillcolor="#fff0d0", color="#886600"];
+    op_litellm [label="oauth2-proxy-litellm\nport 4001\nPKCE S256", shape=box, fillcolor="#fff0d0", color="#886600"];
+    op_jupyter [label="oauth2-proxy-jupyter\nport 8889\nPKCE S256", shape=box, fillcolor="#fff0d0", color="#886600"];
+    op_webui [label="oauth2-proxy-webui\nport 3001\nPKCE S256", shape=box, fillcolor="#fff0d0", color="#886600"];
+    op_portal [label="oauth2-proxy-portal\nport 4185\nPKCE S256", shape=box, fillcolor="#fff0d0", color="#886600"];
+
+    // Volumes
+    vol_workflows [label="./workflows", shape=cylinder, fillcolor="#e8ffe8", color="#005522", style="filled,dashed"];
+    vol_output [label="./output", shape=cylinder, fillcolor="#e8ffe8", color="#005522", style="filled,dashed"];
+    vol_notebooks [label="./notebooks", shape=cylinder, fillcolor="#e8ffe8", color="#005522", style="filled,dashed"];
+    vol_phases [label="./phases", shape=cylinder, fillcolor="#e8ffe8", color="#005522", style="filled,dashed"];
+    vol_scripts [label="./scripts", shape=cylinder, fillcolor="#e8ffe8", color="#005522", style="filled,dashed"];
+  }
+
+  // ── HOMELAB ONLY ─────────────────────────────────────────────────────────────
+  subgraph cluster_homelab {
+    label="Homelab only (docker-compose.homelab.yml)";
+    style=filled;
+    color="#fff8e0";
+    fontname="Helvetica Bold";
+    fontsize=13;
+    gpu [label="RTX 3070\n8GB VRAM\nNVIDIA GPU", shape=diamond, fillcolor="#fffacc", color="#887700"];
+  }
+
+  // ── VPS ONLY ─────────────────────────────────────────────────────────────────
+  subgraph cluster_vps {
+    label="VPS only (docker-compose.prod.yml)";
+    style=filled;
+    color="#e8ffe8";
+    fontname="Helvetica Bold";
+    fontsize=13;
+    nginx_pub [label="nginx-public\nport 80 and 443\n*.sovereignadvisory.ai", shape=box, fillcolor="#ccffcc", color="#004400"];
+    nginx_priv [label="nginx-private\n127.0.0.1:443\n*.private domain", shape=box, fillcolor="#ccffcc", color="#004400"];
+    certbot [label="certbot\nHTTP-01 renewal\n12h cycle", shape=box, fillcolor="#f0f0f0", color="#444444"];
+    twingate [label="twingate\nnetwork_mode: host\nZero Trust connector", shape=diamond, fillcolor="#ffe8cc", color="#884400"];
+  }
+
+  // ── EXTERNAL CLOUD PROVIDERS ─────────────────────────────────────────────────
+  subgraph cluster_cloud {
+    label="External Cloud Providers";
+    style=filled;
+    color="#f0e8ff";
+    fontname="Helvetica Bold";
+    fontsize=13;
+    anthropic [label="Anthropic\nclaude-opus / sonnet / haiku", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    openai [label="OpenAI\ngpt-4o / o3 / o4-mini", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    gemini [label="Google Gemini\n2.0-flash / 2.5-pro", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    groq [label="Groq\nllama3 / deepseek-r1", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    deepseek [label="DeepSeek\nchat / reasoner", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    perplexity [label="Perplexity\nsonar-pro", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    openrouter [label="OpenRouter\nfree models", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    venice [label="Venice AI\nllama3 / mistral", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+    mistral [label="Mistral AI\ncodestral / large", shape=diamond, fillcolor="#e8d8ff", color="#440088"];
+  }
+
+  // ── EDGES: DATA FLOWS ────────────────────────────────────────────────────────
+
+  // PostgreSQL relations
+  postgres -> pg_data [label="stores data", style=dashed];
+  postgres -> litellm [label="spend tracking\nmodel DB"];
+  postgres -> n8n [label="workflow state\npostgresdb"];
+  postgres -> keycloak [label="realm data\nJDBC"];
+  postgres -> lead_review [label="leads DB"];
+  postgres -> backup [label="pg_dumpall"];
+
+  // Volume mounts
+  vol_workflows -> n8n [label="mount", style=dashed];
+  vol_output -> n8n [label="mount", style=dashed];
+  vol_output -> jupyter [label="mount", style=dashed];
+  vol_output -> pipeline_server [label="mount", style=dashed];
+  vol_notebooks -> jupyter [label="mount", style=dashed];
+  vol_phases -> pipeline_server [label="mount", style=dashed];
+  vol_scripts -> pipeline_server [label="mount", style=dashed, color="#888888"];
+  vol_scripts -> n8n [label="mount", style=dashed, color="#888888"];
+
+  // Core service flows
+  ollama -> litellm [label="local models\n:11434"];
+  litellm -> n8n [label="LLM API\n:4000"];
+  litellm -> jupyter [label="LLM API\n:4000"];
+  litellm -> pipeline_server [label="LLM API\n:4000"];
+  litellm -> test_runner [label="LLM API\n:4000"];
+  litellm -> free_model_sync [label="management API\n/model/new"];
+  n8n -> pipeline_server [label="trigger\n:5002"];
+  pipeline_server -> webui [label="status / logs"];
+  test_runner -> webui [label="test results"];
+
+  // OAuth2-proxy flows
+  keycloak -> op_n8n [label="OIDC tokens"];
+  keycloak -> op_litellm [label="OIDC tokens"];
+  keycloak -> op_jupyter [label="OIDC tokens"];
+  keycloak -> op_webui [label="OIDC tokens"];
+  keycloak -> op_portal [label="OIDC tokens"];
+  op_n8n -> n8n [label="proxy\n:5678"];
+  op_litellm -> litellm [label="proxy\n:4000"];
+  op_jupyter -> jupyter [label="proxy\n:8888"];
+  op_webui -> webui [label="proxy\n:3000"];
+  op_portal -> portal [label="proxy\n:80"];
+
+  // Scheduler
+  ofelia -> free_model_sync [label="exec every 6h"];
+  ofelia -> backup [label="exec daily 02:00"];
+
+  // Homelab GPU
+  gpu -> ollama [label="NVIDIA GPU\nRTX 3070", color="#aa8800"];
+
+  // VPS nginx routing
+  nginx_pub -> lead_review [label=":5003"];
+  nginx_priv -> op_n8n [label=":5679\nn8n.private"];
+  nginx_priv -> op_litellm [label=":4001\nlitellm.private"];
+  nginx_priv -> op_jupyter [label=":8889\njupyter.private"];
+  nginx_priv -> op_webui [label=":3001\nwebui.private"];
+  nginx_priv -> op_portal [label=":4185\nhome.private"];
+  nginx_priv -> keycloak [label=":8080\nkc.domain"];
+  nginx_priv -> vaultwarden [label=":80\nvault.private"];
+  twingate -> nginx_priv [label="Zero Trust\nTCP tunnel", color="#884400"];
+  certbot -> nginx_pub [label="TLS cert\nrenewal"];
+  certbot_dns -> nginx_priv [label="wildcard cert\n*.private"];
+
+  // LiteLLM to cloud providers
+  litellm -> anthropic [label="claude models", color="#440088"];
+  litellm -> openai [label="gpt / o-series", color="#440088"];
+  litellm -> gemini [label="gemini models", color="#440088"];
+  litellm -> groq [label="llama / deepseek", color="#440088"];
+  litellm -> deepseek [label="deepseek models", color="#440088"];
+  litellm -> perplexity [label="sonar search", color="#440088"];
+  litellm -> openrouter [label="free models", color="#440088"];
+  litellm -> venice [label="privacy models", color="#440088"];
+  litellm -> mistral [label="codestral / large", color="#440088"];
+}

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agentic SDLC — Architecture and Workflow</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      color: #222;
+    }
+
+    header {
+      background: #1a1f2e;
+      color: #fff;
+      padding: 28px 40px;
+      border-bottom: 4px solid #4a7cf7;
+    }
+
+    header h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    header p {
+      margin-top: 6px;
+      color: #9ba8c4;
+      font-size: 0.95rem;
+    }
+
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px 24px 64px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+      padding: 32px 36px;
+      margin-bottom: 40px;
+    }
+
+    .card h2 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #1a1f2e;
+      margin-bottom: 8px;
+    }
+
+    .card .desc {
+      color: #555;
+      font-size: 0.92rem;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .mermaid-wrap {
+      overflow-x: auto;
+      min-height: 300px;
+    }
+
+    pre.mermaid {
+      min-height: 250px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Agentic SDLC &mdash; Architecture &amp; Workflow</h1>
+  <p>Four diagrams: Service Topology &bull; LiteLLM Model Tier Routing &bull; Pipeline Phases 1&ndash;10 &bull; SSO Auth Flow</p>
+</header>
+
+<main>
+
+  <!-- ============================================================
+       Diagram 1: Service Topology
+       ============================================================ -->
+  <div class="card">
+    <h2>1 &mdash; Service Topology</h2>
+    <p class="desc">All Docker containers, their exposed ports, volume mounts, and inter-service connections across the base stack with homelab (GPU) and VPS (Twingate, nginx-public, certbot) deployment variants.</p>
+    <div class="mermaid-wrap">
+<pre class="mermaid">
+graph LR
+  subgraph shared ["Shared Stack (docker-compose.yml)"]
+    PG["postgres\n:5432\npg_data vol"]
+    LITELLM["litellm\n:4000\nlitellm_config.yaml"]
+    N8N["n8n\n:5678\n./workflows ./output ./scripts ./portal"]
+    OLLAMA["ollama\n:11434\nollama_data vol"]
+    JUPYTER["jupyter\n:8888\n./notebooks ./output"]
+    WEBUI["webui\n:3000\n./output"]
+    PIPELINE["pipeline-server\n:5002\n./output ./phases ./scripts"]
+    TESTRUNNER["test-runner\n:5001\n./output ./scripts"]
+    KEYCLOAK["keycloak\n:8080\nKC_PROXY=edge"]
+    VAULTWARDEN["vaultwarden\n:80\nvaultwarden_data vol"]
+    PORTAL["portal\n:80\n./portal"]
+    LEADREVIEW["lead-review\n:5003\n./output"]
+    FREEMODELSYNC["free-model-sync\n./free_model_sync.py"]
+    BACKUP["backup\n./backup ./output"]
+    WATCHTOWER["watchtower\nnightly 03:00\nlabeled containers"]
+    OFELIA["ofelia\nofelia.ini\ncron scheduler"]
+    CERTBOTDNS["certbot-dns\nDNS-01 wildcard\n*.private domain"]
+
+    OP2N8N["oauth2-proxy-n8n\n:5679\nPKCE S256"]
+    OP2LITELLM["oauth2-proxy-litellm\n:4001\nPKCE S256"]
+    OP2JUPYTER["oauth2-proxy-jupyter\n:8889\nPKCE S256"]
+    OP2WEBUI["oauth2-proxy-webui\n:3001\nPKCE S256"]
+    OP2PORTAL["oauth2-proxy-portal\n:4185\nPKCE S256"]
+  end
+
+  subgraph homelab ["Homelab only (docker-compose.homelab.yml)"]
+    GPU["RTX 3070\n8GB VRAM\nnvidia driver"]
+  end
+
+  subgraph vps ["VPS only (docker-compose.prod.yml)"]
+    NGINX_PUB["nginx-public\n:80 :443\n*.sovereignadvisory.ai"]
+    NGINX_PRIV["nginx-private\n127.0.0.1:443\n*.private domain"]
+    CERTBOT["certbot\nHTTP-01 renewal"]
+    TWINGATE["twingate\nnetwork_mode host\nZero Trust connector"]
+  end
+
+  subgraph cloud ["External Cloud Providers"]
+    ANTHROPIC["Anthropic\nclaude-opus / sonnet / haiku"]
+    OPENAI["OpenAI\ngpt-4o / o3 / o4-mini"]
+    GEMINI["Google Gemini\n2.0-flash / 2.5-pro"]
+    GROQ["Groq\nllama3 / deepseek-r1"]
+    DEEPSEEK["DeepSeek\ndeepseek-chat / reasoner"]
+    PERPLEXITY["Perplexity\nsonar-pro"]
+    OPENROUTER["OpenRouter\nfree models"]
+    VENICE["Venice AI\nllama3 / mistral"]
+    MISTRAL["Mistral\ncodestral / large"]
+  end
+
+  PG --> LITELLM
+  PG --> N8N
+  PG --> KEYCLOAK
+  PG --> LEADREVIEW
+  PG --> BACKUP
+
+  OLLAMA --> LITELLM
+  LITELLM --> N8N
+  LITELLM --> JUPYTER
+  LITELLM --> PIPELINE
+  LITELLM --> TESTRUNNER
+  LITELLM --> FREEMODELSYNC
+
+  N8N --> PIPELINE
+  PIPELINE --> WEBUI
+  TESTRUNNER --> WEBUI
+
+  KEYCLOAK --> OP2N8N
+  KEYCLOAK --> OP2LITELLM
+  KEYCLOAK --> OP2JUPYTER
+  KEYCLOAK --> OP2WEBUI
+  KEYCLOAK --> OP2PORTAL
+
+  OP2N8N --> N8N
+  OP2LITELLM --> LITELLM
+  OP2JUPYTER --> JUPYTER
+  OP2WEBUI --> WEBUI
+  OP2PORTAL --> PORTAL
+
+  OFELIA --> FREEMODELSYNC
+  OFELIA --> BACKUP
+
+  GPU --> OLLAMA
+
+  LITELLM --> ANTHROPIC
+  LITELLM --> OPENAI
+  LITELLM --> GEMINI
+  LITELLM --> GROQ
+  LITELLM --> DEEPSEEK
+  LITELLM --> PERPLEXITY
+  LITELLM --> OPENROUTER
+  LITELLM --> VENICE
+  LITELLM --> MISTRAL
+
+  NGINX_PUB --> LEADREVIEW
+  NGINX_PRIV --> OP2N8N
+  NGINX_PRIV --> OP2LITELLM
+  NGINX_PRIV --> OP2JUPYTER
+  NGINX_PRIV --> OP2WEBUI
+  NGINX_PRIV --> OP2PORTAL
+  NGINX_PRIV --> KEYCLOAK
+  NGINX_PRIV --> VAULTWARDEN
+
+  TWINGATE --> NGINX_PRIV
+  CERTBOT --> NGINX_PUB
+  CERTBOTDNS --> NGINX_PRIV
+</pre>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Diagram 2: LiteLLM Model Tier Routing
+       ============================================================ -->
+  <div class="card">
+    <h2>2 &mdash; LiteLLM Model Tier Routing</h2>
+    <p class="desc">How the four tiers (local, hybrid, cloud, free) resolve to actual models, the least-busy routing strategy within each group, and the cross-tier fallback chains defined in litellm_config.yaml.</p>
+    <div class="mermaid-wrap">
+<pre class="mermaid">
+graph TD
+  CLIENT["Client Request\nmodel: tier/variant"]
+
+  subgraph local ["Tier 1: local — Zero cost, on-device only"]
+    LC["local/chat\nllama3.2:3b, llama3.1:8b, mistral:7b"]
+    LCODE["local/code\nqwen2.5-coder:7b, deepseek-r1:7b"]
+    LREASON["local/reason\ndeepseek-r1:7b"]
+    LFAST["local/fast\nllama3.2:3b"]
+  end
+
+  subgraph hybrid ["Tier 2: hybrid — Ollama first, cloud fallback"]
+    HC["hybrid/chat\nOllama local, Ollama cloud, Groq llama3-70b, Gemini 2.0-flash, DeepSeek-chat"]
+    HCODE["hybrid/code\nOllama qwen2.5-coder, deepseek-r1, Groq deepseek-r1-70b, Mistral codestral"]
+    HREASON["hybrid/reason\nOllama deepseek-r1, Groq deepseek-r1-70b, DeepSeek-reasoner"]
+    HFAST["hybrid/fast\nGroq llama3.1-8b-instant, Gemini 2.0-flash, Ollama llama3.1:8b"]
+  end
+
+  subgraph cloudtier ["Tier 3: cloud — Premium providers"]
+    CC["cloud/chat\nClaude Sonnet, GPT-4o, Gemini 2.5-pro"]
+    CSMART["cloud/smart\nClaude Opus, OpenAI o3, Gemini 2.5-pro"]
+    CCODE["cloud/code\nClaude Sonnet, Mistral codestral, GPT-4o"]
+    CREASON["cloud/reason\nOpenAI o3, DeepSeek-reasoner, Claude Opus"]
+    CFAST["cloud/fast\nClaude Haiku, GPT-4o-mini, Gemini 2.0-flash"]
+    CSEARCH["cloud/search\nPerplexity sonar-pro, sonar-reasoning-pro"]
+  end
+
+  subgraph freetier ["Tier 4: free — Dynamic via free-model-sync"]
+    FCHAT["free/chat\nOpenRouter free models"]
+    FCODE["free/code\nOpenRouter free models"]
+    FREASON["free/reason\nOpenRouter free models"]
+    FFAST["free/fast\nGroq / Gemini free tier"]
+  end
+
+  ROUTER["LiteLLM Router\nstrategy: least-busy\nretries: 2, timeout: 900s"]
+
+  CLIENT --> ROUTER
+  ROUTER --> local
+  ROUTER --> hybrid
+  ROUTER --> cloudtier
+  ROUTER --> freetier
+
+  FREEMODELSYNC2["free-model-sync\nwrites free tier via\n/model/new API every 6h"]
+  FREEMODELSYNC2 --> freetier
+
+  subgraph fallbacks ["Cross-tier Fallbacks (if entire group fails)"]
+    FB1["local/chat -> hybrid/chat -> free/chat -> cloud/fast"]
+    FB2["local/code -> hybrid/code -> free/code -> cloud/code"]
+    FB3["local/reason -> hybrid/reason -> free/reason -> cloud/reason"]
+    FB4["local/fast -> hybrid/fast -> free/fast -> cloud/fast"]
+    FB5["hybrid/chat -> free/chat -> cloud/fast -> cloud/chat"]
+    FB6["hybrid/code -> free/code -> cloud/code -> cloud/chat"]
+    FB7["hybrid/reason -> free/reason -> cloud/reason -> cloud/chat"]
+    FB8["hybrid/fast -> free/fast -> cloud/fast"]
+    FB9["cloud/smart -> free/fast -> local/fast"]
+    FB10["cloud/chat -> free/chat -> hybrid/chat"]
+    FB11["cloud/search -> hybrid/chat -> free/chat"]
+    FB12["free/chat -> hybrid/chat"]
+    FB13["free/code -> hybrid/code"]
+  end
+
+  ROUTER --> fallbacks
+</pre>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Diagram 3: Pipeline Phases 1-10
+       ============================================================ -->
+  <div class="card">
+    <h2>3 &mdash; Pipeline Phases 1&ndash;10</h2>
+    <p class="desc">Full pipeline sequence from webhook trigger through planning, code generation, testing, quality gate, documentation, human approval gate, git push, deployment, and monitoring with Slack notification.</p>
+    <div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+  TRIGGER["POST /run-opportunity\n{name, prompt}"]
+
+  P1["Phase 1: Plan\nLLM: hybrid/chat\nGenerates project_plan.md\nArchitecture, stack, file structure"]
+
+  P2["Phase 2: Code Generation\nLLM: free/code or cloud/code fallback\nOutputs all files in FILE block format\nRequires: main app, tests/, requirements.txt, Dockerfile"]
+
+  P3["Phase 3: Format Validation\nLLM: free/code\nValidates FILE block syntax\nAuto-fixes malformed output"]
+
+  P4["Phase 4: Extract and Test Loop\nExtracts files to project_dir\nRuns pytest in isolated venv\nLLM fix loop up to MAX_ATTEMPTS\nPostprocesses requirements.txt"]
+
+  P5["Phase 5: Quality Gate\nRuns ruff, bandit, mypy\nLLM security review if HIGH+ bandit issues\nCan BLOCK pipeline on critical vulnerabilities"]
+
+  BLOCKED{"Phase 5\nBLOCKED?"}
+
+  P6["Phase 6: Documentation\nLLM generates README.md\nCHANGELOG.md and API docs\nModel: cloud/fast"]
+
+  P10GATE{"ENABLE_APPROVAL_GATE\n= true?"}
+
+  P10["Phase 10: Human Approval Gate\nSends Slack notification with approve/reject URLs\nWaits for POST /approvals/run_id/signal\nTimeout: APPROVAL_TIMEOUT_HOURS default 24h"]
+
+  APPROVED{"Approved?"}
+
+  P7["Phase 7: Git Push\nInitializes git repo in project_dir\ngit add, commit, push to GIT_REMOTE_URL\nOptionally builds and pushes Docker image to DOCKER_REGISTRY"]
+
+  P8["Phase 8: Deployment\nDEPLOY_TARGET options:\nskip default - no deploy\nlocal - docker run on host\nssh - scp and docker compose on remote host"]
+
+  P9["Phase 9: Monitoring and Notify\nHealth checks against endpoint/health\nUp to 5 checks with 10s interval\nSlack webhook notification via SLACK_WEBHOOK_URL"]
+
+  DONE["Pipeline complete\nrun_state.json updated\nstatus: done"]
+
+  TRIGGER --> P1
+  P1 --> P2
+  P2 --> P3
+  P3 --> P4
+  P4 --> P5
+  P5 --> BLOCKED
+  BLOCKED -- "Yes: status=blocked\nPhases 6-10 skipped" --> DONE
+  BLOCKED -- "No" --> P6
+  P6 --> P10GATE
+  P10GATE -- "No: phase 10 skipped" --> P7
+  P10GATE -- "Yes" --> P10
+  P10 --> APPROVED
+  APPROVED -- "No: status=rejected\nPhases 7-9 skipped" --> DONE
+  APPROVED -- "Yes" --> P7
+  P7 --> P8
+  P8 --> P9
+  P9 --> DONE
+</pre>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Diagram 4: SSO Auth Flow
+       ============================================================ -->
+  <div class="card">
+    <h2>4 &mdash; SSO Auth Flow</h2>
+    <p class="desc">Browser request through nginx to oauth2-proxy using PKCE S256, Keycloak OIDC token issuance, cookie validation, and upstream proxy to the protected service. Applies to n8n, LiteLLM, JupyterLab, WebUI, Portal, and Vaultwarden.</p>
+    <div class="mermaid-wrap">
+<pre class="mermaid">
+sequenceDiagram
+  participant Browser
+  participant nginx as "nginx-private\n(*.private domain)"
+  participant proxy as "oauth2-proxy\n(PKCE S256)"
+  participant kc as "Keycloak\nrealm: agentic-sdlc"
+  participant svc as "Upstream Service\n(n8n / LiteLLM / Jupyter\nWebUI / Portal / Vaultwarden)"
+
+  Browser->>nginx: HTTPS request to protected URL
+  nginx->>proxy: Proxy pass to oauth2-proxy port
+
+  alt No valid session cookie
+    proxy->>Browser: 302 Redirect to Keycloak auth endpoint
+    Note over proxy,kc: code_challenge=S256, PKCE flow
+    Browser->>kc: GET /realms/agentic-sdlc/protocol/openid-connect/auth?code_challenge=...
+    kc->>Browser: Login page (username + password)
+    Browser->>kc: POST credentials
+    kc->>Browser: 302 Redirect with authorization code
+    Browser->>proxy: GET /oauth2/callback?code=AUTH_CODE
+    proxy->>kc: POST /protocol/openid-connect/token (PKCE code_verifier)
+    kc->>proxy: access_token + id_token + refresh_token
+    proxy->>Browser: Set-Cookie session (encrypted, secure=true)
+  end
+
+  alt Valid session cookie present
+    proxy->>proxy: Validate session cookie
+    proxy->>svc: Proxy request with X-Auth headers
+    svc->>proxy: Response
+    proxy->>Browser: Response
+  end
+
+  Note over proxy: OIDC_ENABLED=false gate bypasses auth for lead-review
+  Note over proxy: n8n skips auth on /webhook/ and /webhook-test/ routes
+  Note over proxy: Keycloak role check: agentic-sdlc:admin or agentic-sdlc:user
+</pre>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  mermaid.initialize({ startOnLoad: true, theme: 'default' });
+</script>
+
+</body>
+</html>
