@@ -103,6 +103,9 @@ def run_phase8(
             _run(["docker", "rm", "-f", container_name], timeout=30)
 
             # Run container
+            # NOTE: assumes generated project listens on port 8000 (FastAPI/uvicorn default).
+            # Projects using 3000, 5000, 8080, etc. will start but port detection will fail.
+            # Set DEPLOY_TARGET=skip or DEPLOY_TARGET=ssh to avoid this assumption.
             rc, out = _run(
                 [
                     "docker", "run", "-d",

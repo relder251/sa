@@ -135,7 +135,7 @@ def run_phase5(
                 bandit_data = json.loads(r.stdout) if r.stdout.strip() else {}
                 results = bandit_data.get("results", [])
                 high_issues = [
-                    x for x in results if x.get("issue_severity") in ("HIGH", "CRITICAL")
+                    x for x in results if x.get("issue_severity") == "HIGH"
                 ]
                 high_bandit_issues = len(high_issues)
                 total_issues = len(results)
