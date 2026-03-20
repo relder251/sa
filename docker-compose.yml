@@ -424,7 +424,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
 
   # Ofelia — lightweight cron scheduler for Docker
-  # Triggers free_model_sync.py every 6 hours
+  # Triggers free_model_sync.py every 6 hours and daily-backup at 02:00
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
@@ -436,6 +436,7 @@ services:
     restart: unless-stopped
     depends_on:
       - free-model-sync
+      - backup
 
   # -----------------------------------------
   # JupyterLab - Interactive Development,
