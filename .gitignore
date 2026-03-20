@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!refactor/*.md
 *.pem
 *.key
 certbot/
