@@ -31,3 +31,18 @@ END $$;
 -- Grant database ownership (databases must already exist — created by earlier init scripts)
 GRANT ALL PRIVILEGES ON DATABASE n8n TO n8n_user;
 GRANT ALL PRIVILEGES ON DATABASE keycloak TO keycloak_user;
+
+-- Grant schema and object access (required for PostgreSQL 15+)
+\c n8n
+GRANT ALL ON SCHEMA public TO n8n_user;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO n8n_user;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO n8n_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO n8n_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO n8n_user;
+
+\c keycloak
+GRANT ALL ON SCHEMA public TO keycloak_user;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO keycloak_user;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO keycloak_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO keycloak_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO keycloak_user;
