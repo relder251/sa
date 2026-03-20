@@ -1,0 +1,52 @@
+server {
+    listen 80;
+    server_name home.private.sovereignadvisory.ai;
+
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # LiteLLM provider health — used by portal for API access badges
+    # Must appear before /api/ to make ordering intent explicit
+    # (nginx longest-match prefix means /api/litellm-health always wins over /api/)
+    location /api/litellm-health {
+        proxy_pass http://litellm:4000/health/services;
+        proxy_set_header Host $host;
+        # LITELLM_API_KEY is injected by nginx:alpine envsubst at container start.
+        # Set LITELLM_API_KEY in the portal service environment in docker-compose.
+        proxy_set_header Authorization "Bearer ${LITELLM_API_KEY}";
+    }
+
+    # n8n provisioning webhooks — each maps to its workflow-ID-prefixed path
+    # (n8n v1.x webhook URLs include the workflow ID: /webhook/<workflowId>/webhook/<path>)
+
+    location /api/portal-provision {
+        proxy_pass http://n8n:5678/webhook/FrPgMVhkBNi9nE85/webhook/portal-provision;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 120s;
+    }
+
+    location /api/portal-update-categories {
+        proxy_pass http://n8n:5678/webhook/wgvZCgnHnlIkSEN5/webhook/portal-update-categories;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/portal-update {
+        proxy_pass http://n8n:5678/webhook/HJu73t0odAN7bW2b/webhook/portal-update;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/portal-delete {
+        proxy_pass http://n8n:5678/webhook/tUHxTclRAAU8xCih/webhook/portal-delete;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+}

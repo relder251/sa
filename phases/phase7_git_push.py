@@ -3,6 +3,7 @@ Phase 7: Git Push / Registry
 Commits generated code to git, optionally pushes to remote, optionally builds+pushes Docker image.
 """
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -36,7 +37,7 @@ def run_phase7(
     project_dir = Path(project_dir)
     project_base = Path(project_base)
 
-    DOCKER_REGISTRY = os.environ.get("DOCKER_REGISTRY", "")
+    DOCKER_REGISTRY = re.sub(r'\s*#.*', '', os.environ.get("DOCKER_REGISTRY", "")).strip()
     GIT_REMOTE_URL = os.environ.get("GIT_REMOTE_URL", "")
 
     def L(msg):

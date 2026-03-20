@@ -5,6 +5,7 @@ Supports: local (docker run), ssh (remote docker compose), skip (default when no
 """
 import json
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
@@ -25,7 +26,7 @@ def _run(cmd: list, cwd: str = None, timeout: int = 120, input_data: str = None)
 
 def _get_image_name(name: str, project_base: Path) -> str:
     """Try to read image name from phase7 report, otherwise construct it."""
-    DOCKER_REGISTRY = os.environ.get("DOCKER_REGISTRY", "")
+    DOCKER_REGISTRY = re.sub(r'\s*#.*', '', os.environ.get("DOCKER_REGISTRY", "")).strip()
     report_path = project_base / "phase7_git_report.md"
     if report_path.exists():
         content = report_path.read_text(errors="replace")
