@@ -9,6 +9,7 @@ volumes:
   ollama_data:
   pg_data:
   vaultwarden_data:
+  backup_data:
 
 services:
   nginx:
@@ -106,7 +107,9 @@ services:
       PDF_OUTPUT_DIR: /data/output/lead_pdfs
       LITELLM_BASE_URL: http://litellm:4000
       OIDC_ENABLED: "true"
-      KEYCLOAK_ISSUER: http://keycloak:8080/realms/agentic-sdlc
+      # No keycloak container in this compose — Keycloak runs externally.
+      # All other services (oauth2-proxy-*, vaultwarden) reach KC at the public URL.
+      KEYCLOAK_ISSUER: https://kc.sovereignadvisory.ai/realms/agentic-sdlc
       KEYCLOAK_EXTERNAL_URL: https://kc.sovereignadvisory.ai
       KEYCLOAK_CLIENT_ID: lead-review
       KEYCLOAK_CLIENT_SECRET: ${LEAD_REVIEW_OIDC_CLIENT_SECRET}
@@ -427,6 +430,32 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # Daily backup: pg_dumpall + output/opportunities/ssl snapshots
+  # Scheduled by ofelia at 02:00 UTC daily. Retention: 7 daily + 4 weekly.
+  # Restore test: bash scripts/backup_test.sh
+  backup:
+    image: postgres:15
+    container_name: backup
+    volumes:
+      - backup_data:/backup
+      - ./output:/data/output:ro
+      - ./opportunities:/data/opportunities:ro
+      - /opt/sovereignadvisory/ssl:/ssl:ro
+      - ./scripts/backup.sh:/backup.sh:ro
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${LITELLM_USER:-litellm}
+      - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
+      - BACKUP_DIR=/backup
+    command: ["sleep", "infinity"]
+    networks:
+      - vibe_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    # No watchtower label — postgres:15 is pinned; update manually
+
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
@@ -438,6 +467,7 @@ services:
     restart: unless-stopped
     depends_on:
       - free-model-sync
+      - backup
 
   jupyter:
     image: quay.io/jupyter/scipy-notebook:latest
