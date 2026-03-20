@@ -507,7 +507,7 @@ services:
     container_name: sa_certbot_dns
     restart: unless-stopped
     environment:
-      - CF_API_TOKEN=${CF_API_TOKEN}
+      - CF_API_TOKEN=${CF_API_TOKEN:-}
     volumes:
       - /opt/sovereignadvisory/ssl:/etc/letsencrypt
       - ./certbot/nginx-reload.py:/nginx-reload.py:ro
