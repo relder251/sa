@@ -241,6 +241,9 @@ def run_pytest(project_dir: Path, venv_dir: Path):
         return True, "No tests/ directory — skipped", []
 
     pytest_bin = venv_dir / "bin" / "pytest"
+    if not pytest_bin.exists():
+        return False, "pytest binary missing — pip install likely failed", ["pip install failed: pytest not installed"]
+
     env = os.environ.copy()
     env["PYTHONPATH"] = str(project_dir)
     env["HOME"] = "/tmp"
@@ -724,9 +727,28 @@ async def run_opportunity(body: RunOpportunityRequest):
 
     Lx("Step 6: Running test & fix loop ...", phase=4)
     ok, venv_dir, pip_msg = ensure_venv(project_dir)
-    Lx(f"  venv: {pip_msg or 'ready'}", phase=4)
+    Lx(f"  venv: {'ready' if ok else 'pip install failed'}", phase=4)
 
+    # If pip install failed, seed the fix loop with the error so the LLM can correct requirements.txt
     iterations = []
+    if not ok:
+        Lx(f"  pip install failed — seeding LLM fix loop with error", phase=4)
+        seed_output = f"pip install failed:\n{pip_msg}"
+        iterations.append({"attempt": 0, "passed": False, "output": seed_output})
+        try:
+            src = read_source_files(project_dir)
+            fixed = call_llm_fix(seed_output, src, 0)
+            applied = parse_and_apply_fixes(project_dir, fixed)
+            Lx(f"  Applied pip fix: {applied}", phase=4)
+            if "requirements.txt" in applied:
+                h = venv_dir / ".req_hash"
+                if h.exists():
+                    h.unlink()
+                ok, venv_dir, pip_msg = ensure_venv(project_dir)
+                Lx(f"  Re-install: {'ok' if ok else 'still failing'}", phase=4)
+        except Exception as e:
+            Lx(f"  LLM pip fix failed: {e}", phase=4)
+
     for attempt in range(1, MAX_ATTEMPTS + 2):
         passed, test_output, failures = run_pytest(project_dir, venv_dir)
         iter_entry = {"attempt": attempt, "passed": passed, "output": test_output}
