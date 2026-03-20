@@ -140,14 +140,6 @@ services:
       - OLLAMA_MAX_LOADED_MODELS=1
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
-    # RTX 3070 8GB VRAM — GPU enabled
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
 
   # -----------------------------------------
   # LiteLLM - The Traffic Cop

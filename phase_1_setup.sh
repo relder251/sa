@@ -26,9 +26,11 @@ fi
 echo "📂 Verifying project directories..."
 mkdir -p workflows output output/opportunities backup notebooks opportunities
 
-# ── 2. Boot Docker (reads local docker-compose.yml automatically) ────────────
+# ── 2. Boot Docker ───────────────────────────────────────────────────────────
 echo "🚀 Starting Docker containers..."
-docker compose up -d
+# docker-compose.homelab.yml adds RTX 3070 GPU reservation for ollama.
+# The VPS uses docker-compose.prod.yml instead and does not include homelab.yml.
+docker compose -f docker-compose.yml -f docker-compose.homelab.yml up -d
 
 # ── 3. Monitor Boot Sequence ─────────────────────────────────────────────────
 echo "⏳ Waiting for n8n to become ready (timeout: 120s)..."
