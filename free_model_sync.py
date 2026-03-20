@@ -412,7 +412,7 @@ def sync(dry_run: bool = False, verbose: bool = False):
 
     # Pre-flight: verify LiteLLM is reachable before making multiple API calls
     try:
-        requests.get(f"{LITELLM_BASE_URL}/health", headers={"Authorization": f"Bearer {LITELLM_API_KEY}"}, timeout=5).raise_for_status()
+        requests.get(f"{LITELLM_BASE_URL}/health/liveliness", headers={"Authorization": f"Bearer {LITELLM_API_KEY}"}, timeout=10).raise_for_status()
     except requests.RequestException as e:
         log.error(f"LiteLLM unreachable at {LITELLM_BASE_URL}: {e}")
         sys.exit(1)
