@@ -78,7 +78,7 @@
 
 | Item | Owner | Notes |
 |---|---|---|
-| Deduplicate `_call_llm()` / `_read_source_files()` across phases | `scripts/` pass | Requires a shared `phases/utils.py` — deferred to avoid scope creep |
+| Deduplicate `_call_llm()` / `_read_source_files()` across phases | **Done 2026-03-20** | `phases/utils.py` created; phase5 and phase6 now import from it |
 | `mypy_report_dir` collision on concurrent runs | `phases/phase5` | Acceptable until concurrent pipelines are supported; use `tempfile.mkdtemp()` if needed |
 | Configurable container port for local deployment | `phases/phase8` | Could read from `docker-compose.yml` or a pipeline config field |
 | SSH deploy without registry push | `phases/phase8` | Add `--build` flag or document that `DOCKER_REGISTRY` must be set for SSH deployment |

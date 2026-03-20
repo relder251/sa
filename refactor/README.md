@@ -32,15 +32,15 @@ Each file gets its own tracking document named `<filename>.md` (e.g., `ofelia.in
 - [ ] `.env.example`
 
 ### Subdirectories (pass 2)
-- [ ] `nginx-public/`
-- [ ] `nginx-private/`
-- [ ] `nginx/`
+- [x] `nginx-public/` — 2026-03-20
+- [x] `nginx-private/` — 2026-03-20
+- [x] `nginx/` — 2026-03-20
 - [ ] `certbot/`
-- [ ] `postgres-init/`
-- [ ] `keycloak/`
-- [ ] `portal/`
+- [x] `postgres-init/` — 2026-03-20
+- [x] `keycloak/` — 2026-03-20
+- [x] `portal/` — 2026-03-20 (clean, no changes)
 - [ ] `scripts/`
-- [ ] `phases/`
+- [x] `phases/` — 2026-03-20
 - [ ] `workflows/`
 - [ ] `webui/`
 - [ ] `tests/`

@@ -2,54 +2,9 @@
 Phase 6: Documentation Generation
 Generates README.md, CHANGELOG.md, optionally API docs.
 """
-import os
 from pathlib import Path
 
-
-LITELLM_URL = os.environ.get("LITELLM_BASE_URL", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-vibe-coding-key-123")
-
-
-def _call_llm(model: str, system: str, user: str, max_tokens: int = 2048) -> str:
-    import requests as http
-    resp = http.post(
-        f"{LITELLM_URL}/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {LITELLM_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": model,
-            "max_tokens": max_tokens,
-            "timeout": 180,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        },
-        timeout=240,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
-
-
-def _read_source_files(project_dir: Path) -> dict:
-    skip_dirs = {".venv", "__pycache__", ".pytest_cache", ".git", "node_modules"}
-    files = {}
-    for f in sorted(project_dir.rglob("*")):
-        if f.is_dir():
-            continue
-        parts = set(f.relative_to(project_dir).parts)
-        if parts & skip_dirs:
-            continue
-        if f.suffix in (".pyc", ".pyo", ".egg-info"):
-            continue
-        rel = str(f.relative_to(project_dir))
-        try:
-            files[rel] = f.read_text(errors="replace")
-        except Exception:
-            pass
-    return files
+from phases.utils import call_llm as _call_llm, read_source_files as _read_source_files
 
 
 def run_phase6(

@@ -4,57 +4,15 @@ Runs ruff, mypy, bandit on project_dir. LLM security review if HIGH+ issues.
 Returns: { passed: bool, blocked: bool, block_reason: str|None, report: str }
 """
 import json
-import os
 import shutil
 import subprocess
-import tempfile
 from pathlib import Path
 
-
-LITELLM_URL = os.environ.get("LITELLM_BASE_URL", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-vibe-coding-key-123")
+from phases.utils import call_llm as _call_llm_base, read_source_files as _read_source_files
 
 
 def _call_llm(system: str, user: str, max_tokens: int = 1024) -> str:
-    import requests as http
-    resp = http.post(
-        f"{LITELLM_URL}/v1/chat/completions",
-        headers={
-            "Authorization": f"Bearer {LITELLM_KEY}",
-            "Content-Type": "application/json",
-        },
-        json={
-            "model": "cloud/fast",
-            "max_tokens": max_tokens,
-            "timeout": 120,
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-        },
-        timeout=180,
-    )
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
-
-
-def _read_source_files(project_dir: Path) -> dict:
-    skip_dirs = {".venv", "__pycache__", ".pytest_cache", ".git", "node_modules"}
-    files = {}
-    for f in sorted(project_dir.rglob("*")):
-        if f.is_dir():
-            continue
-        parts = set(f.relative_to(project_dir).parts)
-        if parts & skip_dirs:
-            continue
-        if f.suffix in (".pyc", ".pyo", ".egg-info"):
-            continue
-        rel = str(f.relative_to(project_dir))
-        try:
-            files[rel] = f.read_text(errors="replace")
-        except Exception:
-            pass
-    return files
+    return _call_llm_base("cloud/fast", system, user, max_tokens=max_tokens, timeout=180)
 
 
 def run_phase5(
