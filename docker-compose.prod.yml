@@ -30,7 +30,7 @@ services:
       - sa_web
       - vibe_net
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget --max-redirect=0 -qO- http://localhost/ 2>/dev/null; r=$$?; [ $$r -eq 0 ] || [ $$r -eq 8 ]"]
+      test: ["CMD-SHELL", "curl -so /dev/null http://localhost/ || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
