@@ -39,7 +39,7 @@ Each file gets its own tracking document named `<filename>.md` (e.g., `ofelia.in
 - [x] `postgres-init/` — 2026-03-20
 - [x] `keycloak/` — 2026-03-20
 - [x] `portal/` — 2026-03-20 (clean, no changes)
-- [ ] `scripts/`
+- [x] `scripts/` — 2026-03-20
 - [x] `phases/` — 2026-03-20
 - [ ] `workflows/`
 - [ ] `webui/`
