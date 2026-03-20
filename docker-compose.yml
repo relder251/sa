@@ -513,7 +513,7 @@ services:
   certbot-dns:
     image: certbot/dns-cloudflare:latest
     container_name: sa_certbot_dns
-    restart: always
+    restart: unless-stopped
     environment:
       - CF_API_TOKEN=${CF_API_TOKEN}
     volumes:
@@ -710,6 +710,7 @@ services:
       - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
       - --cookie-secure=true
       - --skip-provider-button=true
+      - --insecure-oidc-allow-unverified-email=true
       - --allowed-role=agentic-sdlc:admin
       - --allowed-role=agentic-sdlc:user
     networks:
@@ -732,6 +733,12 @@ services:
     networks:
       - vibe_net
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/ > /dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
@@ -776,6 +783,12 @@ services:
     image: vaultwarden/server:latest
     container_name: vaultwarden
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/80' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     environment:
       - DOMAIN=https://vault.private.sovereignadvisory.ai
       - SIGNUPS_ALLOWED=false
