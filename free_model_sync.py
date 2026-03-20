@@ -103,7 +103,7 @@ def fetch_openrouter_free_models() -> list[FreeModel]:
             tags = classify_model_tags(model_id, name)
 
             free.append(FreeModel(
-                model_name=f"{FREE_TIER_PREFIX}/{slugify(model_id)}",
+                model_name=f"{FREE_TIER_PREFIX}/{slugify(f'openrouter/{model_id}')}",
                 litellm_model=f"openrouter/{model_id}",
                 api_key_env="OPENROUTER_API_KEY",
                 context_length=ctx,
@@ -232,11 +232,35 @@ def classify_model_tags(model_id: str, name: str) -> list[str]:
 
 
 def slugify(model_id: str) -> str:
-    """Turn openrouter/meta-llama/llama-3-8b into a clean alias."""
-    # Strip provider prefix, keep the model part
+    """
+    Turn a provider-prefixed model string into a clean, collision-safe alias.
+
+    Input forms:
+      - "groq/llama-3.3-70b-versatile"        → "groq-llama-3.3-70b-versatile"
+      - "gemini/gemini-2.0-flash"              → "gemini-gemini-2.0-flash"
+      - "openrouter/meta-llama/llama-3-8b"    → "openrouter-llama-3-8b"
+      - "meta-llama/llama-3-8b"               → "openrouter-llama-3-8b"
+        (bare OpenRouter IDs have no single-segment provider prefix)
+
+    The first path component is used as the provider label; the last component
+    is the base model name.  Both are lower-cased and non-alphanumeric chars
+    (except hyphens) are collapsed to hyphens, with the result capped at 64 chars.
+    """
     parts = model_id.split("/")
-    slug = parts[-1] if len(parts) > 1 else model_id
-    return slug[:64]  # LiteLLM model_name length limit
+    if len(parts) == 1:
+        # No slash at all — treat as bare model name with unknown provider
+        provider = "model"
+        base = parts[0]
+    else:
+        provider = parts[0]
+        base = parts[-1]
+
+    def _clean(s: str) -> str:
+        import re as _re
+        return _re.sub(r"[^a-z0-9-]+", "-", s.lower()).strip("-")
+
+    slug = f"{_clean(provider)}-{_clean(base)}"
+    return slug[:64]
 
 
 # ── LiteLLM management API ────────────────────────────────────────────────────
