@@ -5,6 +5,9 @@
 *.pem
 *.key
 certbot/
+ssl/
+bitwarden_import*.json
+bitwarden_import*.csv
 
 # Python
 __pycache__/
@@ -21,6 +24,7 @@ venv/
 # Generated output
 output/
 backup/
+logs/
 
 # Nested git repos (not submodules)
 deerflow/
