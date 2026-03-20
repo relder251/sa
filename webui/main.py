@@ -28,8 +28,8 @@ OUTPUT_BASE = Path(os.getenv("OUTPUT_BASE", "/data/output"))
 LITELLM_BASE_URL = os.getenv("LITELLM_BASE_URL", "http://litellm:4000")
 LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "")
 N8N_BASE_URL = os.getenv("N8N_BASE_URL", "http://n8n:5678")
-PIPELINE_SERVER_URL = os.getenv("PIPELINE_SERVER_URL", "http://pipeline-server:8000")
-TEST_RUNNER_URL = os.getenv("TEST_RUNNER_URL", "http://test-runner:9000")
+PIPELINE_SERVER_URL = os.getenv("PIPELINE_SERVER_URL", "http://pipeline-server:5002")
+TEST_RUNNER_URL = os.getenv("TEST_RUNNER_URL", "http://test-runner:5001")
 WEBUI_BASE_URL = os.getenv("WEBUI_BASE_URL", "http://localhost:3000")
 
 OPPORTUNITIES_DIR = OUTPUT_BASE / "opportunities"

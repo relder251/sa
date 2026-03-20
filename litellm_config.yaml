@@ -104,12 +104,12 @@ model_list:
   # ── PREMIUM CLOUD ──────────────────────────────────────────────────────────
   - model_name: _claude-opus
     litellm_params:
-      model: anthropic/claude-opus-4-5-20251101
+      model: anthropic/claude-opus-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: _claude-sonnet
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20250929
+      model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: _claude-haiku
@@ -326,7 +326,7 @@ model_list:
 
   - model_name: cloud/chat
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20250929
+      model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/chat
@@ -341,7 +341,7 @@ model_list:
 
   - model_name: cloud/smart
     litellm_params:
-      model: anthropic/claude-opus-4-5-20251101
+      model: anthropic/claude-opus-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/smart
@@ -356,7 +356,7 @@ model_list:
 
   - model_name: cloud/code
     litellm_params:
-      model: anthropic/claude-sonnet-4-5-20250929
+      model: anthropic/claude-sonnet-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/code
@@ -381,7 +381,7 @@ model_list:
 
   - model_name: cloud/reason
     litellm_params:
-      model: anthropic/claude-opus-4-5-20251101
+      model: anthropic/claude-opus-4-6
       api_key: os.environ/ANTHROPIC_API_KEY
 
   - model_name: cloud/fast
