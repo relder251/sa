@@ -1,6 +1,13 @@
 -- =============================================================================
 --  Sovereign Advisory — Lead Pipeline Schema
---  Run once: psql -U $POSTGRES_USER -d $POSTGRES_DB -f leads_schema.sql
+--
+--  Runs automatically via docker-entrypoint-initdb.d on first Postgres volume
+--  start (ordering: 10 → 11 → 20). All statements are idempotent (IF NOT
+--  EXISTS / IF NOT EXISTS guard) so the file is safe to re-run manually:
+--
+--    psql -U $LITELLM_USER -d $LITELLM_DB -f postgres-init/20-sa-schema.sql
+--
+--  Target database: $LITELLM_DB (default: litellm)
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -36,6 +43,7 @@ CREATE TABLE IF NOT EXISTS sa_leads (
     --           approved | sent | regenerating | queued | do_not_follow_up | spam
 
     do_not_follow_up      BOOLEAN DEFAULT FALSE,
+    archived              BOOLEAN DEFAULT FALSE,
 
     -- External refs
     notion_page_id        VARCHAR(255),
@@ -96,6 +104,7 @@ CREATE INDEX IF NOT EXISTS idx_sa_leads_status       ON sa_leads(status);
 CREATE INDEX IF NOT EXISTS idx_sa_leads_email        ON sa_leads(email);
 CREATE INDEX IF NOT EXISTS idx_sa_leads_created      ON sa_leads(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sa_leads_dnfu         ON sa_leads(do_not_follow_up) WHERE do_not_follow_up = TRUE;
+CREATE INDEX IF NOT EXISTS idx_sa_leads_archived     ON sa_leads(archived) WHERE archived = TRUE;
 CREATE INDEX IF NOT EXISTS idx_sa_review_token       ON sa_review_tokens(token) WHERE is_active = TRUE;
 CREATE INDEX IF NOT EXISTS idx_sa_review_lead        ON sa_review_tokens(lead_id);
 CREATE INDEX IF NOT EXISTS idx_sa_drafts_lead        ON sa_lead_drafts(lead_id);
