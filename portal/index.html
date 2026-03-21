@@ -326,6 +326,18 @@ body {
 .card:hover .card-edit { color: var(--text-3); }
 .card-edit:hover { color: var(--copper-light) !important; background: var(--copper-pale); }
 
+/* SSH launch button on card */
+.card-ssh {
+  position: absolute; top: 10px; right: 36px;
+  background: none; border: none; cursor: pointer;
+  font-size: 10px; color: transparent;
+  padding: 2px 5px; border-radius: 2px;
+  transition: all 0.15s; z-index: 2; text-decoration: none;
+  font-family: var(--font-b); letter-spacing: 0.06em; font-weight: 500;
+}
+.card:hover .card-ssh { color: var(--text-3); }
+.card-ssh:hover { color: #4ade80 !important; background: rgba(74,222,128,0.08); }
+
 /* Empty state */
 .empty { text-align: center; padding: 60px 20px; color: var(--text-3); }
 .empty-icon { font-size: 32px; margin-bottom: 14px; opacity: 0.4; }
@@ -639,6 +651,10 @@ body {
         <label class="form-label">Category</label>
         <div class="cat-grid" id="edit-cat-grid"></div>
       </div>
+      <div class="form-row">
+        <label class="form-label">SSH Target <span style="font-size:10px;color:var(--text-3);font-weight:300;">(optional, e.g. root@192.168.1.1)</span></label>
+        <input class="form-input" id="edit-ssh" type="text" placeholder="user@host">
+      </div>
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
       <button class="btn-secondary" style="color:#f87171;border-color:rgba(248,113,113,0.2);" onclick="deleteService()">Remove</button>
@@ -844,6 +860,7 @@ function renderCards(services) {
     card.dataset.description = svc.description || '';
     card.dataset.icon = svc.icon;
     if (svc.favorite) card.dataset.favorite = 'true';
+    if (svc.sshTarget) card.dataset.sshTarget = svc.sshTarget;
     card.addEventListener('click', (e) => {
       // allow edit/star buttons to handle their own events
       if (e.target.closest('.card-edit') || e.target.closest('.card-star')) return;
@@ -859,6 +876,7 @@ function renderCards(services) {
         <span class="card-tag" style="background:${cat.color};color:${cat.text};border:1px solid ${cat.border}">${escHtml(cat.label || svc.category)}</span>
         <span class="card-status"><span class="live-dot"></span> live</span>
       </div>
+      ${svc.sshTarget ? '<a class="card-ssh" href="ssh://' + escHtml(svc.sshTarget) + '" onclick="event.stopPropagation()" title="SSH: ' + escHtml(svc.sshTarget) + '">⌨ ssh</a>' : ''}
       <button class="card-edit" onclick="openEdit(event,this.closest('.card'))">✎ edit</button>
       <span class="card-arrow">↗</span>
     `;
@@ -1026,6 +1044,7 @@ function openEdit(e, card) {
     btn.onclick = () => { grid.querySelectorAll('.cat-tile').forEach(t=>t.classList.remove('selected')); btn.classList.add('selected'); };
     grid.appendChild(btn);
   });
+  document.getElementById('edit-ssh').value = card.dataset.sshTarget || '';
   document.getElementById('edit-overlay').classList.add('open');
 }
 
@@ -1049,10 +1068,11 @@ async function saveEdit() {
   const newCatLabel  = selectedTile ? selectedTile.textContent.trim() : '';
   const newCat = Object.entries(categories).find(([,v]) => (v.icon + ' ' + v.label) === newCatLabel)?.[0] || editingCard.dataset.category;
   const cat = categories[newCat];
+  const sshTarget = document.getElementById('edit-ssh').value.trim();
 
   // 1. Update in-memory list
   const svc = currentServices.find(s => s.id === id);
-  if (svc) Object.assign(svc, { name, url, description: desc, icon: emoji, category: newCat });
+  if (svc) Object.assign(svc, { name, url, description: desc, icon: emoji, category: newCat, sshTarget: sshTarget || undefined });
 
   // 2. Persist to localStorage
   localStorage.setItem('portal_services', JSON.stringify(currentServices));
@@ -1064,6 +1084,21 @@ async function saveEdit() {
   editingCard.querySelector('.card-icon').textContent = emoji;
   if (url) editingCard.dataset.url = url;
   editingCard.dataset.category = newCat;
+  // Update SSH button: remove old, add new if target set
+  const oldSsh = editingCard.querySelector('.card-ssh');
+  if (oldSsh) oldSsh.remove();
+  if (sshTarget) {
+    editingCard.dataset.sshTarget = sshTarget;
+    const sshBtn = document.createElement('a');
+    sshBtn.className = 'card-ssh';
+    sshBtn.href = 'ssh://' + sshTarget;
+    sshBtn.title = 'SSH: ' + sshTarget;
+    sshBtn.textContent = '⌨ ssh';
+    sshBtn.addEventListener('click', e => e.stopPropagation());
+    editingCard.appendChild(sshBtn);
+  } else {
+    delete editingCard.dataset.sshTarget;
+  }
   if (cat) {
     const tag = editingCard.querySelector('.card-tag');
     tag.textContent = cat.label;
@@ -1077,7 +1112,7 @@ async function saveEdit() {
   fetch('/api/portal-update', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat } })
+    body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat, sshTarget: sshTarget || null } })
   }).catch(() => {});
 
   closeEdit();

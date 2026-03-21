@@ -58,7 +58,8 @@
       "icon": "⚡",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "root@187.77.208.197"
     },
     {
       "id": "pipeline",
@@ -68,7 +69,8 @@
       "icon": "🎯",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "root@187.77.208.197"
     },
     {
       "id": "litellm",
@@ -78,7 +80,8 @@
       "icon": "🤖",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "root@187.77.208.197"
     },
     {
       "id": "jupyter",
@@ -88,7 +91,8 @@
       "icon": "📓",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "root@187.77.208.197"
     },
     {
       "id": "claude",
