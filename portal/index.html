@@ -798,6 +798,7 @@ function sshCommand(target) {
 
 function sshLaunch(e, target) {
   e.stopPropagation();
+  e.preventDefault();
   const cmd = sshCommand(target);
   if (!cmd) return;
   navigator.clipboard.writeText(cmd).then(() => {
@@ -954,7 +955,7 @@ function renderCards(services) {
     if (svc.sshTarget) card.dataset.sshTarget = svc.sshTarget;
     card.addEventListener('click', (e) => {
       // allow edit/star buttons to handle their own events
-      if (e.target.closest('.card-edit') || e.target.closest('.card-star')) return;
+      if (e.target.closest('.card-edit') || e.target.closest('.card-star') || e.target.closest('.card-ssh')) return;
       handleCardClick(svc.id);
     });
     card.innerHTML = `
