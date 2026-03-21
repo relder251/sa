@@ -33,4 +33,9 @@ docker compose \
   -f docker-compose.prod.yml \
   up -d --build
 
+# n8n runs as uid=1000 (node) but git pull creates files as root.
+# Ensure the portal data files n8n needs to write are group/world-writable.
+echo "--- fixing portal data permissions ---"
+chmod 666 "$REPO_DIR/portal/services.json" 2>/dev/null || true
+
 echo "=== Deploy complete ==="
