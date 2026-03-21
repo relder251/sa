@@ -799,18 +799,10 @@ function sshCommand(target) {
 function sshLaunch(e, target) {
   e.stopPropagation();
   e.preventDefault();
-  const cmd = sshCommand(target);
-  if (!cmd) return;
-  navigator.clipboard.writeText(cmd).then(() => {
-    const btn = e.currentTarget;
-    const orig = btn.textContent;
-    btn.textContent = '✓ copied';
-    btn.style.color = '#4ade80';
-    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
-  }).catch(() => {
-    // Clipboard API unavailable — show the command in a prompt for manual copy
-    window.prompt('Copy SSH command:', cmd);
-  });
+  if (!target) return;
+  // user@host targets map to the 'vps' terminal; plain names are container names
+  const termTarget = target.includes('@') ? 'vps' : target;
+  window.open('/terminal/' + encodeURIComponent(termTarget), '_blank', 'noopener,noreferrer');
 }
 
 // ── Recent history — persisted as [{id, ts}] in localStorage ─────────────

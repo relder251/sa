@@ -222,8 +222,8 @@
     {
       "id": "vps-root",
       "name": "VPS Root",
-      "url": "https://hpanel.hostinger.com/vps",
-      "description": "Production VPS host — direct SSH access",
+      "url": "/terminal/vps",
+      "description": "Production VPS host — web terminal",
       "icon": "🖧",
       "category": "infra",
       "favorite": false,
