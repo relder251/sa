@@ -212,6 +212,7 @@ services:
       - ./workflows:/data/workflows
       - ./output:/data/output
       - ./opportunities:/data/opportunities
+      - ./portal:/data/portal
       - ./scripts:/data/scripts:ro
     networks:
       - vibe_net

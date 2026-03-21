@@ -791,23 +791,36 @@ let currentServices = [];
 const categories = {};
 
 // ── Portal data loading ───────────────────────────────
+// Server (/api/portal-services) is the source of truth.
+// localStorage is a resilience cache: used only if the server is unreachable.
 async function loadPortal() {
+  let data = null;
   try {
-    const res = await fetch('./services.json');
-    const base = await res.json();
-    // Merge localStorage overrides (user edits persist in browser)
-    const savedServices = JSON.parse(localStorage.getItem('portal_services') || 'null');
-    const savedCats     = JSON.parse(localStorage.getItem('portal_categories') || 'null');
-    const cats = savedCats     || base.categories || [];
-    const svcs = savedServices || base.services   || [];
-    cats.forEach(cat => { categories[cat.key] = cat; labels[cat.key] = cat.label; });
-    buildSidebarCategories(cats);
-    buildWizardCategoryTiles(cats);
-    renderCards(svcs);
-    loadApiStatus();
+    const res = await fetch('/api/portal-services');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    data = await res.json();
+    // Refresh cache with latest server state
+    localStorage.setItem('portal_services',   JSON.stringify(data.services   || []));
+    localStorage.setItem('portal_categories', JSON.stringify(data.categories || []));
   } catch (err) {
-    console.error('Failed to load portal:', err);
+    console.warn('portal-services API unavailable, using cache:', err);
+    const cachedSvcs = JSON.parse(localStorage.getItem('portal_services') || 'null');
+    const cachedCats = JSON.parse(localStorage.getItem('portal_categories') || 'null');
+    if (cachedSvcs) {
+      data = { services: cachedSvcs, categories: cachedCats || [] };
+    } else {
+      // Last resort: fall back to static file bundled with deployment
+      const res2 = await fetch('./services.json');
+      data = await res2.json();
+    }
   }
+  const cats = data.categories || [];
+  const svcs = data.services   || [];
+  cats.forEach(cat => { categories[cat.key] = cat; labels[cat.key] = cat.label; });
+  buildSidebarCategories(cats);
+  buildWizardCategoryTiles(cats);
+  renderCards(svcs);
+  loadApiStatus();
 }
 
 function buildSidebarCategories(cats) {
