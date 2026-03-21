@@ -892,6 +892,11 @@ async function loadPortal() {
     }
   }
   if (data.sshGateway) sshGateway = data.sshGateway;
+  // Sync server-side recently-used into localStorage so it survives logout
+  if (Array.isArray(data.recentlyUsed)) {
+    localStorage.setItem('portal_recent', JSON.stringify(data.recentlyUsed));
+    recentOrder = data.recentlyUsed.map(e => e.id);
+  }
   const cats = data.categories || [];
   const svcs = data.services   || [];
   cats.forEach(cat => { categories[cat.key] = cat; labels[cat.key] = cat.label; });
@@ -938,11 +943,9 @@ function renderCards(services) {
   grid.innerHTML = '';
   services.forEach(svc => {
     const cat = categories[svc.category] || { text: '#a09aaf', color: 'rgba(160,154,175,0.08)', border: 'rgba(160,154,175,0.15)', label: svc.category };
-    const card = document.createElement('a');
+    const card = document.createElement('div');
     card.className = 'card';
-    card.href = svc.url;
-    card.target = '_blank';
-    card.rel = 'noopener noreferrer';
+    card.tabIndex = 0;
     card.dataset.id = svc.id;
     card.dataset.category = svc.category;
     card.dataset.ssoTier = svc.ssoTier;
@@ -954,9 +957,13 @@ function renderCards(services) {
     if (svc.favorite) card.dataset.favorite = 'true';
     if (svc.sshTarget) card.dataset.sshTarget = svc.sshTarget;
     card.addEventListener('click', (e) => {
-      // allow edit/star buttons to handle their own events
+      // allow edit/star/ssh buttons to handle their own events
       if (e.target.closest('.card-edit') || e.target.closest('.card-star') || e.target.closest('.card-ssh')) return;
+      window.open(svc.url, '_blank', 'noopener,noreferrer');
       handleCardClick(svc.id);
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); window.open(svc.url, '_blank', 'noopener,noreferrer'); handleCardClick(svc.id); }
     });
     card.innerHTML = `
       ${svc.apiProvider ? '<span class="api-badge" data-provider="' + escHtml(svc.apiProvider) + '">API —</span>' : ''}
@@ -1077,6 +1084,18 @@ function handleCardClick(id) {
   saveRecentEntry(id);
   renderRecentSidebar();
   if (currentFilter === 'recent') applyFilter();
+  // Server-side tracking so recently-used survives logout/cache-clear
+  fetch('/api/portal-track-recent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id })
+  }).then(r => r.json()).then(d => {
+    if (Array.isArray(d.recentlyUsed)) {
+      localStorage.setItem('portal_recent', JSON.stringify(d.recentlyUsed));
+      recentOrder = d.recentlyUsed.map(e => e.id);
+      renderRecentSidebar();
+    }
+  }).catch(() => {});
 }
 
 function openService(id) {
@@ -1199,12 +1218,23 @@ async function saveEdit() {
   if (currentFilter !== 'all' && currentFilter !== 'favorites' && currentFilter !== 'recent') applyFilter();
   refreshSidebarCategories();
 
-  // 4. Fire-and-forget n8n sync (non-blocking, silently ignored)
-  fetch('/api/portal-update', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat, sshTarget: sshTarget || null } })
-  }).catch(() => {});
+  // 4. Sync to server — await so changes are durable before modal closes
+  const saveBtn = document.querySelector('#edit-modal .btn-primary');
+  if (saveBtn) { saveBtn.textContent = 'Saving…'; saveBtn.disabled = true; }
+  try {
+    const resp = await fetch('/api/portal-update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat, sshTarget: sshTarget || null } })
+    });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const d = await resp.json();
+    if (d.status !== 'ok') throw new Error(d.message || 'n8n error');
+  } catch (err) {
+    alert('Saved locally but failed to sync to server: ' + err.message + '\nChanges will be lost on next reload.');
+  } finally {
+    if (saveBtn) { saveBtn.textContent = 'Save Changes'; saveBtn.disabled = false; }
+  }
 
   closeEdit();
 }
