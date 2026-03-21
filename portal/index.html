@@ -796,13 +796,11 @@ function sshCommand(target) {
   return 'ssh -t ' + sshGateway + ' "docker exec -it ' + target + ' /bin/bash"';
 }
 
-function sshLaunch(e, target) {
-  e.stopPropagation();
-  e.preventDefault();
-  if (!target) return;
-  // user@host targets map to the 'vps' terminal; plain names are container names
-  const termTarget = target.includes('@') ? 'vps' : target;
-  window.open('/terminal/' + encodeURIComponent(termTarget), '_blank', 'noopener,noreferrer');
+// Returns the /terminal/<name> URL for an sshTarget value.
+// user@host → /terminal/vps  |  containerName → /terminal/containerName
+function terminalUrl(target) {
+  if (!target) return '';
+  return '/terminal/' + encodeURIComponent(target.includes('@') ? 'vps' : target);
 }
 
 // ── Recent history — persisted as [{id, ts}] in localStorage ─────────────
@@ -967,7 +965,7 @@ function renderCards(services) {
         <span class="card-tag" style="background:${cat.color};color:${cat.text};border:1px solid ${cat.border}">${escHtml(cat.label || svc.category)}</span>
         <span class="card-status"><span class="live-dot"></span> live</span>
       </div>
-      ${svc.sshTarget ? '<button class="card-ssh" onclick="sshLaunch(event,' + JSON.stringify(svc.sshTarget) + ')" title="' + escHtml(sshCommand(svc.sshTarget)) + '">⌨ ssh</button>' : ''}
+      ${svc.sshTarget ? '<a class="card-ssh" href="' + escHtml(terminalUrl(svc.sshTarget)) + '" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="' + escHtml(sshCommand(svc.sshTarget)) + '">⌨ ssh</a>' : ''}
       <button class="card-edit" onclick="openEdit(event,this.closest('.card'))">✎ edit</button>
       <span class="card-arrow">↗</span>
     `;
@@ -1192,11 +1190,14 @@ async function saveEdit() {
   if (oldSsh) oldSsh.remove();
   if (sshTarget) {
     editingCard.dataset.sshTarget = sshTarget;
-    const sshBtn = document.createElement('button');
+    const sshBtn = document.createElement('a');
     sshBtn.className = 'card-ssh';
+    sshBtn.href = terminalUrl(sshTarget);
+    sshBtn.target = '_blank';
+    sshBtn.rel = 'noopener noreferrer';
     sshBtn.title = sshCommand(sshTarget);
     sshBtn.textContent = '⌨ ssh';
-    sshBtn.addEventListener('click', e => sshLaunch(e, sshTarget));
+    sshBtn.addEventListener('click', e => e.stopPropagation());
     editingCard.appendChild(sshBtn);
   } else {
     delete editingCard.dataset.sshTarget;
