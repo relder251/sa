@@ -1,4 +1,5 @@
 {
+  "sshGateway": "root@187.77.208.197",
   "categories": [
     {
       "key": "automation",
@@ -59,7 +60,7 @@
       "category": "automation",
       "favorite": false,
       "ssoTier": 1,
-      "sshTarget": "root@187.77.208.197"
+      "sshTarget": "n8n"
     },
     {
       "id": "pipeline",
@@ -70,7 +71,7 @@
       "category": "automation",
       "favorite": false,
       "ssoTier": 1,
-      "sshTarget": "root@187.77.208.197"
+      "sshTarget": "webui"
     },
     {
       "id": "litellm",
@@ -81,7 +82,7 @@
       "category": "ai",
       "favorite": false,
       "ssoTier": 1,
-      "sshTarget": "root@187.77.208.197"
+      "sshTarget": "litellm"
     },
     {
       "id": "jupyter",
@@ -92,7 +93,7 @@
       "category": "ai",
       "favorite": false,
       "ssoTier": 1,
-      "sshTarget": "root@187.77.208.197"
+      "sshTarget": "jupyter"
     },
     {
       "id": "claude",
@@ -216,6 +217,17 @@
       "favorite": false,
       "ssoTier": 3,
       "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger"
+    },
+    {
+      "id": "vps-root",
+      "name": "VPS Root",
+      "url": "https://hpanel.hostinger.com/vps",
+      "description": "Production VPS host — direct SSH access",
+      "icon": "🖧",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 3,
+      "sshTarget": "root@187.77.208.197"
     }
   ]
 }

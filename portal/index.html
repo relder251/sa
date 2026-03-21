@@ -648,8 +648,8 @@ body {
         <div class="cat-grid" id="edit-cat-grid"></div>
       </div>
       <div class="form-row">
-        <label class="form-label">SSH Target <span style="font-size:10px;color:var(--text-3);font-weight:300;">(optional, e.g. root@192.168.1.1)</span></label>
-        <input class="form-input" id="edit-ssh" type="text" placeholder="user@host">
+        <label class="form-label">SSH Target <span style="font-size:10px;color:var(--text-3);font-weight:300;">(optional · container name or user@host)</span></label>
+        <input class="form-input" id="edit-ssh" type="text" placeholder="containerName  or  user@host">
       </div>
     </div>
     <div class="modal-footer" style="justify-content:space-between;">
@@ -782,6 +782,36 @@ const labels = { all: 'All Services', favorites: 'Favorites', recent: 'Recently 
 let currentFilter = 'all';
 let currentServices = [];
 
+// ── SSH helpers ───────────────────────────────────────
+// sshGateway: read from services.json ("sshGateway" top-level field).
+// sshTarget semantics:
+//   "user@host"  → direct SSH to that host
+//   "container"  → docker exec into that container via sshGateway
+let sshGateway = '';
+
+function sshCommand(target) {
+  if (!target) return '';
+  if (target.includes('@')) return 'ssh ' + target;
+  if (!sshGateway) return 'ssh -t root@VPS "docker exec -it ' + target + ' /bin/bash"';
+  return 'ssh -t ' + sshGateway + ' "docker exec -it ' + target + ' /bin/bash"';
+}
+
+function sshLaunch(e, target) {
+  e.stopPropagation();
+  const cmd = sshCommand(target);
+  if (!cmd) return;
+  navigator.clipboard.writeText(cmd).then(() => {
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.textContent = '✓ copied';
+    btn.style.color = '#4ade80';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
+  }).catch(() => {
+    // Clipboard API unavailable — show the command in a prompt for manual copy
+    window.prompt('Copy SSH command:', cmd);
+  });
+}
+
 // ── Recent history — persisted as [{id, ts}] in localStorage ─────────────
 // recentOrder keeps IDs in newest-first order for applyFilter().
 let recentOrder = [];
@@ -860,6 +890,7 @@ async function loadPortal() {
       data = await res2.json();
     }
   }
+  if (data.sshGateway) sshGateway = data.sshGateway;
   const cats = data.categories || [];
   const svcs = data.services   || [];
   cats.forEach(cat => { categories[cat.key] = cat; labels[cat.key] = cat.label; });
@@ -936,7 +967,7 @@ function renderCards(services) {
         <span class="card-tag" style="background:${cat.color};color:${cat.text};border:1px solid ${cat.border}">${escHtml(cat.label || svc.category)}</span>
         <span class="card-status"><span class="live-dot"></span> live</span>
       </div>
-      ${svc.sshTarget ? '<a class="card-ssh" href="ssh://' + escHtml(svc.sshTarget) + '" onclick="event.stopPropagation()" title="SSH: ' + escHtml(svc.sshTarget) + '">⌨ ssh</a>' : ''}
+      ${svc.sshTarget ? '<button class="card-ssh" onclick="sshLaunch(event,' + JSON.stringify(svc.sshTarget) + ')" title="' + escHtml(sshCommand(svc.sshTarget)) + '">⌨ ssh</button>' : ''}
       <button class="card-edit" onclick="openEdit(event,this.closest('.card'))">✎ edit</button>
       <span class="card-arrow">↗</span>
     `;
@@ -1149,12 +1180,11 @@ async function saveEdit() {
   if (oldSsh) oldSsh.remove();
   if (sshTarget) {
     editingCard.dataset.sshTarget = sshTarget;
-    const sshBtn = document.createElement('a');
+    const sshBtn = document.createElement('button');
     sshBtn.className = 'card-ssh';
-    sshBtn.href = 'ssh://' + sshTarget;
-    sshBtn.title = 'SSH: ' + sshTarget;
+    sshBtn.title = sshCommand(sshTarget);
     sshBtn.textContent = '⌨ ssh';
-    sshBtn.addEventListener('click', e => e.stopPropagation());
+    sshBtn.addEventListener('click', e => sshLaunch(e, sshTarget));
     editingCard.appendChild(sshBtn);
   } else {
     delete editingCard.dataset.sshTarget;
