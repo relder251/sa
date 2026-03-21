@@ -19,8 +19,16 @@ server {
         proxy_set_header Authorization "Bearer ${LITELLM_API_KEY}";
     }
 
+    # portal data API — returns live services.json via n8n (GET, no body required)
+    location /api/portal-services {
+        proxy_pass http://n8n:5678/webhook/VHUS5Dx1q9HBZPln/webhook/portal-services;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 10s;
+    }
+
     # n8n provisioning webhooks
-    # portal-provision uses legacy workflowId-prefixed path (n8n 2.12.x internal format)
+    # portal-provision uses workflowId-prefixed path (n8n 2.12.x internal format)
     # the 3 newer workflows use plain /webhook/{path} format
 
     location /api/portal-provision {
