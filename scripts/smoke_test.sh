@@ -236,11 +236,13 @@ fi
 check_container "portal static server" "portal"
 
 # Portal API + webhook roundtrip — uses a temporary service to avoid corrupting real data
-PORTAL_HOST="home.private.sovereignadvisory.ai"
+# Hit portal container directly (port 80) to bypass SSO; this tests n8n webhook plumbing.
+# The SSO gate (302 redirect) is tested separately in the nginx-private SSO section below.
 SMOKE_SVC_ID="smoke-test-$$"
+_pcurl() { docker exec portal curl -sk --max-time 10 "$@" 2>/dev/null || echo ""; }
 
 # GET: live services.json via n8n
-_before=$(curl -sk "https://127.0.0.1/api/portal-services" -H "Host: $PORTAL_HOST" --max-time 10 2>/dev/null)
+_before=$(_pcurl "http://localhost/api/portal-services")
 _before_count=$(echo "$_before" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('services',[])))" 2>/dev/null || echo "0")
 if [ "$_before_count" -gt 0 ]; then
   echo -e "  ${green}✅ PASS${reset}  [GET /api/portal-services → ${_before_count} services] portal-services API"
@@ -252,10 +254,9 @@ else
 fi
 
 # PROVISION: add a smoke-test service
-_prov=$(curl -sk -X POST "https://127.0.0.1/api/portal-provision" \
-  -H "Host: $PORTAL_HOST" -H "Content-Type: application/json" \
-  -d "{\"id\":\"$SMOKE_SVC_ID\",\"name\":\"Smoke Test\",\"url\":\"https://example.com\",\"category\":\"infra\"}" \
-  --max-time 10 2>/dev/null || echo "")
+_prov=$(_pcurl -X POST "http://localhost/api/portal-provision" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$SMOKE_SVC_ID\",\"name\":\"Smoke Test\",\"url\":\"https://example.com\",\"category\":\"infra\"}")
 if echo "$_prov" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
   echo -e "  ${green}✅ PASS${reset}  [status=ok] portal-provision webhook"
   PASS=$((PASS + 1))
@@ -266,10 +267,9 @@ else
 fi
 
 # UPDATE: modify the smoke-test service
-_upd=$(curl -sk -X POST "https://127.0.0.1/api/portal-update" \
-  -H "Host: $PORTAL_HOST" -H "Content-Type: application/json" \
-  -d "{\"id\":\"$SMOKE_SVC_ID\",\"fields\":{\"description\":\"updated by smoke test\"}}" \
-  --max-time 10 2>/dev/null || echo "")
+_upd=$(_pcurl -X POST "http://localhost/api/portal-update" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$SMOKE_SVC_ID\",\"fields\":{\"description\":\"updated by smoke test\"}}")
 if echo "$_upd" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
   echo -e "  ${green}✅ PASS${reset}  [status=ok] portal-update webhook"
   PASS=$((PASS + 1))
@@ -281,10 +281,9 @@ fi
 
 # UPDATE-CATEGORIES: no-op with current categories (read them, write them back)
 _cats=$(echo "$_before" | python3 -c "import sys,json; d=json.load(sys.stdin); print(__import__('json').dumps(d.get('categories',[])))" 2>/dev/null || echo "[]")
-_uc=$(curl -sk -X POST "https://127.0.0.1/api/portal-update-categories" \
-  -H "Host: $PORTAL_HOST" -H "Content-Type: application/json" \
-  -d "{\"categories\":$_cats}" \
-  --max-time 10 2>/dev/null || echo "")
+_uc=$(_pcurl -X POST "http://localhost/api/portal-update-categories" \
+  -H "Content-Type: application/json" \
+  -d "{\"categories\":$_cats}")
 if echo "$_uc" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
   echo -e "  ${green}✅ PASS${reset}  [status=ok] portal-update-categories webhook"
   PASS=$((PASS + 1))
@@ -295,10 +294,9 @@ else
 fi
 
 # DELETE: remove the smoke-test service
-_del=$(curl -sk -X POST "https://127.0.0.1/api/portal-delete" \
-  -H "Host: $PORTAL_HOST" -H "Content-Type: application/json" \
-  -d "{\"id\":\"$SMOKE_SVC_ID\"}" \
-  --max-time 10 2>/dev/null || echo "")
+_del=$(_pcurl -X POST "http://localhost/api/portal-delete" \
+  -H "Content-Type: application/json" \
+  -d "{\"id\":\"$SMOKE_SVC_ID\"}")
 if echo "$_del" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok' and d.get('deleted',0)==1" 2>/dev/null; then
   echo -e "  ${green}✅ PASS${reset}  [status=ok, deleted=1] portal-delete webhook"
   PASS=$((PASS + 1))
@@ -309,7 +307,7 @@ else
 fi
 
 # VERIFY: service count is back to original
-_after_count=$(curl -sk "https://127.0.0.1/api/portal-services" -H "Host: $PORTAL_HOST" --max-time 10 2>/dev/null \
+_after_count=$(_pcurl "http://localhost/api/portal-services" \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('services',[])))" 2>/dev/null || echo "-1")
 if [ "$_after_count" -eq "$_before_count" ]; then
   echo -e "  ${green}✅ PASS${reset}  [count restored: $_after_count] portal data integrity"
@@ -335,6 +333,19 @@ for vhost in home.private.sovereignadvisory.ai n8n.private.sovereignadvisory.ai 
     FAIL=$((FAIL + 1))
   fi
 done
+
+# Portal API SSO enforcement — /api/portal-* must also redirect to login (not 200 unauthed)
+_api_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
+  -H "Host: home.private.sovereignadvisory.ai" \
+  "https://127.0.0.1/api/portal-services" 2>/dev/null || echo "000")
+if [[ "$_api_code" =~ ^3 ]]; then
+  echo -e "  ${green}✅ PASS${reset}  [$_api_code] portal /api/portal-services requires SSO (no bypass)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  [$_api_code] portal /api/portal-services should require SSO (got non-3xx)"
+  ERRORS+=("portal /api/portal-services SSO: expected 3xx redirect, got $_api_code")
+  FAIL=$((FAIL + 1))
+fi
 
 # ── Public nginx ──────────────────────────────────────────────────────────────
 echo ""
