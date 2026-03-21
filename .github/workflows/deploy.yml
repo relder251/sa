@@ -7,22 +7,12 @@ on:
 
 jobs:
   deploy:
-    name: SSH deploy to VPS
-    runs-on: ubuntu-latest
+    name: Deploy and smoke test
+    runs-on: [self-hosted, linux, prod]
 
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: 187.77.208.197
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: bash /opt/agentic-sdlc/scripts/deploy.sh
+      - name: Deploy
+        run: bash /opt/agentic-sdlc/scripts/deploy.sh
 
       - name: Smoke test
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: 187.77.208.197
-          username: root
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: bash /opt/agentic-sdlc/scripts/smoke_test.sh
+        run: bash /opt/agentic-sdlc/scripts/smoke_test.sh
