@@ -1,0 +1,28 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    name: SSH deploy to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: sovereignadvisory.ai
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: bash /opt/agentic-sdlc/scripts/deploy.sh
+
+      - name: Smoke test
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: sovereignadvisory.ai
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: bash /opt/agentic-sdlc/scripts/smoke_test.sh
