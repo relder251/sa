@@ -586,11 +586,7 @@ body {
       <span class="filter-label">Recently Used</span>
     </button>
 
-    <div id="recent-list">
-      <button class="recent-item" onclick="openService('n8n')"><span class="recent-icon">⚡</span><span class="recent-name">n8n</span><span class="recent-time">2m ago</span></button>
-      <button class="recent-item" onclick="openService('litellm')"><span class="recent-icon">🤖</span><span class="recent-name">LiteLLM</span><span class="recent-time">1h ago</span></button>
-      <button class="recent-item" onclick="openService('vaultwarden')"><span class="recent-icon">🔐</span><span class="recent-name">Vaultwarden</span><span class="recent-time">3h ago</span></button>
-    </div>
+    <div id="recent-list"></div>
 
     <hr class="sidebar-divider">
 
@@ -784,8 +780,58 @@ function escHtml(str) {
 // ── Labels map (extended dynamically from categories) ─
 const labels = { all: 'All Services', favorites: 'Favorites', recent: 'Recently Used' };
 let currentFilter = 'all';
-const recentOrder = [];
 let currentServices = [];
+
+// ── Recent history — persisted as [{id, ts}] in localStorage ─────────────
+// recentOrder keeps IDs in newest-first order for applyFilter().
+let recentOrder = [];
+
+function loadRecentHistory() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('portal_recent') || '[]');
+    recentOrder = raw.map(e => e.id);
+  } catch (_) { recentOrder = []; }
+}
+
+function saveRecentEntry(id) {
+  try {
+    let history = JSON.parse(localStorage.getItem('portal_recent') || '[]');
+    history = history.filter(e => e.id !== id);
+    history.unshift({ id, ts: Date.now() });
+    if (history.length > 10) history = history.slice(0, 10);
+    localStorage.setItem('portal_recent', JSON.stringify(history));
+    recentOrder = history.map(e => e.id);
+  } catch (_) {}
+}
+
+function relTime(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 60) return 'just now';
+  if (s < 3600) return Math.floor(s / 60) + 'm ago';
+  if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+  return Math.floor(s / 86400) + 'd ago';
+}
+
+function renderRecentSidebar() {
+  const el = document.getElementById('recent-list');
+  if (!el) return;
+  try {
+    const history = JSON.parse(localStorage.getItem('portal_recent') || '[]');
+    const top3 = history.slice(0, 3);
+    if (top3.length === 0) {
+      el.innerHTML = '<span style="font-size:11px;color:rgba(160,154,175,0.4);padding:4px 8px;display:block">No recent activity</span>';
+      return;
+    }
+    el.innerHTML = top3.map(e => {
+      const svc = currentServices.find(s => s.id === e.id);
+      if (!svc) return '';
+      const icon = escHtml(svc.icon || '□');
+      const name = escHtml(svc.name);
+      const time = relTime(e.ts);
+      return `<button class="recent-item" onclick="openService('${escHtml(e.id)}')"><span class="recent-icon">${icon}</span><span class="recent-name">${name}</span><span class="recent-time">${time}</span></button>`;
+    }).join('');
+  } catch (_) { el.innerHTML = ''; }
+}
 
 // ── Category registry — populated from services.json ─
 const categories = {};
@@ -820,6 +866,7 @@ async function loadPortal() {
   buildSidebarCategories(cats);
   buildWizardCategoryTiles(cats);
   renderCards(svcs);
+  renderRecentSidebar();
   loadApiStatus();
 }
 
@@ -995,19 +1042,19 @@ function toggleStar(e, id) {
 }
 
 function handleCardClick(id) {
-  const idx = recentOrder.indexOf(id);
-  if (idx > -1) recentOrder.splice(idx, 1);
-  recentOrder.unshift(id);
-  if (recentOrder.length > 5) recentOrder.pop();
+  saveRecentEntry(id);
+  renderRecentSidebar();
   if (currentFilter === 'recent') applyFilter();
 }
 
 function openService(id) {
   const svc = currentServices.find(s => s.id === id);
   if (svc) {
+    saveRecentEntry(id);
+    renderRecentSidebar();
     window.open(svc.url, '_blank', 'noopener,noreferrer');
+    setFilter('recent', document.getElementById('btn-recent'));
   }
-  setFilter('recent', document.getElementById('btn-recent'));
 }
 
 // ── Category helpers ──────────────────────────────────
@@ -1410,7 +1457,11 @@ async function loadUser() {
 }
 
 // ── Init ──────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => { loadPortal(); loadUser(); });
+document.addEventListener('DOMContentLoaded', () => {
+  loadRecentHistory();
+  loadPortal();   // renderRecentSidebar() is called after currentServices is populated
+  loadUser();
+});
 </script>
 </body>
 </html>
