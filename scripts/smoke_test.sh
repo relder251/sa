@@ -15,6 +15,8 @@ red='\033[0;31m'
 yellow='\033[0;33m'
 reset='\033[0m'
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 check() {
   local label="$1"
   local expected_code="$2"
@@ -46,6 +48,42 @@ check_contains() {
   else
     echo -e "  ${red}❌ FAIL${reset}  [missing '$expected_text'] $label"
     ERRORS+=("$label: response did not contain '$expected_text'")
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+check_container() {
+  local label="$1"
+  local container="$2"
+  local status
+  status=$(docker inspect --format '{{.State.Status}}' "$container" 2>/dev/null || echo "not_found")
+  if [ "$status" = "running" ]; then
+    echo -e "  ${green}✅ PASS${reset}  [running] $label"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  [$status] $label"
+    ERRORS+=("$label: expected running, got $status")
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# POST to a webhook and assert {"status":"ok"} in response.
+# Extra curl args are passed as an array: check_webhook "label" "url" [extra_arg ...]
+check_webhook() {
+  local label="$1"
+  local url="$2"
+  shift 2
+  local body
+  body=$(curl -sk -X POST "$url" \
+    -H "Content-Type: application/json" \
+    -d '{"smoke_test":true}' \
+    --max-time 10 "$@" 2>/dev/null || echo "")
+  if echo "$body" | python3 -c "import sys,json; d=json.load(sys.stdin); assert d.get('status')=='ok'" 2>/dev/null; then
+    echo -e "  ${green}✅ PASS${reset}  [status=ok] $label"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  [bad response] $label — ${body:0:120}"
+    ERRORS+=("$label: expected {\"status\":\"ok\"}")
     FAIL=$((FAIL + 1))
   fi
 }
@@ -139,7 +177,7 @@ check_contains "Pipeline root lists endpoints" "http://localhost:5002/" "run-opp
 # ── LiteLLM model tiers ───────────────────────────────────────────────────────
 echo ""
 echo "── LiteLLM model tiers ─────────────────────────"
-LITELLM_KEY=$(grep '^LITELLM_API_KEY=' /home/user/vibe_coding/Agentic_SDLC/.env | cut -d= -f2 | sed 's/#.*//' | tr -d '[:space:]')
+LITELLM_KEY=$(grep '^LITELLM_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2 | sed 's/#.*//' | tr -d '[:space:]')
 models_body=$(curl -s --max-time 10 \
   -H "Authorization: Bearer $LITELLM_KEY" \
   "http://localhost:4000/model/info" 2>/dev/null || echo "")
@@ -155,18 +193,118 @@ fi
 # ── n8n workflow imports ──────────────────────────────────────────────────────
 echo ""
 echo "── n8n workflows ───────────────────────────────"
-N8N_API_KEY=$(grep '^N8N_API_KEY=' /home/user/vibe_coding/Agentic_SDLC/.env | cut -d= -f2)
+N8N_API_KEY=$(grep '^N8N_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2)
 wf_count=$(curl -s --max-time 10 \
   -H "X-N8N-API-KEY: $N8N_API_KEY" \
   "http://localhost:5678/api/v1/workflows" 2>/dev/null \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "?")
 echo -e "  ${yellow}ℹ INFO${reset}   n8n workflows loaded: $wf_count"
 
+# ── Portal ────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Portal ──────────────────────────────────────"
+
+# Validate services.json syntax and structure
+svc_count=$(python3 -c "
+import json, sys
+try:
+  d = json.load(open('$REPO_DIR/portal/services.json'))
+  assert isinstance(d.get('services'), list) and len(d['services']) > 0
+  print(len(d['services']))
+except Exception as e:
+  print('ERR:' + str(e), file=sys.stderr)
+  sys.exit(1)
+" 2>/tmp/smoke_svc_err)
+if [ $? -eq 0 ]; then
+  echo -e "  ${green}✅ PASS${reset}  services.json valid JSON ($svc_count services)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  services.json invalid: $(cat /tmp/smoke_svc_err)"
+  ERRORS+=("services.json: $(cat /tmp/smoke_svc_err)")
+  FAIL=$((FAIL + 1))
+fi
+
+# Portal source HTML contains expected title (catches truncated/wrong file deploys)
+if grep -q "SA Portal" "$REPO_DIR/portal/index.html"; then
+  echo -e "  ${green}✅ PASS${reset}  [contains 'SA Portal'] portal/index.html"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  [missing 'SA Portal'] portal/index.html"
+  ERRORS+=("portal/index.html: 'SA Portal' not found")
+  FAIL=$((FAIL + 1))
+fi
+check_container "portal static server" "portal"
+
+# Portal webhooks — bypass SSO via nginx-private, must return {"status":"ok"}
+PORTAL_HOST="home.private.sovereignadvisory.ai"
+check_webhook "portal-provision webhook"         "https://127.0.0.1/api/portal-provision"         -H "Host: $PORTAL_HOST"
+check_webhook "portal-update-categories webhook" "https://127.0.0.1/api/portal-update-categories" -H "Host: $PORTAL_HOST"
+check_webhook "portal-update webhook"            "https://127.0.0.1/api/portal-update"            -H "Host: $PORTAL_HOST"
+check_webhook "portal-delete webhook"            "https://127.0.0.1/api/portal-delete"            -H "Host: $PORTAL_HOST"
+
+# nginx-private SSO gate — expect 302 (Keycloak redirect), never 5xx
+for vhost in home.private.sovereignadvisory.ai n8n.private.sovereignadvisory.ai \
+             litellm.private.sovereignadvisory.ai jupyter.private.sovereignadvisory.ai \
+             webui.private.sovereignadvisory.ai; do
+  code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
+    -H "Host: $vhost" "https://127.0.0.1/" 2>/dev/null || echo "000")
+  if [[ "$code" =~ ^[23] ]]; then
+    echo -e "  ${green}✅ PASS${reset}  [$code] nginx-private: $vhost"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  [$code] nginx-private: $vhost"
+    ERRORS+=("nginx-private $vhost: expected 2xx/3xx, got $code")
+    FAIL=$((FAIL + 1))
+  fi
+done
+
+# ── Public nginx ──────────────────────────────────────────────────────────────
+echo ""
+echo "── Public nginx (sa_nginx) ─────────────────────"
+check "HTTP→HTTPS redirect" 301 "http://187.77.208.197/"
+check_container "sa_nginx"         "sa_nginx"
+check_container "sa_nginx_private" "sa_nginx_private"
+
+# ── Ollama ────────────────────────────────────────────────────────────────────
+echo ""
+echo "── Ollama ──────────────────────────────────────"
+check_contains "Ollama API root"   "http://localhost:11434/"          "Ollama is running"
+check          "Ollama /api/tags"  200 "http://localhost:11434/api/tags"
+
+# ── Keycloak ──────────────────────────────────────────────────────────────────
+echo ""
+echo "── Keycloak ─────────────────────────────────────"
+check_contains "Keycloak health/live" "http://localhost:8080/health/live" '"UP"'
+check          "Keycloak ready"       200 "http://localhost:8080/health/ready"
+
+# ── Vaultwarden ───────────────────────────────────────────────────────────────
+echo ""
+echo "── Vaultwarden ─────────────────────────────────"
+check_container "vaultwarden container" "vaultwarden"
+
+# ── Lead Review ───────────────────────────────────────────────────────────────
+echo ""
+echo "── Lead Review ─────────────────────────────────"
+check "lead-review health" 200 "http://localhost:5003/health"
+
+# ── Support services ─────────────────────────────────────────────────────────
+echo ""
+echo "── Support services ────────────────────────────"
+check_container "ofelia (cron scheduler)"           "ofelia"
+check_container "free_model_sync"                   "free_model_sync"
+check_container "watchtower"                        "watchtower"
+check_container "twingate"                          "twingate"
+check_container "oauth2_proxy_portal"               "oauth2_proxy_portal"
+check_container "oauth2_proxy_n8n"                  "oauth2_proxy_n8n"
+check_container "oauth2_proxy_webui"                "oauth2_proxy_webui"
+check_container "oauth2_proxy_litellm"              "oauth2_proxy_litellm"
+check_container "oauth2_proxy_jupyter"              "oauth2_proxy_jupyter"
+
 # ── Template variable audit ───────────────────────────────────────────────────
 echo ""
 echo "── Template variable audit ─────────────────────"
-TEMPLATE_DIR="/home/user/vibe_coding/Agentic_SDLC/webui/templates"
-MAIN_PY="/home/user/vibe_coding/Agentic_SDLC/webui/main.py"
+TEMPLATE_DIR="$REPO_DIR/webui/templates"
+MAIN_PY="$REPO_DIR/webui/main.py"
 
 # Extract all {{ var }} and {% if var %} usages from templates (top-level vars only)
 template_vars=$(grep -roh '{{ *\([a-zA-Z_][a-zA-Z_0-9]*\)' "$TEMPLATE_DIR" | \
