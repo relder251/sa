@@ -129,7 +129,7 @@ else
 fi
 
 # Verify most recent backup file exists and is < 25 hours old
-latest_backup=$(find ./backup -name "postgres_*.sql.gz" -mtime -1 2>/dev/null | head -1)
+latest_backup=$(find "$REPO_DIR/backup" -name "postgres_*.sql.gz" -mtime -1 2>/dev/null | head -1 || true)
 if [ -n "$latest_backup" ]; then
   size=$(du -h "$latest_backup" | cut -f1)
   echo -e "  ${green}✅ PASS${reset}  latest postgres backup: $latest_backup ($size)"
