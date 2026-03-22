@@ -35,7 +35,7 @@ socketio = SocketIO(
 # ── Allowed targets ──────────────────────────────────────────────────────────
 # Keep this list explicit — never interpolate user input into a shell command.
 TARGETS: dict[str, list[str]] = {
-    "n8n":     ["docker", "exec", "-it", "n8n",     "bash"],
+    "n8n":     ["docker", "exec", "-it", "n8n",     "sh"],      # n8n image has sh only
     "webui":   ["docker", "exec", "-it", "webui",   "bash"],
     "litellm": ["docker", "exec", "-it", "litellm", "bash"],
     "jupyter": ["docker", "exec", "-it", "jupyter", "bash"],
@@ -78,7 +78,7 @@ _HTML_TEMPLATE = r"""<!DOCTYPE html>
 
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/socket.io@4.7.2/dist/socket.io.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.2/dist/socket.io.min.js"></script>
 <script>
 const TARGET = '__TARGET__';
 
