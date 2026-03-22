@@ -284,6 +284,7 @@ services:
       - GENERIC_CLIENT_NAME=Keycloak SSO
       - GENERIC_USER_ID_ATTRIBUTE=preferred_username
       - LITELLM_ADMIN_EMAILS=relder@sovereignadvisory.ai
+      - PROXY_ADMIN_ID=relder
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
