@@ -6,49 +6,57 @@
       "key": "automation",
       "label": "Automation",
       "icon": "⚡",
-      "color": "rgba(74,222,128,0.08)",
-      "text": "#6ee7a0",
-      "border": "rgba(74,222,128,0.15)"
+      "color": "hsla(38,80%,60%,0.08)",
+      "text": "hsla(38,100%,70%,1)",
+      "border": "hsla(38,80%,60%,0.2)"
     },
     {
       "key": "ai",
-      "label": "AI & Dev",
+      "label": "AI",
       "icon": "🤖",
-      "color": "rgba(129,140,248,0.08)",
-      "text": "#a5b4fc",
-      "border": "rgba(129,140,248,0.15)"
+      "color": "hsla(270,60%,70%,0.08)",
+      "text": "hsla(270,80%,80%,1)",
+      "border": "hsla(270,60%,70%,0.2)"
     },
     {
       "key": "providers",
-      "label": "AI Providers",
-      "icon": "🧠",
-      "color": "rgba(252,211,77,0.08)",
-      "text": "#fcd34d",
-      "border": "rgba(252,211,77,0.15)"
+      "label": "Providers",
+      "icon": "☁️",
+      "color": "hsla(210,70%,65%,0.08)",
+      "text": "hsla(210,90%,75%,1)",
+      "border": "hsla(210,70%,65%,0.2)"
     },
     {
       "key": "security",
       "label": "Security",
       "icon": "🔐",
-      "color": "rgba(248,113,113,0.08)",
-      "text": "#fca5a5",
-      "border": "rgba(248,113,113,0.15)"
+      "color": "hsla(0,60%,65%,0.08)",
+      "text": "hsla(0,80%,75%,1)",
+      "border": "hsla(0,60%,65%,0.2)"
     },
     {
       "key": "productivity",
       "label": "Productivity",
-      "icon": "📋",
-      "color": "rgba(52,211,153,0.08)",
-      "text": "#6ee7b7",
-      "border": "rgba(52,211,153,0.15)"
+      "icon": "📝",
+      "color": "hsla(140,60%,60%,0.08)",
+      "text": "hsla(140,80%,70%,1)",
+      "border": "hsla(140,60%,60%,0.2)"
     },
     {
       "key": "infra",
       "label": "Infrastructure",
-      "icon": "⚙️",
-      "color": "rgba(56,189,248,0.08)",
-      "text": "#7dd3fc",
-      "border": "rgba(56,189,248,0.15)"
+      "icon": "🖥️",
+      "color": "hsla(220,20%,60%,0.08)",
+      "text": "hsla(220,30%,75%,1)",
+      "border": "hsla(220,20%,60%,0.2)"
+    },
+    {
+      "key": "testing",
+      "label": "Testing",
+      "icon": "🧪",
+      "color": "hsla(200,60%,70%,0.08)",
+      "text": "hsla(200,80%,80%,1)",
+      "border": "hsla(200,60%,70%,0.2)"
     }
   ],
   "services": [
@@ -219,6 +227,16 @@
       "ssoTier": 3,
       "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger",
       "sshTarget": "hostinger"
+    },
+    {
+      "id": "test-service",
+      "name": "Test Service",
+      "url": "https://test-service.private.sovereignadvisory.ai",
+      "description": "UPDATED - portal validation test card",
+      "icon": "box",
+      "category": "testing",
+      "favorite": false,
+      "ssoTier": 3
     }
   ]
 }

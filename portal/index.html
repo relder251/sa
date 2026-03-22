@@ -981,8 +981,10 @@ async function loadApiStatus() {
     const res = await fetch('/api/litellm-health');
     if (!res.ok) return;
     const data = await res.json();
-    const healthy = new Set(data.healthy_providers || []);
-    const unhealthy = new Set(data.unhealthy_providers || []);
+    // Extract provider prefix (e.g. "anthropic" from "anthropic/claude-3-5-sonnet")
+    const toProviders = endpoints => new Set((endpoints || []).map(e => (e.model || '').split('/')[0]).filter(Boolean));
+    const healthy = toProviders(data.healthy_endpoints);
+    const unhealthy = toProviders(data.unhealthy_endpoints);
     document.querySelectorAll('.api-badge[data-provider]').forEach(badge => {
       const p = badge.dataset.provider;
       if (healthy.has(p)) {
@@ -1426,6 +1428,7 @@ async function startDeploy() {
   // Fire provision request
   let provisionOk = false;
   let provisionErr = null;
+  let serverSvc = null;
   try {
     const provRes = await fetch('/api/portal-provision', {
       method: 'POST',
@@ -1433,13 +1436,18 @@ async function startDeploy() {
       body: JSON.stringify({ name, url, description: desc, icon: emoji, category: cat, internal: isInternal })
     });
     provisionOk = provRes.ok;
-    if (!provisionOk) provisionErr = 'Server returned ' + provRes.status;
+    if (provisionOk) {
+      const body = await provRes.json();
+      serverSvc = body.service || null;
+    } else {
+      provisionErr = 'Server returned ' + provRes.status;
+    }
   } catch (e) {
     provisionErr = e.message;
   }
 
-  // Save new service to localStorage regardless of provision result
-  const newSvc = {
+  // Use server-assigned ID if provision succeeded, otherwise generate a local one
+  const newSvc = serverSvc || {
     id: url.replace(/https?:\/\//, '').replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 30) + '-' + Date.now(),
     name, url, description: desc, icon: emoji, category: cat, favorite: false, ssoTier: isInternal ? 1 : 3
   };

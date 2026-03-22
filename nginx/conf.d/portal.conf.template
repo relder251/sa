@@ -18,11 +18,12 @@ server {
     # Must appear before /api/ to make ordering intent explicit
     # (nginx longest-match prefix means /api/litellm-health always wins over /api/)
     location /api/litellm-health {
-        proxy_pass http://litellm:4000/health/services;
+        proxy_pass http://litellm:4000/health?model=cloud/smart;
         proxy_set_header Host $host;
         # LITELLM_API_KEY is injected by nginx:alpine envsubst at container start.
         # Set LITELLM_API_KEY in the portal service environment in docker-compose.
         proxy_set_header Authorization "Bearer ${LITELLM_API_KEY}";
+        proxy_read_timeout 20s;
     }
 
     # portal data API — returns live services.json via n8n (GET, no body required)
