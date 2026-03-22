@@ -21,6 +21,8 @@ venv/
 .claude/*
 .claude/worktrees/
 !.claude/skills/
+!.claude/hooks/
+!.claude/settings.json
 .superpowers/
 .playwright-mcp/
 

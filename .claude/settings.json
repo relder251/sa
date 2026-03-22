@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"{\\\"systemMessage\\\": \\\"Repo: $(git remote get-url origin 2>/dev/null || echo none) | Branch: $(git branch --show-current 2>/dev/null) | Uncommitted: $(git status --short 2>/dev/null | wc -l | xargs) files\\\"}\""
+          },
+          {
+            "type": "command",
+            "command": "/home/user/vibe_coding/Agentic_SDLC/.claude/hooks/cleanup-stale-processes.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "frontend-design@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "github@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "commit-commands@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "serena@claude-plugins-official": true,
+    "figma@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "pyright-lsp@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true,
+    "notion@claude-plugins-official": true,
+    "hookify@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true,
+    "plugin-dev@claude-plugins-official": true,
+    "playground@claude-plugins-official": true,
+    "linear@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "csharp-lsp@claude-plugins-official": true,
+    "sentry@claude-plugins-official": true,
+    "gitlab@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "php-lsp@claude-plugins-official": true,
+    "jdtls-lsp@claude-plugins-official": true,
+    "huggingface-skills@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true,
+    "laravel-boost@claude-plugins-official": false
+  }
+}
