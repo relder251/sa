@@ -15,8 +15,21 @@ services:
   # shell-gateway needs host PID namespace + privileged caps so nsenter can
   # enter the host's mount/net/pid namespaces for the "vps" terminal target.
   shell-gateway:
+    build: ./shell-gateway
+    container_name: shell_gateway
     privileged: true
     pid: "host"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:7681/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   nginx:
     image: nginx:1.27-alpine
