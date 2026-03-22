@@ -526,6 +526,26 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
+  # vault-sync — programmatic Vaultwarden credential updates via Bitwarden CLI
+  vault-sync:
+    build: ./vault-sync
+    container_name: vault_sync
+    restart: unless-stopped
+    environment:
+      - BW_SERVER=https://vault.private.sovereignadvisory.ai
+      - BW_CLIENTID=${BW_CLIENTID}
+      - BW_CLIENTSECRET=${BW_CLIENTSECRET}
+      - BW_MASTER_PASS=${BW_MASTER_PASS}
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8777/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      com.sovereignadvisory.service: "vault-sync"
+
   # Vaultwarden — self-hosted Bitwarden-compatible vault
   vaultwarden:
     image: vaultwarden/server:latest
@@ -548,6 +568,9 @@ services:
       - SMTP_PASSWORD=${NEO_SMTP_PASS}
       - SMTP_FROM=${NOTIFY_EMAIL}
       - SMTP_FROM_NAME=Sovereign Advisory Vault
+      - PUSH_ENABLED=${PUSH_ENABLED:-false}
+      - PUSH_INSTALLATION_ID=${PUSH_INSTALLATION_ID:-}
+      - PUSH_INSTALLATION_KEY=${PUSH_INSTALLATION_KEY:-}
     volumes:
       - vaultwarden_data:/data
     networks:
