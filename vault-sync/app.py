@@ -50,6 +50,12 @@ def _authenticate():
     """Configure server, log in with API key, unlock with master password, cache session."""
     global _BW_SESSION
 
+    # Clear any stale bw state; a corrupt/outdated data.json crashes bw on startup.
+    data_json = os.path.expanduser("~/.config/Bitwarden CLI/data.json")
+    if os.path.exists(data_json):
+        os.remove(data_json)
+        log.info("Cleared stale bw data.json")
+
     log.info("Configuring bw server: %s", BW_SERVER)
     _run(["config", "server", BW_SERVER])
 
