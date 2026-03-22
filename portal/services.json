@@ -65,7 +65,7 @@
     },
     {
       "id": "pipeline",
-      "name": "Open WebUI",
+      "name": "Development Automation",
       "url": "https://webui.private.sovereignadvisory.ai",
       "description": "Automated development pipeline interface",
       "icon": "🎯",
@@ -212,23 +212,13 @@
       "id": "hostinger",
       "name": "Hostinger",
       "url": "https://hpanel.hostinger.com",
-      "description": "Domain & hosting",
+      "description": "Domain & hosting — VPS host",
       "icon": "🖥️",
       "category": "infra",
       "favorite": false,
       "ssoTier": 3,
-      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger"
-    },
-    {
-      "id": "vps-root",
-      "name": "VPS Root",
-      "url": "/terminal/vps",
-      "description": "Production VPS host — web terminal",
-      "icon": "🖧",
-      "category": "infra",
-      "favorite": false,
-      "ssoTier": 3,
-      "sshTarget": "root@187.77.208.197"
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger",
+      "sshTarget": "hostinger"
     }
   ]
 }

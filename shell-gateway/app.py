@@ -40,7 +40,8 @@ TARGETS: dict[str, list[str]] = {
     "litellm": ["docker", "exec", "-it", "litellm", "bash"],
     "jupyter": ["docker", "exec", "-it", "jupyter", "bash"],
     # nsenter enters host namespaces; requires pid:host + privileged in compose
-    "vps":     ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
+    "vps":      ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
+    "hostinger": ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
 }
 
 # ── Terminal HTML (xterm.js + socket.io) ─────────────────────────────────────
