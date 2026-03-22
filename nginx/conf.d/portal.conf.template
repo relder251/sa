@@ -73,6 +73,14 @@ server {
         proxy_read_timeout 10s;
     }
 
+    # Credential rotation — atomically updates Vaultwarden + Keycloak
+    location /api/rotate-credential {
+        proxy_pass http://n8n:5678/webhook/rotate-credential;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 60s;
+    }
+
     # oauth2-proxy — userinfo + auth endpoints for portal SSO
     location /oauth2/ {
         proxy_pass http://oauth2_proxy_portal:4185;
