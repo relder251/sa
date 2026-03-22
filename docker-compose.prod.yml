@@ -282,7 +282,8 @@ services:
       - GENERIC_USERINFO_ENDPOINT=https://kc.sovereignadvisory.ai/realms/agentic-sdlc/protocol/openid-connect/userinfo
       - GENERIC_REDIRECT_URI=https://litellm.private.sovereignadvisory.ai/ui/oauth/callback
       - GENERIC_CLIENT_NAME=Keycloak SSO
-      - LITELLM_ADMIN_EMAILS=relder@sovereignadvisory.ai
+      - GENERIC_USER_ID_ATTRIBUTE=preferred_username
+      - LITELLM_ADMIN_EMAILS=relder
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
