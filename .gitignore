@@ -17,8 +17,10 @@ __pycache__/
 .venv/
 venv/
 
-# Claude / tool data
-.claude/
+# Claude / tool data (keep skills tracked, ignore session/cache data)
+.claude/*
+.claude/worktrees/
+!.claude/skills/
 .superpowers/
 .playwright-mcp/
 
