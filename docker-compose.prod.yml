@@ -532,7 +532,7 @@ services:
     container_name: vault_sync
     restart: unless-stopped
     environment:
-      - BW_SERVER=https://vault.private.sovereignadvisory.ai
+      - BW_SERVER=http://vaultwarden:80
       - BW_CLIENTID=${BW_CLIENTID}
       - BW_CLIENTSECRET=${BW_CLIENTSECRET}
       - BW_MASTER_PASS=${BW_MASTER_PASS}
