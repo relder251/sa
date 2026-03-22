@@ -10,6 +10,7 @@ volumes:
   pg_data:
   vaultwarden_data:
   backup_data:
+  glitchtip_db_data:
 
 services:
   # shell-gateway needs host PID namespace + privileged caps so nsenter can
@@ -98,6 +99,7 @@ services:
           - litellm.private.sovereignadvisory.ai
           - jupyter.private.sovereignadvisory.ai
           - webui.private.sovereignadvisory.ai
+          - sentry.private.sovereignadvisory.ai
     labels:
       com.sovereignadvisory.service: "nginx-private"
 
@@ -556,6 +558,13 @@ services:
       - BW_CLIENTID=${BW_CLIENTID}
       - BW_CLIENTSECRET=${BW_CLIENTSECRET}
       - BW_MASTER_PASS=${BW_MASTER_PASS}
+      - KEYCLOAK_ADMIN_URL=https://kc.sovereignadvisory.ai
+      - KEYCLOAK_ADMIN_USER=admin
+      - KEYCLOAK_ADMIN_PASS=${KEYCLOAK_ADMIN_PASSWORD}
+      - KEYCLOAK_REALM=agentic-sdlc
+      - KEYCLOAK_SYNC_ITEMS=Keycloak SSO
+      - SENTRY_DSN=${SENTRY_DSN_VAULTSYNC:-}
+      - ENVIRONMENT=production
     networks:
       - vibe_net
     healthcheck:
@@ -718,6 +727,77 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # GlitchTip — self-hosted Sentry-compatible error monitoring
+  glitchtip-web:
+    image: glitchtip/glitchtip:latest
+    container_name: glitchtip_web
+    depends_on:
+      - glitchtip-db
+      - glitchtip-redis
+    environment:
+      - DATABASE_URL=postgresql://glitchtip:${GLITCHTIP_DB_PASSWORD}@glitchtip-db:5432/glitchtip
+      - REDIS_URL=redis://glitchtip-redis:6379/0
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY}
+      - DEFAULT_FROM_EMAIL=${NOTIFY_EMAIL:-alerts@sovereignadvisory.ai}
+      - EMAIL_URL=smtp+tls://${NEO_SMTP_USER}:${NEO_SMTP_PASS}@${NEO_SMTP_HOST}:${NEO_SMTP_PORT}
+      - GLITCHTIP_DOMAIN=https://sentry.private.sovereignadvisory.ai
+      - ENABLE_OPEN_USER_REGISTRATION=false
+      - DJANGO_SUPERUSER_EMAIL=relder@sovereignadvisory.ai
+      - DJANGO_SUPERUSER_PASSWORD=${GLITCHTIP_ADMIN_PASSWORD}
+      - DJANGO_SUPERUSER_USERNAME=admin
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/0/projects/')\" 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    labels:
+      com.sovereignadvisory.service: "glitchtip"
+
+  glitchtip-worker:
+    image: glitchtip/glitchtip:latest
+    container_name: glitchtip_worker
+    command: ./bin/run-celery-with-beat.sh
+    depends_on:
+      - glitchtip-db
+      - glitchtip-redis
+    environment:
+      - DATABASE_URL=postgresql://glitchtip:${GLITCHTIP_DB_PASSWORD}@glitchtip-db:5432/glitchtip
+      - REDIS_URL=redis://glitchtip-redis:6379/0
+      - SECRET_KEY=${GLITCHTIP_SECRET_KEY}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+
+  glitchtip-db:
+    image: postgres:15-alpine
+    container_name: glitchtip_db
+    environment:
+      - POSTGRES_DB=glitchtip
+      - POSTGRES_USER=glitchtip
+      - POSTGRES_PASSWORD=${GLITCHTIP_DB_PASSWORD}
+    volumes:
+      - glitchtip_db_data:/var/lib/postgresql/data
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glitchtip -d glitchtip"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  glitchtip-redis:
+    image: redis:7-alpine
+    container_name: glitchtip_redis
+    networks:
+      - vibe_net
+    restart: unless-stopped
 
   # oauth2-proxy — Internal Access Portal (port 4185)
   oauth2-proxy-portal:

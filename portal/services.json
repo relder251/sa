@@ -237,6 +237,17 @@
       "category": "testing",
       "favorite": false,
       "ssoTier": 3
+    },
+    {
+      "id": "glitchtip",
+      "name": "GlitchTip",
+      "url": "https://sentry.private.sovereignadvisory.ai",
+      "description": "Error monitoring & alerting — Sentry-compatible",
+      "icon": "🐛",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 1,
+      "sshTarget": "glitchtip_web"
     }
   ]
 }
