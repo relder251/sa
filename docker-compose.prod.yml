@@ -737,6 +737,7 @@ services:
       - --skip-provider-button=true
       - --insecure-oidc-allow-unverified-email=true
       - --code-challenge-method=S256
+      - --cookie-expire=0
     networks:
       - vibe_net
     restart: unless-stopped
