@@ -221,6 +221,35 @@ For the request "add keyboard shortcut `/` to focus the search/filter bar":
 - Blast radius: minimal — event listener is additive and guarded by activeElement check
 - Verify: open portal, press `/`, confirm input receives focus; press `/` while typing in an input, confirm no interference
 
+## Step 5 — Create Notion Task
+
+After generating the implementation plan in Step 4, always create a Notion task so the work is tracked and can be dispatched to Claude Code automatically.
+
+Use the `mcp__plugin_Notion_notion__notion-create-pages` tool:
+
+```
+parent:
+  data_source_id: 2a299de0-e9dd-8291-b26c-879566a6e569
+
+properties:
+  Task name: "<feature name> — <type key> — portal"
+  Status: "Planning"
+  Agent status: <the full implementation plan generated in Step 4>
+  Agent blocked: __NO__
+```
+
+After creating the task, tell the user:
+
+```
+Notion task created (Status: Planning).
+Review it at: https://www.notion.so/f7f99de0e9dd83429d7981a93b571dfc
+When ready to implement, set Status → "Ready" to dispatch to Claude Code automatically.
+```
+
+**Do not set Status to "Ready"** — the user reviews the plan first and approves by setting Ready themselves.
+
+---
+
 ## Important Notes
 
 - The portal has **no build step** — changes to `index.html` take effect on next browser reload after the file is served
