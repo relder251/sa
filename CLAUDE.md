@@ -129,6 +129,12 @@ docker compose restart litellm
 
 The `free/*` tier is managed dynamically by `free_model_sync.py` and does **not** live in `litellm_config.yaml` — it is written to LiteLLM's database via the management API.
 
+## Validation Tools
+
+The `/n8n-workflow` skill (`.claude/skills/n8n-workflow/SKILL.md`) validates webhook routing after deploys — run it to confirm all nginx proxy_pass targets resolve to active n8n webhooks and detect workflow drift.
+
+The `/stack-validate` skill runs a broader health check covering containers, Keycloak, Vaultwarden, and nginx config sync.
+
 ## GPU / Hardware Notes
 
 Ollama is configured for an RTX 3070 (8GB VRAM):
