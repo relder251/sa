@@ -232,6 +232,7 @@ services:
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -242,6 +243,7 @@ services:
       - ./opportunities:/data/opportunities
       - ./portal:/data/portal
       - ./scripts:/data/scripts:ro
+      - /opt/actions-runner/externals/node20/lib/node_modules/@anthropic-ai/claude-code:/opt/claude-code:ro
     networks:
       - vibe_net
     restart: unless-stopped
