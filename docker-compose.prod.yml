@@ -750,7 +750,7 @@ services:
       - vibe_net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/0/projects/')\" 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/_health/')\" || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 5
