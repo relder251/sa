@@ -283,7 +283,7 @@ services:
       - GENERIC_REDIRECT_URI=https://litellm.private.sovereignadvisory.ai/ui/oauth/callback
       - GENERIC_CLIENT_NAME=Keycloak SSO
       - GENERIC_USER_ID_ATTRIBUTE=preferred_username
-      - LITELLM_ADMIN_EMAILS=relder
+      - LITELLM_ADMIN_EMAILS=relder@sovereignadvisory.ai
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
