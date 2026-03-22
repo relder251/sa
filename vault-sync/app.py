@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 # Module-level session token cache; None means we need to (re-)authenticate.
 _BW_SESSION = None
 
-BW_SERVER      = os.environ.get("BW_SERVER", "http://vaultwarden:80")
+BW_SERVER      = os.environ.get("BW_SERVER", "https://vault.private.sovereignadvisory.ai")
 BW_CLIENTID    = os.environ.get("BW_CLIENTID", "")
 BW_CLIENTSECRET = os.environ.get("BW_CLIENTSECRET", "")
 BW_MASTER_PASS = os.environ.get("BW_MASTER_PASS", "")

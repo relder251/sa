@@ -77,7 +77,14 @@ services:
       pipeline-server:
         condition: service_started
     networks:
-      - vibe_net
+      vibe_net:
+        aliases:
+          - vault.private.sovereignadvisory.ai
+          - home.private.sovereignadvisory.ai
+          - n8n.private.sovereignadvisory.ai
+          - litellm.private.sovereignadvisory.ai
+          - jupyter.private.sovereignadvisory.ai
+          - webui.private.sovereignadvisory.ai
     labels:
       com.sovereignadvisory.service: "nginx-private"
 
@@ -532,7 +539,7 @@ services:
     container_name: vault_sync
     restart: unless-stopped
     environment:
-      - BW_SERVER=http://vaultwarden:80
+      - BW_SERVER=https://vault.private.sovereignadvisory.ai
       - BW_CLIENTID=${BW_CLIENTID}
       - BW_CLIENTSECRET=${BW_CLIENTSECRET}
       - BW_MASTER_PASS=${BW_MASTER_PASS}
