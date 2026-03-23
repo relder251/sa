@@ -7,11 +7,17 @@ NOTE on bitwarden-sdk:
   API for Password Manager ciphers (login items, collections).  We use the bw CLI
   standalone binary here until the SDK gains cipher support.  The standalone binary
   is downloaded at image build time; Node.js is not required.
+
+NOTE on bw unlock --raw:
+  The --raw flag works in TTY mode only.  In headless Docker (no TTY) the standalone
+  binary returns an empty string.  We use the standard unlock output and extract the
+  session token via regex instead.
 """
 
 import json
 import logging
 import os
+import re
 import subprocess
 
 log = logging.getLogger(__name__)
@@ -67,15 +73,22 @@ def _authenticate() -> None:
 
     log.info("Unlocking vault...")
     result = subprocess.run(
-        ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS", "--raw"],
+        ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS"],
         capture_output=True, text=True,
         env={**env, "BW_MASTER_PASS": BW_MASTER_PASS},
         check=False,
     )
-    session = result.stdout.strip()
+    # --raw outputs the session token only in TTY mode; the standalone binary returns
+    # empty in headless Docker.  Parse the token from the unlock message instead.
+    match = re.search(r'BW_SESSION="([^"]+)"', result.stdout)
+    if not match:
+        match = re.search(r'--session\s+(\S+)', result.stdout)
+    session = match.group(1) if match else ""
     if not session:
         raise RuntimeError(
-            "bw unlock returned empty session — check BW_MASTER_PASS and server connectivity"
+            f"bw unlock failed to return a session token — "
+            f"check BW_MASTER_PASS and server connectivity.\n"
+            f"stdout: {result.stdout[:200]!r}\nstderr: {result.stderr[:200]!r}"
         )
 
     _session = session
