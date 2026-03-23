@@ -37,6 +37,10 @@ while read -r oldrev newrev refname; do
   COMMIT="$newrev"
   log "TRIGGER: branch=$branch commit=$COMMIT"
 
+  # Fix n8n-writable file ownership (n8n runs as uid 1000; git pull resets to root)
+  chown 1000:1000 /opt/agentic-sdlc/portal/services.json 2>/dev/null || true
+  log "PERMS: portal/services.json ownership set to 1000:1000"
+
   HTTP_CODE=$(curl -s -o /tmp/pcirt-push-resp.json -w "%{http_code}" \
     --max-time 10 \
     -X POST "${N8N_WEBHOOK_URL}/webhook/pcirt-push" \
