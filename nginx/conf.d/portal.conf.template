@@ -35,8 +35,9 @@ server {
     }
 
     # n8n provisioning webhooks
-    # portal-provision uses workflowId-prefixed path (n8n 2.12.x internal format)
-    # the 3 newer workflows use plain /webhook/{path} format
+    # portal-provision (DXjMzKwRB6c54GCY) uses workflowId-prefixed path (n8n 2.12.x legacy format)
+    # portal-update-categories (MdZMVjJ2zUPmDtyu), portal-update (NCvllVAgkG91FXzD),
+    # and portal-delete (q6C6PUPzyYhhT8gG) use plain /webhook/{path} as registered in DB
 
     location /api/portal-provision {
         proxy_pass http://n8n:5678/webhook/DXjMzKwRB6c54GCY/webhook/portal-provision;
@@ -46,6 +47,7 @@ server {
     }
 
     location /api/portal-update-categories {
+        # workflowId: MdZMVjJ2zUPmDtyu — plain path registered in webhook_entity
         proxy_pass http://n8n:5678/webhook/portal-update-categories;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -53,6 +55,7 @@ server {
     }
 
     location /api/portal-update {
+        # workflowId: NCvllVAgkG91FXzD — plain path registered in webhook_entity
         proxy_pass http://n8n:5678/webhook/portal-update;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -60,6 +63,7 @@ server {
     }
 
     location /api/portal-delete {
+        # workflowId: q6C6PUPzyYhhT8gG — plain path registered in webhook_entity
         proxy_pass http://n8n:5678/webhook/portal-delete;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
