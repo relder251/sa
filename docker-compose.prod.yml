@@ -593,6 +593,8 @@ services:
     build: ./vault-sync
     container_name: vault_sync
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:8777:8777"
     environment:
       - BW_SERVER=https://vault.private.sovereignadvisory.ai
       - BW_CLIENTID=${BW_CLIENTID}
