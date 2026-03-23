@@ -151,6 +151,21 @@ These commands are defined in `.env` and used by the PCIRT+ Framework (FRAMEWORK
 - `SCORE_DB_PORT=5433` — CQS score database port
 - `N8N_WEBHOOK_URL=https://n8n.private.sovereignadvisory.ai` — n8n webhook base URL
 
+## Fresh Data Rule — MANDATORY
+
+**Always fetch live. Never act on values recalled from a prior session.**
+
+| What you need | Where to get it |
+|---------------|----------------|
+| Credentials / secrets | `ssh root@187.77.208.197 'cat /opt/agentic-sdlc/.env'` |
+| Service state | `ssh root@187.77.208.197 'docker ps'` |
+| Recent logs | `ssh root@187.77.208.197 'docker logs --tail 50 <container>'` |
+| Live configs | Read the file on VPS — not local repo copy |
+| Vault contents | `bw sync && bw list items` |
+| n8n workflow state | Query live via n8n API or UI |
+
+If you are about to use a credential, port, hostname, or config value and you have not fetched it in this session — stop and fetch it first. Session summaries and memory are references, not sources of truth.
+
 ## Completion Gate — MANDATORY, No Exceptions
 
 **A task, fix, or feature is NOT complete until all of the following pass:**

@@ -25,6 +25,7 @@ venv/
 !.claude/hooks/
 !.claude/settings.json
 !.claude/hookify.require-completion-gate.local.md
+!.claude/hookify.require-fresh-data.local.md
 .superpowers/
 .playwright-mcp/
 
