@@ -400,7 +400,7 @@ check_container "glitchtip_web"    "glitchtip_web"
 check_container "glitchtip_worker" "glitchtip_worker"
 check_container "glitchtip_db"     "glitchtip_db"
 check_container "glitchtip_redis"  "glitchtip_redis"
-check_via_container "GlitchTip web API" "sa_nginx_private" 200 "http://glitchtip_web:8000/api/0/organizations/"
+check_via_container "GlitchTip web API" "sa_nginx_private" 200 "http://glitchtip_web:8000/api/0/"
 
 # nginx-private must route sentry vhost (non-5xx through proxy)
 _sentry_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
@@ -454,7 +454,7 @@ check_container "vault_sync"                        "vault_sync"
 check_container "shell_gateway"                     "shell_gateway"
 check_container "agentic-sdlc-score-db"             "agentic-sdlc-score-db"
 check_via_container "vault_sync health"   "sa_nginx_private" 200 "http://vault_sync:8777/health"
-check_via_container "shell_gateway alive" "portal"           200 "http://shell_gateway:7681/"
+check_via_container "shell_gateway alive" "portal"           200 "http://shell_gateway:7681/health"
 
 # ── Template variable audit ───────────────────────────────────────────────────
 echo ""
