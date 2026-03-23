@@ -23,9 +23,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
+import shlex
+
 import vault
 import keycloak as kc
 from models import VALID_COLLECTIONS, ITEM_TAXONOMY, item_to_cred
+from registry import SERVICE_REGISTRY, VALID_SERVICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -389,3 +392,94 @@ def sync_keycloak():
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# ---------------------------------------------------------------------------
+# CRED-04 — Credential injection endpoint
+# ---------------------------------------------------------------------------
+
+def _extract_field(item: dict, field: str) -> str:
+    """Extract password, username, or notes from a raw vault item dict."""
+    login = item.get("login") or {}
+    if field == "password":
+        return login.get("password") or ""
+    if field == "username":
+        return login.get("username") or ""
+    if field == "notes":
+        return item.get("notes") or ""
+    return ""
+
+
+def _resolve_service(service: str) -> dict[str, str]:
+    """
+    Fetch all credentials for a service from the vault.
+    Returns {ENV_VAR: value, ...}.  Raises ValueError if service unknown.
+    """
+    mappings = SERVICE_REGISTRY.get(service)
+    if mappings is None:
+        raise ValueError(
+            f"Unknown service {service!r}. Valid: {sorted(VALID_SERVICES)}"
+        )
+
+    # Batch-fetch only the vault items we need (de-duplicated)
+    needed_items = {m["vault_item"] for m in mappings}
+    item_cache: dict[str, dict] = {}
+    for name in needed_items:
+        try:
+            item_cache[name] = vault.get_item(name)
+        except ValueError:
+            item_cache[name] = {}
+
+    result: dict[str, str] = {}
+    for m in mappings:
+        raw = item_cache.get(m["vault_item"], {})
+        value = _extract_field(raw, m["field"])
+        result[m["env_var"]] = value
+
+    return result
+
+
+@app.get("/inject/{service}")
+def inject(service: str, format: str = "json"):
+    """
+    Return credentials for a service as env-var key/value pairs.
+
+    Query params:
+      format=json   (default) — {"ENV_VAR": "value", ...}
+      format=shell  — export ENV_VAR="value"\\n... (shell-sourceable)
+      format=dotenv — ENV_VAR=value\\n... (.env file format)
+    """
+    if service not in VALID_SERVICES:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Unknown service {service!r}. Valid: {sorted(VALID_SERVICES)}",
+        )
+    if format not in ("json", "shell", "dotenv"):
+        raise HTTPException(
+            status_code=400,
+            detail="format must be one of: json, shell, dotenv",
+        )
+    try:
+        creds = _resolve_service(service)
+    except Exception as exc:
+        log.error("inject(%s) failed: %s", service, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    if format == "shell":
+        from fastapi.responses import PlainTextResponse
+        lines = [f"export {k}={shlex.quote(v)}" for k, v in creds.items()]
+        return PlainTextResponse("\n".join(lines) + "\n")
+
+    if format == "dotenv":
+        from fastapi.responses import PlainTextResponse
+        lines = [f"{k}={v}" for k, v in creds.items()]
+        return PlainTextResponse("\n".join(lines) + "\n")
+
+    return {"status": "ok", "service": service, "credentials": creds}
+
+
+@app.get("/inject")
+def list_services():
+    """List all registered services available for credential injection."""
+    return {
+        "status":   "ok",
+        "services": sorted(VALID_SERVICES),
+    }
