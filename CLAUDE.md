@@ -151,6 +151,26 @@ These commands are defined in `.env` and used by the PCIRT+ Framework (FRAMEWORK
 - `SCORE_DB_PORT=5433` — CQS score database port
 - `N8N_WEBHOOK_URL=https://n8n.private.sovereignadvisory.ai` — n8n webhook base URL
 
+## Completion Gate — MANDATORY, No Exceptions
+
+**A task, fix, or feature is NOT complete until all of the following pass:**
+
+1. `bash scripts/smoke_test.sh` — runs clean with zero failures on the VPS
+2. Every nginx proxy_pass upstream touched by the work returns non-502/503/000 (run `/stack-validate` or check directly)
+3. The specific change has been tested **end-to-end** — not just "code is present" or "container is running"
+   - If it's a network path: curl it through the full proxy chain
+   - If it's a WebSocket: verify the negotiate endpoint responds
+   - If it's a credential/secret: verify the consuming service can actually read it
+   - If it's a Notion/n8n integration: trigger the workflow and confirm output
+4. Both CLI **and** browser/GUI tests where a UI is involved (headless Playwright if needed)
+
+**Never:**
+- Mark a Notion task Done without running these checks
+- Claim a fix is working based on config changes or log absence alone
+- Skip testing because the change "looks correct"
+
+If `smoke_test.sh` does not cover the thing you just changed, extend it first, then run it.
+
 ## GPU / Hardware Notes
 
 Ollama is configured for an RTX 3070 (8GB VRAM):
