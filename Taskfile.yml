@@ -1,0 +1,63 @@
+version: '3'
+
+vars:
+  VPS: root@187.77.208.197
+  PROD_DIR: /opt/agentic-sdlc
+  COMPOSE_FILE: docker-compose.prod.yml
+  PORTAL_URL: https://home.private.sovereignadvisory.ai
+
+tasks:
+  deploy:
+    desc: Pull latest code and restart services on VPS
+    cmds:
+      - ssh {{.VPS}} "cd {{.PROD_DIR}} && git pull && docker compose -f {{.COMPOSE_FILE}} up -d"
+
+  restart:
+    desc: Restart a specific service on VPS (requires SVC variable)
+    requires:
+      vars: [SVC]
+    cmds:
+      - ssh {{.VPS}} "cd {{.PROD_DIR}} && docker compose -f {{.COMPOSE_FILE}} restart {{.SVC}}"
+
+  smoke:
+    desc: Run smoke tests against the production portal
+    cmds:
+      - |
+        echo "Checking portal at {{.PORTAL_URL}} ..."
+        STATUS=$(curl -o /dev/null -s -w "%{http_code}" --max-time 15 {{.PORTAL_URL}})
+        echo "HTTP status: $STATUS"
+        if [ "$STATUS" -ge 200 ] && [ "$STATUS" -lt 400 ]; then
+          echo "Portal is UP"
+        else
+          echo "Portal check FAILED (status $STATUS)" && exit 1
+        fi
+
+  validate-nginx:
+    desc: Validate nginx config on VPS
+    cmds:
+      - ssh {{.VPS}} "docker exec nginx nginx -t"
+
+  logs:
+    desc: Tail logs for a specific service on VPS (requires SVC variable)
+    requires:
+      vars: [SVC]
+    cmds:
+      - ssh {{.VPS}} "cd {{.PROD_DIR}} && docker compose -f {{.COMPOSE_FILE}} logs -f --tail=50 {{.SVC}}"
+
+  test:
+    desc: Run test scripts in scripts/
+    cmds:
+      - |
+        if ls scripts/*.sh 2>/dev/null | grep -q .; then
+          for script in scripts/*.sh; do
+            echo "Running $script ..."
+            bash "$script"
+          done
+        else
+          echo "No test scripts found in scripts/"
+        fi
+
+  ps:
+    desc: List running services on VPS
+    cmds:
+      - ssh {{.VPS}} "cd {{.PROD_DIR}} && docker compose -f {{.COMPOSE_FILE}} ps"

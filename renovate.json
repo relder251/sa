@@ -1,0 +1,19 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "schedule": ["before 6am on Monday"],
+  "automerge": false,
+  "packageRules": [
+    {
+      "matchUpdateTypes": ["patch"],
+      "matchPackagePatterns": ["*"],
+      "automerge": true
+    },
+    {
+      "matchFileNames": ["docker-compose.prod.yml"],
+      "enabled": true
+    }
+  ],
+  "ignorePaths": ["**/node_modules/**"],
+  "labels": ["dependencies", "renovate"]
+}
