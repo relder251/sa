@@ -27,7 +27,7 @@ import urllib.parse
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
 # Sentry / GlitchTip error monitoring (optional — only active when SENTRY_DSN is set)
@@ -73,6 +73,7 @@ def _run(args, input_text=None, check=True):
     if _BW_SESSION:
         env["BW_SESSION"] = _BW_SESSION
 
+    log.debug("_run %s session_len=%d", args[0:2], len(_BW_SESSION or ""))
     result = subprocess.run(
         ["bw"] + args,
         input=input_text,
@@ -81,6 +82,8 @@ def _run(args, input_text=None, check=True):
         env=env,
         check=check,
     )
+    log.debug("_run %s rc=%d stdout_len=%d stderr=%s",
+              args[0:2], result.returncode, len(result.stdout), result.stderr[:80])
     return result
 
 
