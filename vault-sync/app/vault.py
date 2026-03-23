@@ -62,6 +62,12 @@ def _authenticate() -> None:
         "BW_CLIENTSECRET": BW_CLIENTSECRET,
     })
 
+    # Always start from a clean state.  bw refuses to change the server config
+    # while logged in, and the container may have residual state from a previous
+    # session or from env-var-based auto-auth.
+    log.info("Logging out to ensure clean state...")
+    subprocess.run(["bw", "logout"], capture_output=True, env=env, check=False)
+
     log.info("Configuring bw server: %s", BW_SERVER)
     subprocess.run(["bw", "config", "server", BW_SERVER], capture_output=True, env=env)
 
