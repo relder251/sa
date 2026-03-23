@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import subprocess
+import time
 
 log = logging.getLogger(__name__)
 
@@ -72,10 +73,17 @@ def _authenticate() -> None:
     subprocess.run(["bw", "config", "server", BW_SERVER], capture_output=True, env=env)
 
     log.info("Logging in with API key...")
-    subprocess.run(
+    login_result = subprocess.run(
         ["bw", "login", "--apikey"],
         capture_output=True, text=True, env=env, check=False,
     )
+    if login_result.returncode != 0:
+        # "You're already logged in!" is a non-fatal failure (exit 1 on some versions)
+        if "already logged in" not in (login_result.stdout + login_result.stderr).lower():
+            log.warning("bw login returned %d: stdout=%r stderr=%r",
+                        login_result.returncode, login_result.stdout[:200], login_result.stderr[:200])
+    # Allow the CLI state to settle before unlock
+    time.sleep(2)
 
     log.info("Unlocking vault...")
     result = subprocess.run(
@@ -118,7 +126,7 @@ def _ensure_session() -> None:
         # first call in a fresh container).  Wait briefly and retry once.
         log.warning("First auth attempt failed (%s); retrying in 3s...", exc)
         _session = None
-        import time; time.sleep(3)
+        time.sleep(3)
         _authenticate()
 
 
