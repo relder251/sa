@@ -140,8 +140,11 @@ def _authenticate() -> None:
     log.info("Vault unlocked; session cached.")
 
     log.info("Syncing vault...")
-    _run(["sync"])
-    log.info("Vault sync complete.")
+    try:
+        _run(["sync"])
+        log.info("Vault sync complete.")
+    except subprocess.CalledProcessError as exc:
+        log.warning("bw sync failed (non-fatal): %s", exc)
 
 
 def _ensure_session() -> None:
