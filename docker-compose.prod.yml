@@ -712,7 +712,7 @@ services:
 
   # Internal Access Portal
   portal:
-    image: nginx:1.27-alpine
+    image: nginx:alpine
     container_name: portal
     environment:
       - LITELLM_API_KEY=${LITELLM_API_KEY}
