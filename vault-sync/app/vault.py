@@ -52,8 +52,31 @@ def _run(args: list[str], input_text: str | None = None, check: bool = True) -> 
     )
 
 
+def _unlock(env: dict) -> str:
+    """Run bw unlock and return the session token, or '' on failure."""
+    result = subprocess.run(
+        ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS"],
+        capture_output=True, text=True,
+        env={**env, "BW_MASTER_PASS": BW_MASTER_PASS},
+        check=False,
+    )
+    # --raw outputs the token only in TTY mode; parse the token from the message.
+    match = re.search(r'BW_SESSION="([^"]+)"', result.stdout)
+    if not match:
+        match = re.search(r'--session\s+(\S+)', result.stdout)
+    token = match.group(1) if match else ""
+    if not token:
+        log.debug("bw unlock stdout=%r stderr=%r", result.stdout[:200], result.stderr[:200])
+    return token
+
+
 def _authenticate() -> None:
-    """Configure server, log in with API key, unlock with master password."""
+    """Configure server, log in with API key, unlock with master password.
+
+    Strategy (fast path first):
+      1. Try bw unlock directly — works when bw is logged in but session expired.
+      2. If unlock says "not logged in", do the full logout → config → login → unlock.
+    """
     global _session
 
     env = os.environ.copy()
@@ -63,49 +86,57 @@ def _authenticate() -> None:
         "BW_CLIENTSECRET": BW_CLIENTSECRET,
     })
 
+    # Fast path: bw may already be logged in (session expired but login state intact).
+    log.info("Attempting fast unlock (session may have expired)...")
+    token = _unlock(env)
+    if token:
+        _session = token
+        log.info("Vault re-unlocked (fast path); session refreshed.")
+        log.info("Syncing vault...")
+        _run(["sync"])
+        log.info("Vault sync complete.")
+        return
+
+    # Slow path: bw login state is gone — full re-auth.
+    log.info("Fast unlock failed; performing full re-auth (logout → login → unlock)...")
+
     # Always start from a clean state.  bw refuses to change the server config
     # while logged in, and the container may have residual state from a previous
     # session or from env-var-based auto-auth.
-    log.info("Logging out to ensure clean state...")
     subprocess.run(["bw", "logout"], capture_output=True, env=env, check=False)
 
     log.info("Configuring bw server: %s", BW_SERVER)
     subprocess.run(["bw", "config", "server", BW_SERVER], capture_output=True, env=env)
 
-    log.info("Logging in with API key...")
-    login_result = subprocess.run(
-        ["bw", "login", "--apikey"],
-        capture_output=True, text=True, env=env, check=False,
-    )
-    if login_result.returncode != 0:
-        # "You're already logged in!" is a non-fatal failure (exit 1 on some versions)
-        if "already logged in" not in (login_result.stdout + login_result.stderr).lower():
-            log.warning("bw login returned %d: stdout=%r stderr=%r",
-                        login_result.returncode, login_result.stdout[:200], login_result.stderr[:200])
-    # Allow the CLI state to settle before unlock
-    time.sleep(2)
+    for attempt in range(1, 4):
+        log.info("Logging in with API key (attempt %d/3)...", attempt)
+        login_result = subprocess.run(
+            ["bw", "login", "--apikey"],
+            capture_output=True, text=True, env=env, check=False,
+        )
+        if login_result.returncode != 0:
+            if "already logged in" not in (login_result.stdout + login_result.stderr).lower():
+                log.warning("bw login attempt %d returned %d: stdout=%r stderr=%r",
+                            attempt, login_result.returncode,
+                            login_result.stdout[:200], login_result.stderr[:200])
 
-    log.info("Unlocking vault...")
-    result = subprocess.run(
-        ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS"],
-        capture_output=True, text=True,
-        env={**env, "BW_MASTER_PASS": BW_MASTER_PASS},
-        check=False,
-    )
-    # --raw outputs the session token only in TTY mode; the standalone binary returns
-    # empty in headless Docker.  Parse the token from the unlock message instead.
-    match = re.search(r'BW_SESSION="([^"]+)"', result.stdout)
-    if not match:
-        match = re.search(r'--session\s+(\S+)', result.stdout)
-    session = match.group(1) if match else ""
-    if not session:
+        # Allow the CLI state to settle before unlock
+        time.sleep(3)
+
+        log.info("Unlocking vault (attempt %d/3)...", attempt)
+        token = _unlock(env)
+        if token:
+            break
+        log.warning("Unlock attempt %d failed; retrying login...", attempt)
+        subprocess.run(["bw", "logout"], capture_output=True, env=env, check=False)
+
+    if not token:
         raise RuntimeError(
-            f"bw unlock failed to return a session token — "
-            f"check BW_MASTER_PASS and server connectivity.\n"
-            f"stdout: {result.stdout[:200]!r}\nstderr: {result.stderr[:200]!r}"
+            "bw unlock failed after 3 login attempts — "
+            "check BW_MASTER_PASS, BW_CLIENTID, BW_CLIENTSECRET and server connectivity."
         )
 
-    _session = session
+    _session = token
     log.info("Vault unlocked; session cached.")
 
     log.info("Syncing vault...")
@@ -114,20 +145,10 @@ def _authenticate() -> None:
 
 
 def _ensure_session() -> None:
-    """Authenticate if no session token is cached.  Retries once on failure."""
-    global _session
+    """Authenticate if no session token is cached."""
     if _session:
         return
-    try:
-        _authenticate()
-    except RuntimeError as exc:
-        # First attempt can fail if the bw data directory isn't fully initialised
-        # (bw login --apikey sometimes returns "You are not logged in" on the very
-        # first call in a fresh container).  Wait briefly and retry once.
-        log.warning("First auth attempt failed (%s); retrying in 3s...", exc)
-        _session = None
-        time.sleep(3)
-        _authenticate()
+    _authenticate()  # _authenticate() has its own 3-attempt retry internally
 
 
 def _with_reauth(fn):
