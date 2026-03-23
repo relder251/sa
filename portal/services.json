@@ -248,6 +248,17 @@
       "favorite": false,
       "ssoTier": 1,
       "sshTarget": "glitchtip_web"
+    },
+    {
+      "id": "ffmpeg",
+      "name": "ffmpeg",
+      "url": "https://ffmpeg.org/documentation.html",
+      "description": "Media processing — convert, transcode, stream",
+      "icon": "🎬",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 3,
+      "sshTarget": "hostinger"
     }
   ]
 }
