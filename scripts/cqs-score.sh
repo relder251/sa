@@ -11,9 +11,9 @@ EVIDENCE="${5:-}"
 CYCLE="${CYCLE_ID:-unknown}"
 SLUG="${PROJECT_SLUG:?PROJECT_SLUG not set}"
 
-PGPASSWORD=scores_pass psql \
-  -h localhost -p "${SCORE_DB_PORT:-5434}" \
-  -U scores_user -d cqs_scores \
+CONTAINER="${PROJECT_SLUG}-score-db"
+
+docker exec "$CONTAINER" psql -U scores_user -d cqs_scores \
   -c "INSERT INTO score_events (project_slug, cycle_id, agent_name, event_type, points, description, evidence)
       VALUES ('${SLUG}', '${CYCLE}', '${AGENT}', '${EVENT}', ${POINTS}, '${DESC}', '${EVIDENCE}');" \
   -c "UPDATE agent_scores SET current_score = current_score + ${POINTS}, last_updated = NOW()
