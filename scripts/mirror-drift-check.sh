@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Source .env for PROJECT_SLUG and other variables when run standalone
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../.env" 2>/dev/null || true
+
 PROD=$(docker inspect --format='{{index .RepoDigests 0}}' \
   "${PROJECT_SLUG}-app" 2>/dev/null || echo "NOT_RUNNING")
 MIRROR=$(docker inspect --format='{{index .RepoDigests 0}}' \
