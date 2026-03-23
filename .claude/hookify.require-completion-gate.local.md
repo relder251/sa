@@ -6,29 +6,24 @@ action: block
 pattern: .*
 ---
 
-🚫 **STOP — Completion Gate Not Confirmed**
+🚫 **STOP — Run the Completion Gate First**
 
-Before ending this session or marking any task complete, verify ALL of the following:
+Before ending this session or marking any task complete, run the full validation suite:
 
-**1. Smoke tests passed**
 ```bash
-ssh root@187.77.208.197 'cd /opt/agentic-sdlc && bash scripts/smoke_test.sh'
+bash scripts/validate-prod.sh
 ```
-Must exit 0 with zero failures.
 
-**2. All touched nginx upstreams return non-502/503/000**
-- Run `/stack-validate` or manually curl each proxy path you changed
-- WebSocket paths: verify `/negotiate` endpoint reachable (not 502)
+This runs three suites (all must exit 0):
+1. **smoke_test.sh** on VPS — containers, endpoints, portal webhook roundtrip
+2. **validate-upstreams.sh** on VPS — every nginx proxy_pass upstream reachable, no 502s, config drift check
+3. **validate-browser.sh** locally — headless Playwright confirms key URLs render
 
-**3. End-to-end test — not just "code is present"**
-- Network path change → curl through the full proxy chain
-- WebSocket → verify negotiate endpoint responds
-- Credentials added → verify consuming service can read them
-- n8n/Notion integration → trigger the workflow, confirm output
-- UI change → Playwright or browser screenshot confirms it renders
+**If `validate-prod.sh` doesn't cover what you just changed:**
+Extend the relevant script first, then run it.
 
-**4. CLI AND browser/GUI tested** (where a UI is involved)
+**Skip flags** (only when explicitly agreed with user):
+- `--skip-browser` — skip Playwright (use if Twingate disconnected)
+- `--skip-smoke` — skip smoke tests (use only for pure-doc changes)
 
-**If you have not run these checks, do not stop. Run them now.**
-
-Only proceed past this gate if you can state explicitly which tests were run and what they returned.
+Only proceed past this gate if you can state: "validate-prod.sh exited 0" or list exactly which suites were run and their exit codes.

@@ -10,6 +10,10 @@
           {
             "type": "command",
             "command": "/home/user/vibe_coding/Agentic_SDLC/.claude/hooks/cleanup-stale-processes.sh"
+          },
+          {
+            "type": "command",
+            "command": "bash -c 'VPS_STATE=$(ssh -o ConnectTimeout=5 -o BatchMode=yes root@187.77.208.197 \"docker ps --format \\\"{{.Names}}:{{.Status}}\\\" | head -20 && echo --- && cd /opt/agentic-sdlc && git log -1 --format=\\\"last-commit:%h %s\\\"\" 2>/dev/null) && echo \"{\\\"systemMessage\\\": \\\"[LIVE VPS] $VPS_STATE\\\"}\" || echo \"{\\\"systemMessage\\\": \\\"[VPS] SSH unavailable at session start — fetch live state before acting on any credentials or configs\\\"}\"'"
           }
         ]
       }
@@ -47,6 +51,8 @@
     "jdtls-lsp@claude-plugins-official": true,
     "huggingface-skills@claude-plugins-official": true,
     "clangd-lsp@claude-plugins-official": true,
+    "agent-sdk-dev@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
     "laravel-boost@claude-plugins-official": false
   }
 }

@@ -168,23 +168,26 @@ If you are about to use a credential, port, hostname, or config value and you ha
 
 ## Completion Gate — MANDATORY, No Exceptions
 
-**A task, fix, or feature is NOT complete until all of the following pass:**
+**The canonical completion command:**
+```bash
+bash scripts/validate-prod.sh
+```
+This SSHs to VPS, runs `smoke_test.sh` + `validate-upstreams.sh` remotely, then runs `validate-browser.sh` locally. **All three suites must exit 0.**
 
-1. `bash scripts/smoke_test.sh` — runs clean with zero failures on the VPS
-2. Every nginx proxy_pass upstream touched by the work returns non-502/503/000 (run `/stack-validate` or check directly)
-3. The specific change has been tested **end-to-end** — not just "code is present" or "container is running"
-   - If it's a network path: curl it through the full proxy chain
-   - If it's a WebSocket: verify the negotiate endpoint responds
-   - If it's a credential/secret: verify the consuming service can actually read it
-   - If it's a Notion/n8n integration: trigger the workflow and confirm output
-4. Both CLI **and** browser/GUI tests where a UI is involved (headless Playwright if needed)
+**What each suite tests:**
+- `smoke_test.sh` — containers, HTTP endpoints, portal webhook roundtrip, SSO enforcement, template audit
+- `validate-upstreams.sh` — every nginx `proxy_pass` upstream returns non-502/503/000, WebSocket paths reachable, config drift check
+- `validate-browser.sh` — headless Playwright confirms key URLs render in a real browser (no 502 pages, no blank screens)
+
+**A task is NOT complete until:**
+1. `bash scripts/validate-prod.sh` exits 0 — all suites pass
+2. The specific change is tested end-to-end (not just code present): trigger the full path, confirm output
+3. If `validate-prod.sh` doesn't cover what you just changed — extend the relevant script first, then run it
 
 **Never:**
-- Mark a Notion task Done without running these checks
-- Claim a fix is working based on config changes or log absence alone
+- Mark a Notion task Done without running `validate-prod.sh`
+- Claim a fix works based on config changes or log absence alone
 - Skip testing because the change "looks correct"
-
-If `smoke_test.sh` does not cover the thing you just changed, extend it first, then run it.
 
 ## GPU / Hardware Notes
 

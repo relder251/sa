@@ -898,9 +898,10 @@ handoff, audit findings, mirror-fail carry-overs. Produce a scoped, prioritized
 0. FETCH LIVE STATE — before reading anything else:
    ssh root@187.77.208.197 'cat /opt/agentic-sdlc/.env'   # live credentials
    ssh root@187.77.208.197 'docker ps --format "table {{.Names}}\t{{.Status}}"'  # service state
-   ssh root@187.77.208.197 'docker compose -f /opt/agentic-sdlc/docker-compose.prod.yml logs --tail=30 2>&1'  # recent logs
+   ssh root@187.77.208.197 'docker logs --tail=30 <any_failing_container> 2>&1'  # targeted logs
    → Do NOT use credential values, config states, or log output recalled from
      a prior session. Fetch live. Prior session data is assumed stale.
+   → Session start hook auto-fetches docker ps via SSH — verify it loaded.
 
 1. READ last handoff:
    cat {PROJECT_ROOT}/HANDOFF.md || echo "FIRST RUN"

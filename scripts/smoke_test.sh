@@ -366,10 +366,45 @@ echo "── Keycloak ───────────────────�
 check_contains "Keycloak health/live" "http://localhost:8080/health/live" '"UP"'
 check          "Keycloak ready"       200 "http://localhost:8080/health/ready"
 
+# ── GlitchTip ─────────────────────────────────────────────────────────────────
+echo ""
+echo "── GlitchTip ───────────────────────────────────"
+check_container "glitchtip_web"    "glitchtip_web"
+check_container "glitchtip_worker" "glitchtip_worker"
+check_container "glitchtip_db"     "glitchtip_db"
+check_container "glitchtip_redis"  "glitchtip_redis"
+check          "GlitchTip web API" 200 "http://localhost:8000/api/0/organizations/"
+
+# nginx-private must route sentry vhost (non-5xx through proxy)
+_sentry_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
+  -H "Host: sentry.private.sovereignadvisory.ai" "https://127.0.0.1/" 2>/dev/null || echo "000")
+if [[ "$_sentry_code" =~ ^[2345] ]] && [[ "$_sentry_code" != "502" ]] && [[ "$_sentry_code" != "503" ]]; then
+  echo -e "  ${green}✅ PASS${reset}  [$_sentry_code] nginx-private: sentry.private.sovereignadvisory.ai"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  [$_sentry_code] nginx-private: sentry.private.sovereignadvisory.ai"
+  ERRORS+=("nginx-private sentry vhost: expected non-502/503, got $_sentry_code")
+  FAIL=$((FAIL + 1))
+fi
+
 # ── Vaultwarden ───────────────────────────────────────────────────────────────
 echo ""
 echo "── Vaultwarden ─────────────────────────────────"
 check_container "vaultwarden container" "vaultwarden"
+# API health — not just container running
+check_contains "Vaultwarden API alive" "http://localhost:80/" "Vaultwarden"
+# WebSocket channel must not be 502 (browser extension sync)
+_vw_ws_code=$(docker exec sa_nginx_private \
+  curl -sk -o /dev/null -w "%{http_code}" --max-time 5 \
+  "http://vaultwarden:80/notifications/hub/negotiate" 2>/dev/null || echo "000")
+if [[ "$_vw_ws_code" != "502" && "$_vw_ws_code" != "503" && "$_vw_ws_code" != "000" ]]; then
+  echo -e "  ${green}✅ PASS${reset}  [$_vw_ws_code] Vaultwarden WebSocket (notifications/hub) reachable"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  [$_vw_ws_code] Vaultwarden WebSocket (notifications/hub) — browser extension sync broken"
+  ERRORS+=("Vaultwarden WebSocket: notifications/hub returned $_vw_ws_code (port mismatch or container down)")
+  FAIL=$((FAIL + 1))
+fi
 
 # ── Lead Review ───────────────────────────────────────────────────────────────
 echo ""
@@ -388,6 +423,11 @@ check_container "oauth2_proxy_n8n"                  "oauth2_proxy_n8n"
 check_container "oauth2_proxy_webui"                "oauth2_proxy_webui"
 check_container "oauth2_proxy_litellm"              "oauth2_proxy_litellm"
 check_container "oauth2_proxy_jupyter"              "oauth2_proxy_jupyter"
+check_container "vault_sync"                        "vault_sync"
+check_container "shell_gateway"                     "shell_gateway"
+check_container "agentic-sdlc-score-db"             "agentic-sdlc-score-db"
+check          "vault_sync health"   200 "http://localhost:8777/health"
+check          "shell_gateway alive" 200 "http://localhost:7681/"
 
 # ── Template variable audit ───────────────────────────────────────────────────
 echo ""
