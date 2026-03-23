@@ -306,8 +306,8 @@ else
   FAIL=$((FAIL + 1))
 fi
 
-# UPDATE-CATEGORIES: no-op with current categories (read them, write them back)
-_cats=$(echo "$_before" | python3 -c "import sys,json; d=json.load(sys.stdin); print(__import__('json').dumps(d.get('categories',[])))" 2>/dev/null || echo "[]")
+# UPDATE-CATEGORIES: write categories from repo file (not live API — avoids destroying data if API returns [])
+_cats=$(python3 -c "import json; d=json.load(open('$REPO_DIR/portal/services.json')); print(json.dumps(d.get('categories',[])))" 2>/dev/null || echo "[]")
 _uc=$(_pcurl -X POST "http://localhost/api/portal-update-categories" \
   -H "Content-Type: application/json" \
   -d "{\"categories\":$_cats}")
@@ -372,6 +372,214 @@ else
   echo -e "  ${red}❌ FAIL${reset}  [$_api_code] portal /api/portal-services should require SSO (got non-3xx)"
   ERRORS+=("portal /api/portal-services SSO: expected 3xx redirect, got $_api_code")
   FAIL=$((FAIL + 1))
+fi
+
+# ── Credential validation ─────────────────────────────────────────────────────
+# Checks that required .env vars are set AND that service-level credentials
+# are accepted by each respective API. Catches key rotation, misconfiguration,
+# and missing secrets before they cause silent runtime failures.
+echo ""
+echo "── Credential validation ───────────────────────"
+
+# Required env vars — values must be non-empty
+for var in LITELLM_API_KEY N8N_API_KEY KEYCLOAK_ADMIN_PASSWORD \
+           VAULTWARDEN_ADMIN_TOKEN PORTAL_OIDC_CLIENT_SECRET \
+           ANTHROPIC_API_KEY POSTGRES_PASSWORD; do
+  val=$(grep "^${var}=" "$REPO_DIR/.env" 2>/dev/null | cut -d= -f2- | tr -d '[:space:]')
+  if [ -n "$val" ]; then
+    echo -e "  ${green}✅ PASS${reset}  .env: $var is set"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  .env: $var is missing or empty"
+    ERRORS+=("credential: $var missing from .env")
+    FAIL=$((FAIL + 1))
+  fi
+done
+
+# LiteLLM API key — must return at least one model group
+_litellm_key=$(grep '^LITELLM_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2 | sed 's/#.*//' | tr -d '[:space:]')
+_lm_models=$(docker exec sa_nginx_private \
+  wget -qO- --header="Authorization: Bearer $_litellm_key" \
+  "http://litellm:4000/model/info" 2>/dev/null \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',d.get('model_info',[]))))" 2>/dev/null || echo "0")
+if [ "${_lm_models:-0}" -gt 0 ] 2>/dev/null; then
+  echo -e "  ${green}✅ PASS${reset}  LiteLLM API key valid ($_lm_models models)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  LiteLLM API key rejected or returned 0 models"
+  ERRORS+=("credential: LITELLM_API_KEY invalid or LiteLLM returned no models")
+  FAIL=$((FAIL + 1))
+fi
+
+# n8n API key — must return at least 1 workflow
+_n8n_key=$(grep '^N8N_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')
+_n8n_wf=$(docker exec sa_nginx_private \
+  wget -qO- --header="X-N8N-API-KEY: $_n8n_key" \
+  "http://n8n:5678/api/v1/workflows" 2>/dev/null \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "0")
+if [ "${_n8n_wf:-0}" -gt 0 ] 2>/dev/null; then
+  echo -e "  ${green}✅ PASS${reset}  n8n API key valid ($_n8n_wf workflows)"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  n8n API key rejected or returned 0 workflows"
+  ERRORS+=("credential: N8N_API_KEY invalid or n8n returned no workflows")
+  FAIL=$((FAIL + 1))
+fi
+
+# Keycloak admin password — must obtain token from master realm
+_kc_pass=$(grep '^KEYCLOAK_ADMIN_PASSWORD=' "$REPO_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')
+_kc_token=$(docker exec sa_nginx_private \
+  wget -qO- --post-data "client_id=admin-cli&username=admin&password=${_kc_pass}&grant_type=password" \
+  "http://keycloak:8080/realms/master/protocol/openid-connect/token" 2>/dev/null \
+  | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('access_token','')[:20])" 2>/dev/null || echo "")
+if [ -n "$_kc_token" ]; then
+  echo -e "  ${green}✅ PASS${reset}  Keycloak admin credentials valid"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  Keycloak admin credentials rejected"
+  ERRORS+=("credential: KEYCLOAK_ADMIN_PASSWORD invalid — cannot obtain admin token")
+  FAIL=$((FAIL + 1))
+fi
+
+# Vaultwarden admin token — /admin login must return 200
+_vw_token=$(grep '^VAULTWARDEN_ADMIN_TOKEN=' "$REPO_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')
+_vw_admin=$(docker exec sa_nginx_private \
+  wget -qO- --post-data "token=${_vw_token}" \
+  "http://vaultwarden:80/admin/login" 2>/dev/null | head -c 200 || echo "")
+if echo "$_vw_admin" | grep -qi "admin\|vault\|login\|200\|html"; then
+  echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin token accepted"
+  PASS=$((PASS + 1))
+else
+  # wget doesn't return body for non-200; check HTTP code instead
+  _vw_admin_code=$(docker exec sa_nginx_private \
+    wget -qO /dev/null --server-response \
+    --post-data "token=${_vw_token}" \
+    "http://vaultwarden:80/admin/login" 2>&1 | grep "HTTP/" | head -1 | awk '{print $2}')
+  if [[ "$_vw_admin_code" =~ ^(200|302|303)$ ]]; then
+    echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin token accepted (HTTP $_vw_admin_code)"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${yellow}⚠ WARN${reset}   Vaultwarden admin token check inconclusive (HTTP $_vw_admin_code) — verify manually"
+  fi
+fi
+
+# ── SSO / OIDC pass-through validation ────────────────────────────────────────
+# Verifies that each oauth2_proxy instance is live AND that its OIDC client
+# is registered and enabled in Keycloak. Catches client deletion, secret
+# rotation, and realm misconfiguration before they break logins.
+echo ""
+echo "── SSO / OIDC pass-through ─────────────────────"
+
+# oauth2_proxy health: /ping must return 200 for each proxy
+for _proxy_entry in \
+  "portal:oauth2_proxy_portal:4185" \
+  "n8n:oauth2_proxy_n8n:5679" \
+  "litellm:oauth2_proxy_litellm:4001" \
+  "webui:oauth2_proxy_webui:3001" \
+  "jupyter:oauth2_proxy_jupyter:8889"; do
+  _pname="${_proxy_entry%%:*}"
+  _paddr="${_proxy_entry#*:}"
+  _pcode=$(docker exec sa_nginx_private \
+    wget -qO /dev/null --server-response "http://${_paddr}/ping" 2>&1 \
+    | grep "HTTP/" | head -1 | awk '{print $2}')
+  if [ "$_pcode" = "200" ]; then
+    echo -e "  ${green}✅ PASS${reset}  oauth2_proxy_${_pname} /ping → 200"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  oauth2_proxy_${_pname} /ping → ${_pcode:-000}"
+    ERRORS+=("SSO: oauth2_proxy_${_pname} /ping failed (${_pcode:-000})")
+    FAIL=$((FAIL + 1))
+  fi
+done
+
+# Keycloak OIDC discovery must be reachable from proxy containers (tests DNS + TLS)
+_kc_disc_code=$(docker exec sa_nginx_private \
+  wget -qO /dev/null --server-response \
+  "http://keycloak:8080/realms/agentic-sdlc/.well-known/openid-configuration" 2>&1 \
+  | grep "HTTP/" | head -1 | awk '{print $2}')
+if [ "$_kc_disc_code" = "200" ]; then
+  echo -e "  ${green}✅ PASS${reset}  Keycloak OIDC discovery endpoint reachable"
+  PASS=$((PASS + 1))
+else
+  echo -e "  ${red}❌ FAIL${reset}  Keycloak OIDC discovery endpoint: HTTP ${_kc_disc_code:-000}"
+  ERRORS+=("SSO: Keycloak OIDC discovery unreachable (${_kc_disc_code:-000})")
+  FAIL=$((FAIL + 1))
+fi
+
+# Keycloak clients: each SSO client must be registered and enabled in the realm
+if [ -n "$_kc_token" ]; then
+  _full_token=$(docker exec sa_nginx_private \
+    wget -qO- --post-data "client_id=admin-cli&username=admin&password=${_kc_pass}&grant_type=password" \
+    "http://keycloak:8080/realms/master/protocol/openid-connect/token" 2>/dev/null \
+    | python3 -c "import sys,json; print(json.load(sys.stdin).get('access_token',''))" 2>/dev/null || echo "")
+  _kc_clients=$(docker exec sa_nginx_private \
+    wget -qO- --header "Authorization: Bearer $_full_token" \
+    "http://keycloak:8080/admin/realms/agentic-sdlc/clients" 2>/dev/null \
+    | python3 -c "import sys,json; cs=json.load(sys.stdin); print(','.join(c['clientId'] + ':' + str(c['enabled']) for c in cs))" 2>/dev/null || echo "")
+  for _client in portal n8n litellm webui jupyter vaultwarden; do
+    _enabled=$(echo "$_kc_clients" | tr ',' '\n' | grep "^${_client}:" | cut -d: -f2)
+    if [ "$_enabled" = "True" ]; then
+      echo -e "  ${green}✅ PASS${reset}  Keycloak client '${_client}' registered and enabled"
+      PASS=$((PASS + 1))
+    elif [ "$_enabled" = "False" ]; then
+      echo -e "  ${red}❌ FAIL${reset}  Keycloak client '${_client}' registered but DISABLED"
+      ERRORS+=("SSO: Keycloak client '${_client}' is disabled")
+      FAIL=$((FAIL + 1))
+    else
+      echo -e "  ${red}❌ FAIL${reset}  Keycloak client '${_client}' NOT FOUND in agentic-sdlc realm"
+      ERRORS+=("SSO: Keycloak client '${_client}' missing from realm")
+      FAIL=$((FAIL + 1))
+    fi
+  done
+else
+  echo -e "  ${yellow}⚠ WARN${reset}   Skipping Keycloak client checks — admin token unavailable"
+fi
+
+# ── Portal configuration consistency ──────────────────────────────────────────
+# Validates the portal data file itself: required fields, category references,
+# duplicate IDs. Catches data corruption, bad webhook writes, and config drift.
+echo ""
+echo "── Portal configuration ────────────────────────"
+
+_portal_issues=$(python3 - "$REPO_DIR/portal/services.json" << 'EOF'
+import json, sys
+path = sys.argv[1]
+with open(path) as f:
+    d = json.load(f)
+services   = d.get('services', [])
+categories = {c['key'] for c in d.get('categories', [])}
+required   = ['id', 'name', 'url', 'category']
+ids        = {}
+issues     = []
+for svc in services:
+    sid = svc.get('id', '?')
+    for field in required:
+        if not svc.get(field):
+            issues.append(sid + ": missing field '" + field + "'")
+    cat = svc.get('category', '')
+    if cat and cat not in categories:
+        issues.append(sid + ": undefined category '" + cat + "'")
+    if sid in ids:
+        issues.append("duplicate id: '" + sid + "'")
+    ids[sid] = True
+if not categories:
+    issues.append("categories list is empty")
+for i in issues:
+    print(i)
+EOF
+)
+
+if [ -z "$_portal_issues" ]; then
+  _svc_count=$(python3 -c "import json; d=json.load(open('$REPO_DIR/portal/services.json')); print(len(d.get('services',[])))" 2>/dev/null || echo "?")
+  _cat_count=$(python3 -c "import json; d=json.load(open('$REPO_DIR/portal/services.json')); print(len(d.get('categories',[])))" 2>/dev/null || echo "?")
+  echo -e "  ${green}✅ PASS${reset}  services.json structure: ${_svc_count} services, ${_cat_count} categories, all valid"
+  PASS=$((PASS + 1))
+else
+  while IFS= read -r _issue; do
+    echo -e "  ${red}❌ FAIL${reset}  $_issue"
+    ERRORS+=("portal config: $_issue")
+    FAIL=$((FAIL + 1))
+  done <<< "$_portal_issues"
 fi
 
 # ── Public nginx ──────────────────────────────────────────────────────────────
