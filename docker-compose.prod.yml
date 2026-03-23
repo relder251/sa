@@ -608,6 +608,7 @@ services:
       - KEYCLOAK_ADMIN_PASS=${KEYCLOAK_ADMIN_PASSWORD}
       - KEYCLOAK_REALM=agentic-sdlc
       - KEYCLOAK_SYNC_ITEMS=Keycloak SSO
+      - KEYCLOAK_SYNC_INTERVAL=300
       - SENTRY_DSN=${SENTRY_DSN_VAULTSYNC:-}
       - ENVIRONMENT=production
     networks:

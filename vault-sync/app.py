@@ -16,8 +16,11 @@ Optional Keycloak sync variables (enables /update-keycloak and atomic sync on /u
   KEYCLOAK_SYNC_ITEMS  — comma-separated vault item names that should trigger
                          automatic Keycloak password sync when updated via /update
                          e.g. "Keycloak SSO"
+  KEYCLOAK_SYNC_INTERVAL — polling interval in seconds for automatic Keycloak sync
+                           when any user-credentials item changes (default: 300, 0 = disabled)
 """
 
+import hashlib
 import json
 import os
 import subprocess
@@ -64,6 +67,23 @@ KEYCLOAK_SYNC_ITEMS = {
     for s in os.environ.get("KEYCLOAK_SYNC_ITEMS", "").split(",")
     if s.strip()
 }
+KEYCLOAK_SYNC_INTERVAL = int(os.environ.get("KEYCLOAK_SYNC_INTERVAL", "300"))  # 0 = disabled
+
+
+def _credential_hash(items: list) -> str:
+    """Stable hash of all user-credentials items for change detection."""
+    parts = []
+    for item in items:
+        fields = item.get("fields") or []
+        is_user_cred = any(
+            f.get("name") == "collection" and f.get("value") == "user-credentials"
+            for f in fields
+        )
+        if is_user_cred:
+            login = item.get("login") or {}
+            parts.append(f"{item.get('name','')}:{login.get('username','')}:{login.get('password','')}")
+    parts.sort()
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
 
 
 def _run(args, input_text=None, check=True):
@@ -373,6 +393,107 @@ def update_keycloak():
     except Exception as exc:
         log.error("update-keycloak failed: %s", exc)
         return jsonify({"status": "error", "error": str(exc)}), 500
+
+
+@app.route("/sync-all-keycloak", methods=["POST"])
+def sync_all_keycloak():
+    """
+    Sync ALL user-credentials vault items to Keycloak.
+    Pulls latest vault state first, then resets Keycloak passwords for all matched users.
+    Returns {"status":"ok","synced":[...],"skipped":[...],"errors":[...]}
+    """
+    if not KEYCLOAK_ADMIN_URL or not KEYCLOAK_ADMIN_PASS:
+        return jsonify({"status": "error", "error": "Keycloak not configured"}), 503
+    try:
+        def _do():
+            _run(["sync"])
+            items_json = _run(["list", "items"]).stdout
+            return json.loads(items_json)
+        items = _with_reauth(_do)
+    except Exception as exc:
+        log.error("sync-all-keycloak: vault sync failed: %s", exc)
+        return jsonify({"status": "error", "error": str(exc)}), 500
+
+    synced, skipped, errors = [], [], []
+    for item in items:
+        fields = item.get("fields") or []
+        is_user_cred = any(
+            f.get("name") == "collection" and f.get("value") == "user-credentials"
+            for f in fields
+        )
+        if not is_user_cred:
+            continue
+        name = item.get("name", "")
+        login = item.get("login") or {}
+        username = login.get("username", "")
+        password = login.get("password", "")
+        if not username or not password:
+            skipped.append({"name": name, "reason": "no username or password"})
+            continue
+        try:
+            kc = _sync_to_keycloak(username, password)
+            synced.append({"name": name, "user_id": kc.get("user_id"), "username": kc.get("username")})
+            log.info("sync-all-keycloak: synced %s → Keycloak user %s", name, kc.get("username"))
+        except ValueError as exc:
+            skipped.append({"name": name, "reason": str(exc)})
+        except Exception as exc:
+            errors.append({"name": name, "error": str(exc)})
+            log.error("sync-all-keycloak: failed for %s: %s", name, exc)
+
+    return jsonify({"status": "ok", "synced": synced, "skipped": skipped, "errors": errors})
+
+
+# ── Background Keycloak sync watcher ─────────────────────────────────────────
+
+_last_kc_hash: str = ""
+
+
+def _keycloak_watcher():
+    """
+    Background thread: polls Vaultwarden every KEYCLOAK_SYNC_INTERVAL seconds.
+    Syncs user-credentials to Keycloak when a change is detected.
+    """
+    global _last_kc_hash
+    import time
+    log.info("Keycloak watcher started (interval=%ds)", KEYCLOAK_SYNC_INTERVAL)
+    while True:
+        time.sleep(KEYCLOAK_SYNC_INTERVAL)
+        if not KEYCLOAK_ADMIN_URL or not KEYCLOAK_ADMIN_PASS:
+            continue
+        try:
+            def _poll():
+                _run(["sync"])
+                return json.loads(_run(["list", "items"]).stdout)
+            items = _with_reauth(_poll)
+            current_hash = _credential_hash(items)
+            if current_hash == _last_kc_hash:
+                log.debug("Keycloak watcher: no credential changes detected")
+                continue
+            log.info("Keycloak watcher: credential change detected, syncing to Keycloak")
+            _last_kc_hash = current_hash
+            # Reuse sync-all logic inline
+            for item in items:
+                fields = item.get("fields") or []
+                if not any(f.get("name") == "collection" and f.get("value") == "user-credentials" for f in fields):
+                    continue
+                login = item.get("login") or {}
+                username = login.get("username", "")
+                password = login.get("password", "")
+                if not username or not password:
+                    continue
+                try:
+                    _sync_to_keycloak(username, password)
+                    log.info("Keycloak watcher: synced %s", username)
+                except Exception as exc:
+                    log.warning("Keycloak watcher: skipped %s: %s", username, exc)
+        except Exception as exc:
+            log.error("Keycloak watcher: error during poll cycle: %s", exc)
+
+
+if KEYCLOAK_SYNC_INTERVAL > 0 and KEYCLOAK_ADMIN_URL:
+    import threading
+    _watcher_thread = threading.Thread(target=_keycloak_watcher, daemon=True, name="keycloak-watcher")
+    _watcher_thread.start()
 
 
 if __name__ == "__main__":
