@@ -29,6 +29,7 @@ import vault
 import keycloak as kc
 from models import VALID_COLLECTIONS, ITEM_TAXONOMY, item_to_cred
 from registry import SERVICE_REGISTRY, VALID_SERVICES
+from adapters import ADAPTERS, ROTATABLE_SERVICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -483,3 +484,50 @@ def list_services():
         "status":   "ok",
         "services": sorted(VALID_SERVICES),
     }
+
+
+# ---------------------------------------------------------------------------
+# CRED-06 — Credential rotation endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/rotate")
+def list_rotatable():
+    """List all services that support credential rotation."""
+    return {
+        "status":   "ok",
+        "services": sorted(ROTATABLE_SERVICES),
+    }
+
+
+@app.post("/rotate/{service}")
+def rotate_credential(service: str):
+    """
+    Rotate credentials for the named service.
+
+    Generates a new secret, updates the external service (where possible),
+    and writes the new value to the vault.
+
+    Returns:
+      {
+        "status": "ok" | "error",
+        "service": str,
+        "rotated": bool,
+        "restart_required": bool,  # true if service restart needed to apply
+        "detail": str,             # human-readable outcome
+        "error": str,              # only present on failure
+      }
+    """
+    if service not in ROTATABLE_SERVICES:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No rotation adapter for {service!r}. Rotatable: {sorted(ROTATABLE_SERVICES)}",
+        )
+    adapter = ADAPTERS[service]
+    try:
+        result = adapter.rotate()
+        status = "ok" if result.rotated else "error"
+        code = 200 if result.rotated else 500
+        return JSONResponse(content={"status": status, **result.to_dict()}, status_code=code)
+    except Exception as exc:
+        log.error("rotate(%s) unhandled exception: %s", service, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
