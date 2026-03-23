@@ -7,16 +7,18 @@ Set N8N_BASE_URL to override n8n base (default: http://localhost:5678).
 Set LITELLM_BASE_URL to override LiteLLM base (default: http://localhost:4000).
 
 Strategy by service:
-  - n8n        — live-rotation (restart_required=False): new key is immediately active;
-                 validate against real n8n API (/api/v1/workflows).
+  - n8n        — n8n 2.12.x has NO public REST API for API key management.
+                 The n8n adapter attempts live rotation, falls back to vault-only
+                 (restart_required=True). Tests verify the vault round-trip only.
+                 Live key validation is gated behind N8N_VALIDATE_LIVE=1.
   - litellm    — vault-only (restart_required=True): cannot validate against live service
                  until restarted; verify vault round-trip only (non-empty from /inject).
   - jupyter    — vault-only (restart_required=True): same as litellm.
   - glitchtip  — vault-only (restart_required=True): same.
   - vaultwarden— vault-only (restart_required=True): same.
 
-NOTE: Tests perform REAL rotations against the live vault and, for n8n, against the
-live n8n service.  Run in a controlled maintenance window.
+NOTE: Tests perform REAL rotations against the live vault.
+Run in a controlled maintenance window.
 """
 
 import os
@@ -47,63 +49,53 @@ def inject(service: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# n8n — live rotation; new key must authenticate immediately
+# n8n — vault-only (n8n 2.12.x has no REST API for API key management)
 # ---------------------------------------------------------------------------
 
 class TestN8nValidation:
-    """n8n rotates live (restart_required=False); key is active immediately."""
+    """
+    n8n 2.12.x does not expose a REST API for API key management.
+    The adapter attempts live rotation, falls back to vault-only (restart_required=True).
+    Tests verify the vault round-trip and optionally validate against the live service
+    when N8N_VALIDATE_LIVE=1 is set (operator must have restarted n8n first).
+    """
 
-    def test_rotate_n8n_live(self):
-        data = rotate("n8n")
-        assert data["restart_required"] is False, (
-            "n8n adapter unexpectedly set restart_required=True; "
-            "live validation cannot proceed until n8n is restarted"
-        )
-
-    def test_n8n_new_key_authenticates(self):
+    def test_rotate_n8n_vault_writes_nonempty_key(self):
+        """After rotation, vault holds a non-empty N8N_API_KEY."""
         rotate("n8n")
         creds = inject("n8n")
-        new_key = creds.get("N8N_API_KEY", "")
-        assert new_key, "N8N_API_KEY is empty after rotation"
+        assert creds.get("N8N_API_KEY", ""), "N8N_API_KEY is empty in vault after rotation"
 
-        # Verify new key works against live n8n
+    def test_rotate_n8n_key_changes(self):
+        """Two consecutive rotations produce different vault values."""
+        rotate("n8n")
+        first = inject("n8n").get("N8N_API_KEY", "")
+        rotate("n8n")
+        second = inject("n8n").get("N8N_API_KEY", "")
+        assert first and second
+        assert first != second, "n8n rotation produced the same key twice"
+
+    @pytest.mark.skipif(
+        os.environ.get("N8N_VALIDATE_LIVE") != "1",
+        reason=(
+            "n8n 2.12.x has no REST API for API key management; "
+            "set N8N_VALIDATE_LIVE=1 only after manually regenerating the key "
+            "in n8n UI and restarting n8n with the new key"
+        ),
+    )
+    def test_n8n_new_key_authenticates(self):
+        """Live key validation — only run after n8n restart with rotated key."""
+        creds = inject("n8n")
+        new_key = creds.get("N8N_API_KEY", "")
+        assert new_key, "N8N_API_KEY is empty in vault"
         r = httpx.get(
             f"{N8N_URL}/api/v1/workflows",
             headers={"X-N8N-API-KEY": new_key},
             timeout=15,
         )
         assert r.status_code == 200, (
-            f"New n8n API key returned HTTP {r.status_code}; key may not be active yet. "
-            f"Response: {r.text[:200]}"
-        )
-
-    def test_n8n_old_key_rejected_after_rotate(self):
-        """
-        Fetch the current key, rotate, then confirm the OLD key no longer works.
-        This test is best-effort: if n8n's DELETE /api/v1/user/api-key succeeds,
-        the old key should be revoked.  If it 401s, old key is gone (pass).
-        If it 200s, n8n may not have revoked it (note but don't hard-fail).
-        """
-        # Capture key before rotation
-        pre_creds = inject("n8n")
-        old_key = pre_creds.get("N8N_API_KEY", "")
-        assert old_key, "Could not retrieve N8N_API_KEY before rotation"
-
-        rotate("n8n")
-        new_creds = inject("n8n")
-        new_key = new_creds.get("N8N_API_KEY", "")
-
-        if old_key == new_key:
-            pytest.skip("Old and new key are identical (n8n may have reused the key)")
-
-        r = httpx.get(
-            f"{N8N_URL}/api/v1/workflows",
-            headers={"X-N8N-API-KEY": old_key},
-            timeout=15,
-        )
-        assert r.status_code in (401, 403), (
-            f"Old n8n key still accepted after rotation (HTTP {r.status_code}). "
-            "Key revocation may not be working."
+            f"n8n key from vault returned HTTP {r.status_code}; "
+            f"ensure n8n was restarted after rotation. Response: {r.text[:200]}"
         )
 
 
@@ -112,6 +104,7 @@ class TestN8nValidation:
 # ---------------------------------------------------------------------------
 
 VAULT_ONLY = [
+    ("n8n",         "N8N_API_KEY"),
     ("litellm",     "LITELLM_API_KEY"),
     ("jupyter",     "JUPYTER_TOKEN"),
     ("glitchtip",   "SENTRY_DSN"),
@@ -128,6 +121,8 @@ class TestVaultRoundTrip:
 
     @pytest.mark.parametrize("service,env_var", VAULT_ONLY)
     def test_rotate_returns_restart_required(self, service, env_var):
+        # n8n attempts live rotation and falls back to vault-only; restart_required
+        # is always True for the fallback path and for all other vault-only adapters.
         data = rotate(service)
         assert data["restart_required"] is True, (
             f"{service}: expected restart_required=True for vault-only adapter"
@@ -207,22 +202,24 @@ class TestInjectConsistency:
     not a stale cached value.
     """
 
-    def test_n8n_inject_matches_rotation_result(self):
+    def test_n8n_inject_reflects_rotation(self):
         """
-        /inject/n8n must return the key that n8n is now accepting.
-        (This also cross-validates the n8n vault-write and inject pipeline.)
+        /inject/n8n must return a non-empty key after rotation and it must
+        differ from the pre-rotation value (vault was actually updated).
         """
+        pre = inject("n8n").get("N8N_API_KEY", "")
         rotate("n8n")
-        creds = inject("n8n")
-        key = creds.get("N8N_API_KEY", "")
-        assert key, "N8N_API_KEY empty from /inject after rotation"
+        post = inject("n8n").get("N8N_API_KEY", "")
+        assert post, "N8N_API_KEY empty from /inject after rotation"
+        assert pre != post, (
+            "/inject/n8n returned the same key before and after rotation; "
+            "vault was not updated or /inject is serving stale data"
+        )
 
-        r = httpx.get(
-            f"{N8N_URL}/api/v1/workflows",
-            headers={"X-N8N-API-KEY": key},
-            timeout=15,
-        )
-        assert r.status_code == 200, (
-            f"/inject key does not authenticate against n8n (HTTP {r.status_code}); "
-            "vault write or inject pipeline may have a staleness bug"
-        )
+    def test_litellm_inject_reflects_rotation(self):
+        """Same staleness check for litellm."""
+        pre = inject("litellm").get("LITELLM_API_KEY", "")
+        rotate("litellm")
+        post = inject("litellm").get("LITELLM_API_KEY", "")
+        assert post, "LITELLM_API_KEY empty from /inject after rotation"
+        assert pre != post, "LITELLM_API_KEY unchanged after rotation"
