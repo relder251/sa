@@ -336,3 +336,56 @@ def delete_credential(collection: str, name: str):
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+# ---------------------------------------------------------------------------
+# CRED-03 — Keycloak sync adapter endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/drift/keycloak")
+def drift_keycloak():
+    """
+    Compare vault user-credentials items against live Keycloak users.
+    Returns matched, vault-only, and Keycloak-only user sets.
+    """
+    if not kc.KEYCLOAK_ADMIN_URL or not kc.KEYCLOAK_ADMIN_PASS:
+        raise HTTPException(
+            status_code=503,
+            detail="KEYCLOAK_ADMIN_URL and KEYCLOAK_ADMIN_PASS are not configured",
+        )
+    try:
+        items = vault.list_items()
+        report = kc.drift_report(items)
+        drifted = len(report["vault_only"]) + len(report["keycloak_only"])
+        return {
+            "status": "ok",
+            "drifted": drifted,
+            **report,
+        }
+    except Exception as exc:
+        log.error("drift_keycloak failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/sync/keycloak")
+def sync_keycloak():
+    """
+    Push vault user-credential passwords to all matched Keycloak users.
+    Returns counts of synced, skipped, and errored items.
+    """
+    if not kc.KEYCLOAK_ADMIN_URL or not kc.KEYCLOAK_ADMIN_PASS:
+        raise HTTPException(
+            status_code=503,
+            detail="KEYCLOAK_ADMIN_URL and KEYCLOAK_ADMIN_PASS are not configured",
+        )
+    try:
+        items = vault.list_items()
+        result = kc.sync_all(items)
+        log.info(
+            "Keycloak sync complete: %d synced, %d skipped, %d errors",
+            len(result["synced"]), len(result["skipped"]), len(result["errors"]),
+        )
+        return {"status": "ok", **result}
+    except Exception as exc:
+        log.error("sync_keycloak failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+

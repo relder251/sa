@@ -1,7 +1,11 @@
 """
 vault-sync/app/keycloak.py
-Keycloak admin REST API helpers for user management.
-Full bidirectional sync adapter is implemented in CRED-03.
+Keycloak admin REST API helpers + CRED-03 bidirectional sync adapter.
+
+Drift detection compares vault user-credentials items against Keycloak users
+in the configured realm, reporting missing users in either direction.
+
+Sync pushes vault credential passwords to matching Keycloak users.
 """
 
 import json
@@ -22,6 +26,10 @@ KEYCLOAK_SYNC_ITEMS = {
     if s.strip()
 }
 
+
+# ---------------------------------------------------------------------------
+# Low-level admin API helpers
+# ---------------------------------------------------------------------------
 
 def admin_token() -> str:
     """Obtain a Keycloak admin-cli access token."""
@@ -66,6 +74,27 @@ def find_user(token: str, identifier: str) -> dict:
     raise ValueError(f"No Keycloak user found matching: {identifier!r}")
 
 
+def list_users(token: str) -> list[dict]:
+    """Return all users in the realm (pages through if needed)."""
+    users: list[dict] = []
+    first = 0
+    batch = 100
+    while True:
+        url = (
+            f"{KEYCLOAK_ADMIN_URL}/admin/realms/{KEYCLOAK_REALM}/users"
+            f"?first={first}&max={batch}"
+        )
+        req = urllib.request.Request(url)
+        req.add_header("Authorization", f"Bearer {token}")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            page = json.loads(resp.read())
+        users.extend(page)
+        if len(page) < batch:
+            break
+        first += batch
+    return users
+
+
 def reset_password(token: str, user_id: str, new_password: str) -> None:
     """Reset a Keycloak user's password."""
     url = f"{KEYCLOAK_ADMIN_URL}/admin/realms/{KEYCLOAK_REALM}/users/{user_id}/reset-password"
@@ -94,3 +123,156 @@ def sync_password(username: str, password: str) -> dict:
         "username": user.get("username", ""),
         "email":    user.get("email", ""),
     }
+
+
+# ---------------------------------------------------------------------------
+# CRED-03 — Bidirectional sync adapter
+# ---------------------------------------------------------------------------
+
+def _kc_user_key(user: dict) -> str:
+    """Canonical lookup key: prefer email, fall back to username."""
+    return (user.get("email") or user.get("username", "")).lower()
+
+
+def drift_report(vault_items: list[dict]) -> dict:
+    """
+    Compare vault user-credentials items against live Keycloak users.
+
+    Returns:
+      {
+        "vault_only":     [{"name": ..., "vault_id": ...}, ...],   # in vault, not in Keycloak
+        "keycloak_only":  [{"username": ..., "email": ..., "user_id": ...}, ...],  # in KC, not in vault
+        "matched":        [{"name": ..., "vault_id": ..., "keycloak_user_id": ...}, ...],
+        "keycloak_total": int,
+        "vault_total":    int,
+      }
+    """
+    token = admin_token()
+    kc_users = list_users(token)
+
+    # Build lookup: email/username → kc user dict
+    kc_index: dict[str, dict] = {}
+    for u in kc_users:
+        for key in (u.get("email", "").lower(), u.get("username", "").lower()):
+            if key:
+                kc_index[key] = u
+
+    # Extract vault user items (collection == user-credentials)
+    from models import FIELD_COLLECTION
+    vault_user_items = [
+        i for i in vault_items
+        if any(
+            f.get("name") == FIELD_COLLECTION and f.get("value") == "user-credentials"
+            for f in (i.get("fields") or [])
+        )
+    ]
+
+    matched, vault_only = [], []
+    matched_kc_ids: set[str] = set()
+
+    for item in vault_user_items:
+        name = item.get("name", "")
+        vault_id = item.get("id", "")
+        # Try matching by item name (or login username) against KC email/username
+        login_username = (item.get("login") or {}).get("username", "")
+        candidates = {name.lower(), login_username.lower()} - {""}
+        kc_user = None
+        for candidate in candidates:
+            if candidate in kc_index:
+                kc_user = kc_index[candidate]
+                break
+
+        if kc_user:
+            matched.append({
+                "name":             name,
+                "vault_id":         vault_id,
+                "keycloak_user_id": kc_user["id"],
+                "username":         kc_user.get("username", ""),
+                "email":            kc_user.get("email", ""),
+            })
+            matched_kc_ids.add(kc_user["id"])
+        else:
+            vault_only.append({"name": name, "vault_id": vault_id})
+
+    # KC users not matched to any vault item (exclude service accounts: no email, ends with -service)
+    keycloak_only = []
+    for u in kc_users:
+        if u["id"] in matched_kc_ids:
+            continue
+        username = u.get("username", "")
+        if username.endswith("-service") or not u.get("email"):
+            continue
+        keycloak_only.append({
+            "user_id":  u["id"],
+            "username": username,
+            "email":    u.get("email", ""),
+        })
+
+    return {
+        "vault_only":      vault_only,
+        "keycloak_only":   keycloak_only,
+        "matched":         matched,
+        "keycloak_total":  len(kc_users),
+        "vault_total":     len(vault_user_items),
+    }
+
+
+def sync_all(vault_items: list[dict]) -> dict:
+    """
+    Push vault user-credential passwords to all matched Keycloak users.
+
+    Returns:
+      {"synced": [...], "skipped": [...], "errors": [...]}
+    """
+    token = admin_token()
+    kc_users = list_users(token)
+
+    kc_index: dict[str, dict] = {}
+    for u in kc_users:
+        for key in (u.get("email", "").lower(), u.get("username", "").lower()):
+            if key:
+                kc_index[key] = u
+
+    from models import FIELD_COLLECTION
+    vault_user_items = [
+        i for i in vault_items
+        if any(
+            f.get("name") == FIELD_COLLECTION and f.get("value") == "user-credentials"
+            for f in (i.get("fields") or [])
+        )
+    ]
+
+    synced, skipped, errors = [], [], []
+
+    for item in vault_user_items:
+        name = item.get("name", "")
+        login = item.get("login") or {}
+        password = login.get("password")
+        login_username = login.get("username", "")
+
+        if not password:
+            skipped.append({"name": name, "reason": "no password in vault"})
+            continue
+
+        candidates = {name.lower(), login_username.lower()} - {""}
+        kc_user = None
+        for candidate in candidates:
+            if candidate in kc_index:
+                kc_user = kc_index[candidate]
+                break
+
+        if not kc_user:
+            skipped.append({"name": name, "reason": "no matching Keycloak user"})
+            continue
+
+        try:
+            reset_password(token, kc_user["id"], password)
+            synced.append({
+                "name":     name,
+                "user_id":  kc_user["id"],
+                "username": kc_user.get("username", ""),
+            })
+        except Exception as exc:
+            errors.append({"name": name, "error": str(exc)})
+
+    return {"synced": synced, "skipped": skipped, "errors": errors}
