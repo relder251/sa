@@ -22,7 +22,7 @@
       "position": [460, 300],
       "parameters": {
         "method": "POST",
-        "url": "http://vault-sync:8777/sync-all-keycloak",
+        "url": "http://vault-sync:8777/sync/keycloak",
         "options": {"timeout": 60000}
       }
     },

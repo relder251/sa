@@ -9,15 +9,21 @@ Bootstrap environment variables (kept in .env — the only on-disk secrets):
   BW_MASTER_PASS  — vault master password
 
 Optional Keycloak sync (enables /update-keycloak and atomic sync on /update):
-  KEYCLOAK_ADMIN_URL   — e.g. https://kc.sovereignadvisory.ai
-  KEYCLOAK_ADMIN_USER  — default: admin
-  KEYCLOAK_ADMIN_PASS  — Keycloak admin password
-  KEYCLOAK_REALM       — default: agentic-sdlc
-  KEYCLOAK_SYNC_ITEMS  — comma-separated vault item names to auto-sync
+  KEYCLOAK_ADMIN_URL      — e.g. https://kc.sovereignadvisory.ai
+  KEYCLOAK_ADMIN_USER     — default: admin
+  KEYCLOAK_ADMIN_PASS     — Keycloak admin password
+  KEYCLOAK_REALM          — default: agentic-sdlc
+  KEYCLOAK_SYNC_ITEMS     — comma-separated vault item names to auto-sync
+  KEYCLOAK_SYNC_INTERVAL  — polling interval in seconds for background watcher
+                            (default: 300, 0 = disabled)
 """
 
+import hashlib
 import logging
 import os
+import threading
+import time
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import JSONResponse
@@ -37,6 +43,57 @@ log = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Sentry / GlitchTip (optional)
 # ---------------------------------------------------------------------------
+KEYCLOAK_SYNC_INTERVAL = int(os.environ.get("KEYCLOAK_SYNC_INTERVAL", "300"))
+_last_kc_hash: str = ""
+
+
+def _credential_hash(items: list) -> str:
+    """Stable hash of all user-credentials vault items (username + password)."""
+    from models import FIELD_COLLECTION
+    parts = []
+    for item in items:
+        fields = item.get("fields") or []
+        if not any(f.get("name") == FIELD_COLLECTION and f.get("value") == "user-credentials" for f in fields):
+            continue
+        login = item.get("login") or {}
+        parts.append(f"{item.get('name', '')}:{login.get('username', '')}:{login.get('password', '')}")
+    parts.sort()
+    return hashlib.sha256("\n".join(parts).encode()).hexdigest()
+
+
+def _keycloak_watcher():
+    """Background thread: polls vault every KEYCLOAK_SYNC_INTERVAL seconds.
+    Syncs user-credentials to Keycloak only when a change is detected."""
+    global _last_kc_hash
+    log.info("Keycloak watcher started (interval=%ds)", KEYCLOAK_SYNC_INTERVAL)
+    while True:
+        time.sleep(KEYCLOAK_SYNC_INTERVAL)
+        if not kc.KEYCLOAK_ADMIN_URL or not kc.KEYCLOAK_ADMIN_PASS:
+            continue
+        try:
+            vault.sync()
+            items = vault.list_items()
+            current_hash = _credential_hash(items)
+            if current_hash == _last_kc_hash:
+                log.debug("Keycloak watcher: no credential changes")
+                continue
+            log.info("Keycloak watcher: credential change detected, syncing")
+            _last_kc_hash = current_hash
+            result = kc.sync_all(items)
+            log.info(
+                "Keycloak watcher: synced=%d skipped=%d errors=%d",
+                len(result["synced"]), len(result["skipped"]), len(result["errors"]),
+            )
+        except Exception as exc:
+            log.error("Keycloak watcher: poll cycle error: %s", exc)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    if KEYCLOAK_SYNC_INTERVAL > 0 and kc.KEYCLOAK_ADMIN_URL:
+        t = threading.Thread(target=_keycloak_watcher, daemon=True, name="keycloak-watcher")
+        t.start()
+    yield
 _SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
 if _SENTRY_DSN:
     try:
@@ -55,7 +112,7 @@ if _SENTRY_DSN:
 # ---------------------------------------------------------------------------
 # App
 # ---------------------------------------------------------------------------
-app = FastAPI(title="vault-sync", version="2.0.0")
+app = FastAPI(title="vault-sync", version="2.0.0", lifespan=lifespan)
 
 
 # ---------------------------------------------------------------------------
