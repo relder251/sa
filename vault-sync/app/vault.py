@@ -106,7 +106,18 @@ def _authenticate() -> None:
 
 
 def _ensure_session() -> None:
-    if not _session:
+    """Authenticate if no session token is cached.  Retries once on failure."""
+    global _session
+    if _session:
+        return
+    try:
+        _authenticate()
+    except RuntimeError as exc:
+        # First attempt can fail if the bw data directory isn't fully initialised
+        # (bw login --apikey sometimes returns "You are not logged in" on the very
+        # first call in a fresh container).  Retry once.
+        log.warning("First auth attempt failed (%s); retrying...", exc)
+        _session = None
         _authenticate()
 
 
@@ -162,9 +173,10 @@ def get_item(name: str) -> dict:
     return _with_reauth(_do)
 
 
-def update_item(name: str, username: str | None, password: str) -> dict:
+def update_item(name: str, username: str | None, password: str,
+                collection: str | None = None, service_tags: list[str] | None = None) -> dict:
     """
-    Update the username and/or password of a vault login item.
+    Update a vault login item's credentials and optionally its collection/service_tags.
     Returns the updated item dict.
     """
     _ensure_session()
@@ -179,6 +191,16 @@ def update_item(name: str, username: str | None, password: str) -> dict:
             item["login"]["username"] = username
         item["login"]["password"] = password
 
+        # Update collection/service_tags custom fields if provided
+        if collection is not None or service_tags is not None:
+            existing = [f for f in (item.get("fields") or [])
+                        if f.get("name") not in ("collection", "service_tags")]
+            if collection:
+                existing.append({"name": "collection", "value": collection, "type": 0})
+            if service_tags is not None:
+                existing.append({"name": "service_tags", "value": ",".join(service_tags), "type": 0})
+            item["fields"] = existing
+
         encoded = subprocess.run(
             ["bw", "encode"],
             input=json.dumps(item),
@@ -192,12 +214,47 @@ def update_item(name: str, username: str | None, password: str) -> dict:
     return _with_reauth(_do)
 
 
-def create_item(name: str, username: str | None, password: str, notes: str | None = None) -> dict:
-    """Create a new login item in the vault."""
+def tag_item(name: str, collection: str, service_tags: list[str] | None = None) -> dict:
+    """
+    Tag an existing vault item with a collection and optional service_tags.
+    Does not change credentials.  Returns the updated item dict.
+    """
     _ensure_session()
 
     def _do():
-        new_item = {
+        item = get_item(name)
+        item_id = item["id"]
+
+        # Preserve non-taxonomy fields, replace taxonomy ones
+        existing = [f for f in (item.get("fields") or [])
+                    if f.get("name") not in ("collection", "service_tags")]
+        existing.append({"name": "collection", "value": collection, "type": 0})
+        if service_tags:
+            existing.append({"name": "service_tags", "value": ",".join(service_tags), "type": 0})
+        item["fields"] = existing
+
+        encoded = subprocess.run(
+            ["bw", "encode"],
+            input=json.dumps(item),
+            capture_output=True, text=True, check=True,
+        ).stdout.strip()
+
+        _run(["edit", "item", item_id, encoded])
+        _run(["sync"])
+        return item
+
+    return _with_reauth(_do)
+
+
+def create_item(name: str, username: str | None, password: str,
+                notes: str | None = None,
+                collection: str | None = None,
+                service_tags: list[str] | None = None) -> dict:
+    """Create a new login item in the vault with optional taxonomy tags."""
+    _ensure_session()
+
+    def _do():
+        new_item: dict = {
             "type": 1,  # Login
             "name": name,
             "login": {
@@ -207,6 +264,13 @@ def create_item(name: str, username: str | None, password: str, notes: str | Non
         }
         if notes:
             new_item["notes"] = notes
+        fields = []
+        if collection:
+            fields.append({"name": "collection", "value": collection, "type": 0})
+        if service_tags:
+            fields.append({"name": "service_tags", "value": ",".join(service_tags), "type": 0})
+        if fields:
+            new_item["fields"] = fields
 
         encoded = subprocess.run(
             ["bw", "encode"],
@@ -244,3 +308,59 @@ def list_items(search: str | None = None) -> list[dict]:
         return json.loads(result.stdout)
 
     return _with_reauth(_do)
+
+
+def tag_items_batch(taxonomy: dict) -> dict:
+    """
+    Tag multiple vault items with collection + service_tags in a single session.
+    Syncs only once at the end.  taxonomy = {item_name: (collection, service_tags)}.
+    Returns {"tagged": [...], "skipped": [...], "errors": [...]}.
+    """
+    _ensure_session()
+    tagged, skipped, errors = [], [], []
+
+    def _do():
+        all_items = list_items()
+        item_map = {i["name"]: i for i in all_items}
+
+        for item_name, (collection, service_tags) in taxonomy.items():
+            item = item_map.get(item_name)
+            if not item:
+                skipped.append(item_name)
+                continue
+            try:
+                item_id = item["id"]
+                existing = [f for f in (item.get("fields") or [])
+                            if f.get("name") not in ("collection", "service_tags")]
+                existing.append({"name": "collection", "value": collection, "type": 0})
+                if service_tags:
+                    existing.append({"name": "service_tags",
+                                     "value": ",".join(service_tags), "type": 0})
+                item["fields"] = existing
+
+                encoded = subprocess.run(
+                    ["bw", "encode"],
+                    input=json.dumps(item),
+                    capture_output=True, text=True, check=True,
+                ).stdout.strip()
+                _run(["edit", "item", item_id, encoded])
+                tagged.append(item_name)
+            except Exception as exc:
+                errors.append({"item": item_name, "error": str(exc)})
+
+        if tagged:
+            _run(["sync"])
+
+    _with_reauth(_do)
+    return {"tagged": tagged, "skipped": skipped, "errors": errors}
+
+
+def list_by_collection(collection: str) -> list[dict]:
+    """Return all vault items tagged with the given collection custom field."""
+    items = list_items()
+    result = []
+    for item in items:
+        fields = {f["name"]: f["value"] for f in (item.get("fields") or [])}
+        if fields.get("collection") == collection:
+            result.append(item)
+    return result

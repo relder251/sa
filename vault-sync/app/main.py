@@ -25,6 +25,7 @@ from pydantic import BaseModel
 
 import vault
 import keycloak as kc
+from models import VALID_COLLECTIONS, ITEM_TAXONOMY, item_to_cred
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -76,6 +77,20 @@ class CreateRequest(BaseModel):
 
 class DeleteRequest(BaseModel):
     name: str
+
+
+class CredCreateRequest(BaseModel):
+    name: str
+    username: str = ""
+    password: str
+    notes: str = ""
+    service_tags: list[str] = []
+
+
+class CredUpdateRequest(BaseModel):
+    username: str = ""
+    password: str
+    service_tags: list[str] = []
 
 
 # ---------------------------------------------------------------------------
@@ -216,3 +231,108 @@ def list_items(search: str = ""):
     except Exception as exc:
         log.error("list_items failed: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# Credential taxonomy endpoints (CRED-02)
+# ---------------------------------------------------------------------------
+
+def _validate_collection(collection: str) -> None:
+    if collection not in VALID_COLLECTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid collection {collection!r}. Valid: {sorted(VALID_COLLECTIONS)}",
+        )
+
+
+@app.post("/credentials/migrate")
+def migrate_taxonomy():
+    """
+    Tag all known vault items with their collection and service_tags
+    per the ITEM_TAXONOMY map in models.py.  Safe to run multiple times.
+    Performs a single vault sync at the end for efficiency.
+    """
+    try:
+        results = vault.tag_items_batch(ITEM_TAXONOMY)
+        log.info("Migration complete: %d tagged, %d skipped, %d errors",
+                 len(results["tagged"]), len(results["skipped"]), len(results["errors"]))
+        return {"status": "ok", **results}
+    except Exception as exc:
+        log.error("migrate_taxonomy failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.get("/credentials/{collection}")
+def list_credentials(collection: str):
+    """List all vault items tagged with the given collection tier."""
+    _validate_collection(collection)
+    try:
+        items = vault.list_by_collection(collection)
+        creds = [item_to_cred(i) for i in items]
+        return {
+            "status": "ok",
+            "collection": collection,
+            "count": len(creds),
+            "items": [
+                {"id": c.vault_id, "name": c.name, "service_tags": c.service_tags}
+                for c in creds
+            ],
+        }
+    except Exception as exc:
+        log.error("list_credentials(%s) failed: %s", collection, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/credentials/{collection}")
+def create_credential(collection: str, req: CredCreateRequest):
+    """Create a new vault item tagged with the given collection tier."""
+    _validate_collection(collection)
+    try:
+        item = vault.create_item(
+            req.name,
+            req.username or None,
+            req.password,
+            notes=req.notes or None,
+            collection=collection,
+            service_tags=req.service_tags or None,
+        )
+        return {"status": "ok", "collection": collection, "item": item.get("name"), "id": item.get("id")}
+    except Exception as exc:
+        log.error("create_credential(%s) failed: %s", collection, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.put("/credentials/{collection}/{name}")
+def update_credential(collection: str, name: str, req: CredUpdateRequest):
+    """Update credentials for a vault item in the given collection."""
+    _validate_collection(collection)
+    try:
+        item = vault.update_item(
+            name,
+            req.username or None,
+            req.password,
+            collection=collection,
+            service_tags=req.service_tags or None,
+        )
+        return {"status": "ok", "collection": collection, "item": item.get("name")}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        log.error("update_credential(%s/%s) failed: %s", collection, name, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.delete("/credentials/{collection}/{name}")
+def delete_credential(collection: str, name: str):
+    """Delete a vault item from the given collection."""
+    _validate_collection(collection)
+    try:
+        vault.delete_item(name)
+        return {"status": "ok", "collection": collection, "item": name}
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        log.error("delete_credential(%s/%s) failed: %s", collection, name, exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
