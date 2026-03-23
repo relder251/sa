@@ -127,6 +127,8 @@ services:
     image: sa_lead_review:latest
     container_name: sa_lead_review
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:5003:5003"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       LEAD_REVIEW_PASSWORD: ${LEAD_REVIEW_PASSWORD}
@@ -421,6 +423,8 @@ services:
       context: .
       dockerfile: Dockerfile.pipeline
     container_name: pipeline_server
+    ports:
+      - "127.0.0.1:5002:5002"
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
