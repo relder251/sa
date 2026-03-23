@@ -135,6 +135,22 @@ The `/n8n-workflow` skill (`.claude/skills/n8n-workflow/SKILL.md`) validates web
 
 The `/stack-validate` skill runs a broader health check covering containers, Keycloak, Vaultwarden, and nginx config sync.
 
+## FRAMEWORK Operational Commands
+
+These commands are defined in `.env` and used by the PCIRT+ Framework (FRAMEWORK.md):
+
+| Variable | Command | Purpose |
+|----------|---------|---------|
+| `BUILD_CMD` | `docker compose -f docker-compose.prod.yml build` | Rebuild production containers |
+| `TEST_CMD` | `bash scripts/smoke_test.sh` | Run smoke tests |
+| `SANITY_CMD` | `bash scripts/validate_format.sh` | Validate config/format |
+| `DEP_AUDIT_CMD` | `trivy fs /app` (via Docker) | Dependency vulnerability audit |
+
+**Other FRAMEWORK env vars:**
+- `PROJECT_SLUG=agentic-sdlc` — project identifier for CQS scoring
+- `SCORE_DB_PORT=5433` — CQS score database port
+- `N8N_WEBHOOK_URL=https://n8n.private.sovereignadvisory.ai` — n8n webhook base URL
+
 ## GPU / Hardware Notes
 
 Ollama is configured for an RTX 3070 (8GB VRAM):
