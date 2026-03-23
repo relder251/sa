@@ -93,8 +93,11 @@ def _authenticate() -> None:
         _session = token
         log.info("Vault re-unlocked (fast path); session refreshed.")
         log.info("Syncing vault...")
-        _run(["sync"])
-        log.info("Vault sync complete.")
+        try:
+            _run(["sync"])
+            log.info("Vault sync complete.")
+        except subprocess.CalledProcessError as exc:
+            log.warning("bw sync failed (non-fatal): %s", exc)
         return
 
     # Slow path: bw login state is gone — full re-auth.
@@ -145,6 +148,20 @@ def _authenticate() -> None:
         log.info("Vault sync complete.")
     except subprocess.CalledProcessError as exc:
         log.warning("bw sync failed (non-fatal): %s", exc)
+
+
+def _sync_nonfatal() -> None:
+    """Run bw sync; log a warning on failure but do not raise.
+
+    The server-side change (edit/create/delete) has already been applied.
+    A sync failure only means the local bw cache may be stale; the next
+    read operation will re-fetch from the server anyway.
+    """
+    try:
+        _run(["sync"])
+        log.debug("bw sync complete.")
+    except subprocess.CalledProcessError as exc:
+        log.warning("bw sync failed (non-fatal, local cache may be stale): %s", exc)
 
 
 def _ensure_session() -> None:
@@ -241,7 +258,7 @@ def update_item(name: str, username: str | None, password: str,
         ).stdout.strip()
 
         _run(["edit", "item", item_id, encoded])
-        _run(["sync"])
+        _sync_nonfatal()
         return item
 
     return _with_reauth(_do)
@@ -273,7 +290,7 @@ def tag_item(name: str, collection: str, service_tags: list[str] | None = None) 
         ).stdout.strip()
 
         _run(["edit", "item", item_id, encoded])
-        _run(["sync"])
+        _sync_nonfatal()
         return item
 
     return _with_reauth(_do)
@@ -324,7 +341,7 @@ def delete_item(name: str) -> None:
     def _do():
         item = get_item(name)
         _run(["delete", "item", item["id"], "--permanent"])
-        _run(["sync"])
+        _sync_nonfatal()
 
     _with_reauth(_do)
 
@@ -382,7 +399,7 @@ def tag_items_batch(taxonomy: dict) -> dict:
                 errors.append({"item": item_name, "error": str(exc)})
 
         if tagged:
-            _run(["sync"])
+            _sync_nonfatal()
 
     _with_reauth(_do)
     return {"tagged": tagged, "skipped": skipped, "errors": errors}
