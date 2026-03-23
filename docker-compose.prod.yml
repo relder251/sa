@@ -232,8 +232,11 @@ services:
       - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - VAULT_SYNC_URL=http://vault-sync:8777
     depends_on:
       postgres:
+        condition: service_healthy
+      vault_sync:
         condition: service_healthy
     volumes:
       - n8n_data:/home/node/.n8n
@@ -242,6 +245,7 @@ services:
       - ./opportunities:/data/opportunities
       - ./portal:/data/portal
       - ./scripts:/data/scripts:ro
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
       - /opt/actions-runner/externals/node20/lib/node_modules/@anthropic-ai/claude-code:/opt/claude-code:ro
     networks:
       - vibe_net
@@ -309,8 +313,10 @@ services:
       - LITELLM_ADMIN_EMAILS=relder@sovereignadvisory.ai
       - PROXY_ADMIN_ID=relder
       - AUTO_REDIRECT_UI_LOGIN_TO_SSO=true
+      - VAULT_SYNC_URL=http://vault-sync:8777
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
     networks:
       - vibe_net
@@ -319,6 +325,8 @@ services:
       postgres:
         condition: service_healthy
       ollama:
+        condition: service_healthy
+      vault_sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
@@ -350,13 +358,17 @@ services:
     container_name: free_model_sync
     volumes:
       - ./free_model_sync.py:/app/free_model_sync.py:ro
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     working_dir: /app
+    entrypoint: ["/bin/sh", "/vault-entrypoint.sh"]
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - GROQ_API_KEY=${GROQ_API_KEY}
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - VAULT_INJECT_SERVICE=litellm
+      - VAULT_SYNC_URL=http://vault-sync:8777
     command: >
       bash -c "pip install requests -q &&
                python free_model_sync.py &&
@@ -368,6 +380,8 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
+      vault_sync:
+        condition: service_healthy
 
   test-runner:
     image: python:3.12-slim
@@ -375,11 +389,15 @@ services:
     volumes:
       - ./output:/data/output
       - ./scripts:/data/scripts:ro
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     working_dir: /app
+    entrypoint: ["/bin/sh", "/vault-entrypoint.sh"]
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
       - PHASE3_MAX_ATTEMPTS=3
+      - VAULT_INJECT_SERVICE=litellm
+      - VAULT_SYNC_URL=http://vault-sync:8777
     command: >
       bash -c "pip install flask requests -q &&
                python /data/scripts/test_runner_server.py"
@@ -388,6 +406,8 @@ services:
     restart: unless-stopped
     depends_on:
       litellm:
+        condition: service_healthy
+      vault_sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\" "]
@@ -401,11 +421,6 @@ services:
       context: .
       dockerfile: Dockerfile.pipeline
     container_name: pipeline_server
-    volumes:
-      - ./output:/data/output
-      - ./scripts:/data/scripts:ro
-      - ./phases:/data/phases:ro
-      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
@@ -421,11 +436,20 @@ services:
       - ENABLE_APPROVAL_GATE=${ENABLE_APPROVAL_GATE:-false}
       - APPROVAL_TIMEOUT_HOURS=${APPROVAL_TIMEOUT_HOURS:-24}
       - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+      - VAULT_SYNC_URL=http://vault-sync:8777
+    volumes:
+      - ./output:/data/output
+      - ./scripts:/data/scripts:ro
+      - ./phases:/data/phases:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     networks:
       - vibe_net
     restart: unless-stopped
     depends_on:
       litellm:
+        condition: service_healthy
+      vault_sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\" "]
@@ -445,6 +469,7 @@ services:
     volumes:
       - ./output:/data/output:ro
       - ./output/opportunities:/data/output/opportunities
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     environment:
       - OUTPUT_BASE=/data/output
       - LITELLM_BASE_URL=http://litellm:4000
@@ -453,11 +478,15 @@ services:
       - PIPELINE_SERVER_URL=http://pipeline-server:5002
       - TEST_RUNNER_URL=http://test-runner:5001
       - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+      - VAULT_SYNC_URL=http://vault-sync:8777
     networks:
       - vibe_net
     restart: unless-stopped
     depends_on:
-      - pipeline-server
+      pipeline-server:
+        condition: service_healthy
+      vault_sync:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" "]
       interval: 30s
@@ -525,11 +554,13 @@ services:
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
       - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+      - VAULT_SYNC_URL=http://vault-sync:8777
     volumes:
       - ./notebooks:/home/jovyan/notebooks
       - ./output:/home/jovyan/output
       - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
       - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     command:
       - bash
       - -c
@@ -541,6 +572,8 @@ services:
     restart: unless-stopped
     depends_on:
       litellm:
+        condition: service_healthy
+      vault_sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8888/api || exit 1"]
@@ -718,12 +751,17 @@ services:
     container_name: portal
     environment:
       - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - VAULT_SYNC_URL=http://vault-sync:8777
     volumes:
       - ./portal:/usr/share/nginx/html:ro
       - ./nginx/conf.d/portal.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./vault-sync/entrypoint.sh:/vault-entrypoint.sh:ro
     networks:
       - vibe_net
     restart: unless-stopped
+    depends_on:
+      vault_sync:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80/ > /dev/null || exit 1"]
       interval: 30s
