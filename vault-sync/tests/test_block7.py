@@ -114,7 +114,7 @@ class TestN8nValidation:
 VAULT_ONLY = [
     ("litellm",     "LITELLM_API_KEY"),
     ("jupyter",     "JUPYTER_TOKEN"),
-    ("glitchtip",   "GLITCHTIP_DSN"),
+    ("glitchtip",   "SENTRY_DSN"),
     ("vaultwarden", "VAULTWARDEN_ADMIN_TOKEN"),
 ]
 
