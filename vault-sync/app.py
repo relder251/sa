@@ -121,6 +121,10 @@ def _authenticate():
     _BW_SESSION = result.stdout.strip()
     log.info("Vault unlocked; session token cached.")
 
+    log.info("Syncing vault to populate local cache...")
+    _run(["sync"])
+    log.info("Vault sync complete.")
+
 
 def _ensure_session():
     """Authenticate if no session token is cached."""
