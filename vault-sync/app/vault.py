@@ -115,9 +115,10 @@ def _ensure_session() -> None:
     except RuntimeError as exc:
         # First attempt can fail if the bw data directory isn't fully initialised
         # (bw login --apikey sometimes returns "You are not logged in" on the very
-        # first call in a fresh container).  Retry once.
-        log.warning("First auth attempt failed (%s); retrying...", exc)
+        # first call in a fresh container).  Wait briefly and retry once.
+        log.warning("First auth attempt failed (%s); retrying in 3s...", exc)
         _session = None
+        import time; time.sleep(3)
         _authenticate()
 
 
@@ -129,7 +130,7 @@ def _with_reauth(fn):
     except (subprocess.CalledProcessError, OSError) as exc:
         log.warning("bw command failed (%s); re-authenticating...", exc)
         _session = None
-        _authenticate()
+        _ensure_session()   # use retry logic instead of bare _authenticate()
         return fn()
 
 
