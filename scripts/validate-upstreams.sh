@@ -105,7 +105,8 @@ except:
   print(0)
 " 2>/dev/null || echo "0")
 
-  if [ "$wh_count" -gt 0 ]; then
+  wh_count=$(echo "$wh_count" | tr -d '[:space:]')
+  if [ "${wh_count:-0}" -gt 0 ] 2>/dev/null; then
     echo -e "  ${green}✅ PASS${reset}  n8n webhook registered: $path"
     PASS=$((PASS + 1))
   else
@@ -115,19 +116,26 @@ except:
 done
 
 # ── Config drift check ────────────────────────────────────────────────────────
-# Verify that VPS nginx config matches git repo (catches live edits that weren't committed)
+# Verify that the nginx-private container is serving the repo's config.
+# The config is bind-mounted from the repo into the container — they must match.
 echo ""
 echo "── Config drift check ──────────────────────────"
 REPO_PRIVATE="/opt/agentic-sdlc/nginx-private/conf.d/private.conf"
-LIVE_PRIVATE="/etc/nginx/conf.d/private.conf"
 
-if diff -q "$REPO_PRIVATE" "$LIVE_PRIVATE" > /dev/null 2>&1; then
-  echo -e "  ${green}✅ PASS${reset}  nginx-private: live config matches repo"
+REPO_MD5=$(md5sum "$REPO_PRIVATE" | cut -d' ' -f1)
+LIVE_MD5=$(docker exec sa_nginx_private md5sum /etc/nginx/conf.d/private.conf 2>/dev/null | cut -d' ' -f1 || echo "unavailable")
+
+if [ "$REPO_MD5" = "$LIVE_MD5" ]; then
+  echo -e "  ${green}✅ PASS${reset}  nginx-private: container config matches repo (md5: $REPO_MD5)"
   PASS=$((PASS + 1))
+elif [ "$LIVE_MD5" = "unavailable" ]; then
+  echo -e "  ${yellow}⚠ WARN${reset}  nginx-private: could not read container config (container may be stopped)"
 else
-  echo -e "  ${red}❌ FAIL${reset}  nginx-private: live config DIFFERS from repo"
-  echo "  Run: diff $REPO_PRIVATE $LIVE_PRIVATE"
-  ERRORS+=("nginx-private config drift: live /etc/nginx/conf.d/private.conf differs from repo")
+  echo -e "  ${red}❌ FAIL${reset}  nginx-private: container config DIFFERS from repo"
+  echo "  Repo md5:  $REPO_MD5"
+  echo "  Live md5:  $LIVE_MD5"
+  echo "  Run: docker exec sa_nginx_private cat /etc/nginx/conf.d/private.conf | diff - $REPO_PRIVATE"
+  ERRORS+=("nginx-private config drift: container config differs from repo — restart container to reload bind mount")
   FAIL=$((FAIL + 1))
 fi
 
