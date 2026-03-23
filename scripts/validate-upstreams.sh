@@ -86,32 +86,41 @@ check_upstream "oauth2_proxy_portal"    "portal" "http://oauth2_proxy_portal:418
 check_ws_upstream "shell_gateway (terminal)" "portal" "http://shell_gateway:7681/"
 
 # ── n8n webhook registrations ─────────────────────────────────────────────────
-# Test that each portal webhook path is actually registered in n8n
+# Test that each portal webhook path is actually registered in an active n8n workflow.
+# Strategy: query /api/v1/workflows, scan each workflow's nodes for Webhook trigger
+# nodes whose path parameter matches the expected path. Only active workflows count.
 echo ""
 echo "── n8n portal webhook registrations ────────────"
 N8N_API_KEY=$(grep '^N8N_API_KEY=' /opt/agentic-sdlc/.env | cut -d= -f2 | tr -d '[:space:]')
-for path in portal-services portal-provision portal-update portal-update-categories portal-delete portal-track-recent; do
-  wh_count=$(docker exec n8n curl -sk \
-    -H "X-N8N-API-KEY: ${N8N_API_KEY}" \
-    "http://localhost:5678/api/v1/webhooks" 2>/dev/null \
-    | python3 -c "
+
+# Fetch all workflow nodes once, extract active webhook paths into a newline-separated list
+_all_wh_paths=$(docker exec sa_nginx_private \
+  wget -qO- --header "X-N8N-API-KEY: ${N8N_API_KEY}" \
+  "http://n8n:5678/api/v1/workflows?limit=100" 2>/dev/null \
+  | python3 -c "
 import sys, json
 try:
   data = json.load(sys.stdin)
-  webhooks = data if isinstance(data, list) else data.get('data', [])
-  matches = [w for w in webhooks if '${path}' in w.get('webhookPath','') or '${path}' in w.get('path','')]
-  print(len(matches))
-except:
-  print(0)
-" 2>/dev/null || echo "0")
+  for w in data.get('data', []):
+    if not w.get('active', False):
+      continue
+    for n in w.get('nodes', []):
+      if n.get('type') == 'n8n-nodes-base.webhook':
+        path = n.get('parameters', {}).get('path', '')
+        if path:
+          print(path)
+except Exception as e:
+  pass
+" 2>/dev/null || echo "")
 
-  wh_count=$(echo "$wh_count" | tr -d '[:space:]')
-  if [ "${wh_count:-0}" -gt 0 ] 2>/dev/null; then
-    echo -e "  ${green}✅ PASS${reset}  n8n webhook registered: $path"
+for path in portal-services portal-provision portal-update portal-update-categories portal-delete portal-track-recent; do
+  if echo "$_all_wh_paths" | grep -qxF "$path"; then
+    echo -e "  ${green}✅ PASS${reset}  n8n webhook registered (active): $path"
     PASS=$((PASS + 1))
   else
-    echo -e "  ${yellow}⚠ WARN${reset}   n8n webhook not found via API: $path (may use legacy path format)"
-    # Warn only — legacy workflowId-prefixed paths won't appear in /api/v1/webhooks the same way
+    echo -e "  ${red}❌ FAIL${reset}  n8n webhook not found in active workflows: $path"
+    ERRORS+=("n8n webhook missing or inactive: $path")
+    FAIL=$((FAIL + 1))
   fi
 done
 

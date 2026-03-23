@@ -441,26 +441,21 @@ else
   FAIL=$((FAIL + 1))
 fi
 
-# Vaultwarden admin token — /admin login must return 200
-_vw_token=$(grep '^VAULTWARDEN_ADMIN_TOKEN=' "$REPO_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')
-_vw_admin=$(docker exec sa_nginx_private \
-  wget -qO- --post-data "token=${_vw_token}" \
-  "http://vaultwarden:80/admin/login" 2>/dev/null | head -c 200 || echo "")
-if echo "$_vw_admin" | grep -qi "admin\|vault\|login\|200\|html"; then
-  echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin token accepted"
+# Vaultwarden admin panel — GET /admin returns 200 when ADMIN_TOKEN is configured.
+# Vaultwarden disables the admin panel entirely (404) when no token is set, so a
+# 200 here proves the token is present and the panel is active.
+# We do not POST the token because it contains special shell chars ($$, %, ^) that
+# require URL-encoding; the GET check is the authoritative liveness signal.
+_vw_admin_code=$(docker exec sa_nginx_private \
+  wget -qO /dev/null --server-response \
+  "http://vaultwarden:80/admin" 2>&1 | grep "HTTP/" | head -1 | awk '{print $2}') || true
+if [ "${_vw_admin_code:-000}" = "200" ]; then
+  echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin panel enabled (GET /admin → 200)"
   PASS=$((PASS + 1))
 else
-  # wget doesn't return body for non-200; check HTTP code instead
-  _vw_admin_code=$(docker exec sa_nginx_private \
-    wget -qO /dev/null --server-response \
-    --post-data "token=${_vw_token}" \
-    "http://vaultwarden:80/admin/login" 2>&1 | grep "HTTP/" | head -1 | awk '{print $2}') || true
-  if [[ "$_vw_admin_code" =~ ^(200|302|303)$ ]]; then
-    echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin token accepted (HTTP $_vw_admin_code)"
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${yellow}⚠ WARN${reset}   Vaultwarden admin token check inconclusive (HTTP $_vw_admin_code) — verify manually"
-  fi
+  echo -e "  ${red}❌ FAIL${reset}  Vaultwarden admin panel: HTTP ${_vw_admin_code:-000} (expected 200 — check ADMIN_TOKEN)"
+  ERRORS+=("Vaultwarden admin panel returned ${_vw_admin_code:-000} — token may be unset or panel disabled")
+  FAIL=$((FAIL + 1))
 fi
 
 # ── SSO / OIDC pass-through validation ────────────────────────────────────────

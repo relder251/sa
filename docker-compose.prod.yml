@@ -9,7 +9,6 @@ volumes:
   ollama_data:
   pg_data:
   vaultwarden_data:
-  backup_data:
   glitchtip_db_data:
 
 services:
@@ -473,7 +472,7 @@ services:
     image: postgres:15
     container_name: backup
     volumes:
-      - backup_data:/backup
+      - ./backup:/backup
       - ./output:/data/output:ro
       - ./opportunities:/data/opportunities:ro
       - /opt/sovereignadvisory/ssl:/ssl:ro
