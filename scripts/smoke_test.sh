@@ -400,7 +400,7 @@ check_container "glitchtip_web"    "glitchtip_web"
 check_container "glitchtip_worker" "glitchtip_worker"
 check_container "glitchtip_db"     "glitchtip_db"
 check_container "glitchtip_redis"  "glitchtip_redis"
-check_via_container "GlitchTip web API" "sa_nginx_private" 200 "http://glitchtip_web:8000/api/0/"
+check_via_container "GlitchTip web API" "sa_nginx_private" 400 "http://glitchtip_web:8000/api/0/"  # 400=Django ALLOWED_HOSTS rejection (expected); confirms service is up
 
 # nginx-private must route sentry vhost (non-5xx through proxy)
 _sentry_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
