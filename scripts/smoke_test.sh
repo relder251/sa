@@ -454,7 +454,7 @@ else
   _vw_admin_code=$(docker exec sa_nginx_private \
     wget -qO /dev/null --server-response \
     --post-data "token=${_vw_token}" \
-    "http://vaultwarden:80/admin/login" 2>&1 | grep "HTTP/" | head -1 | awk '{print $2}')
+    "http://vaultwarden:80/admin/login" 2>&1 | grep "HTTP/" | head -1 | awk '{print $2}') || true
   if [[ "$_vw_admin_code" =~ ^(200|302|303)$ ]]; then
     echo -e "  ${green}✅ PASS${reset}  Vaultwarden admin token accepted (HTTP $_vw_admin_code)"
     PASS=$((PASS + 1))
@@ -481,7 +481,7 @@ for _proxy_entry in \
   _paddr="${_proxy_entry#*:}"
   _pcode=$(docker exec sa_nginx_private \
     wget -qO /dev/null --server-response "http://${_paddr}/ping" 2>&1 \
-    | grep "HTTP/" | head -1 | awk '{print $2}')
+    | grep "HTTP/" | head -1 | awk '{print $2}') || true
   if [ "$_pcode" = "200" ]; then
     echo -e "  ${green}✅ PASS${reset}  oauth2_proxy_${_pname} /ping → 200"
     PASS=$((PASS + 1))
@@ -496,7 +496,7 @@ done
 _kc_disc_code=$(docker exec sa_nginx_private \
   wget -qO /dev/null --server-response \
   "http://keycloak:8080/realms/agentic-sdlc/.well-known/openid-configuration" 2>&1 \
-  | grep "HTTP/" | head -1 | awk '{print $2}')
+  | grep "HTTP/" | head -1 | awk '{print $2}') || true
 if [ "$_kc_disc_code" = "200" ]; then
   echo -e "  ${green}✅ PASS${reset}  Keycloak OIDC discovery endpoint reachable"
   PASS=$((PASS + 1))
