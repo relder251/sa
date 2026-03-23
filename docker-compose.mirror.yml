@@ -1,0 +1,64 @@
+version: "3.9"
+# Mirror environment — isolated Docker replica for PCIRT+ testing
+# Same images as production. Separate DB. No live API keys.
+# LiteLLM routes to local Ollama only — never cloud in mirror.
+
+services:
+  app-mirror:
+    build: .
+    container_name: ${PROJECT_SLUG}-mirror
+    ports:
+      - "${MIRROR_PORT:-8081}:8080"
+    environment:
+      ENV: mirror
+      DATABASE_URL: postgresql://mirror_user:mirror_pass@db-mirror:5432/mirror_db
+      LITELLM_BASE_URL: http://litellm-mirror:4001
+    depends_on: [db-mirror, litellm-mirror]
+    volumes:
+      - ./:/app
+    networks: [mirror-net]
+
+  db-mirror:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_SLUG}-db-mirror
+    environment:
+      POSTGRES_USER: mirror_user
+      POSTGRES_PASSWORD: mirror_pass
+      POSTGRES_DB: mirror_db
+    ports:
+      - "${MIRROR_DB_PORT:-5433}:5432"
+    volumes:
+      - mirror-db-data:/var/lib/postgresql/data
+    networks: [mirror-net]
+
+  litellm-mirror:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ${PROJECT_SLUG}-litellm-mirror
+    ports:
+      - "${MIRROR_LITELLM_PORT:-4002}:4001"
+    environment:
+      LITELLM_MASTER_KEY: ${MIRROR_LITELLM_KEY}
+      OLLAMA_API_BASE: http://host.docker.internal:11434
+    networks: [mirror-net]
+
+  score-db:
+    image: postgres:15-alpine
+    container_name: ${PROJECT_SLUG}-score-db
+    environment:
+      POSTGRES_USER: scores_user
+      POSTGRES_PASSWORD: scores_pass
+      POSTGRES_DB: cqs_scores
+    ports:
+      - "${SCORE_DB_PORT:-5434}:5432"
+    volumes:
+      - score-db-data:/var/lib/postgresql/data
+      - ./scripts/cqs-schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks: [mirror-net]
+
+volumes:
+  mirror-db-data:
+  score-db-data:
+
+networks:
+  mirror-net:
+    driver: bridge

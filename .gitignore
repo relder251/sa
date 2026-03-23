@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.mirror.example
 !refactor/*.md
 *.pem
 *.key
@@ -37,3 +38,10 @@ deerflow/
 # Jupyter checkpoints
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+
+# FRAMEWORK patch/doc staging dirs — keep structure, ignore content
+.patches/*
+!.patches/.gitkeep
+!.patches/*.proposal.md
+.doc-changes/*
+!.doc-changes/.gitkeep
