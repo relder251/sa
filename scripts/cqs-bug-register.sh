@@ -12,16 +12,18 @@ CYCLE="${CYCLE_ID:-unknown}"
 FINGERPRINT=$(echo "${SLUG}:${FILE}:${FUNC}:${ERR_CLASS}:${DESC}" \
   | sha256sum | cut -d' ' -f1)
 
-CONTAINER="${PROJECT_SLUG}-score-db"
-
 # Check for repeat
-EXISTING=$(docker exec "$CONTAINER" psql -U scores_user -d cqs_scores -tAc \
+EXISTING=$(PGPASSWORD=scores_pass psql \
+  -h localhost -p "${SCORE_DB_PORT:-5433}" \
+  -U scores_user -d cqs_scores -tAc \
   "SELECT times_seen FROM bug_registry
    WHERE project_slug='${SLUG}' AND fingerprint='${FINGERPRINT}';")
 
 if [ -n "$EXISTING" ]; then
   # Repeat bug — update and signal double penalty
-  docker exec "$CONTAINER" psql -U scores_user -d cqs_scores \
+  PGPASSWORD=scores_pass psql \
+    -h localhost -p "${SCORE_DB_PORT:-5433}" \
+    -U scores_user -d cqs_scores \
     -c "UPDATE bug_registry SET times_seen = times_seen + 1,
             last_seen = '${CYCLE}', status = 'regressed'
         WHERE project_slug='${SLUG}' AND fingerprint='${FINGERPRINT}';" \
@@ -30,7 +32,9 @@ if [ -n "$EXISTING" ]; then
   exit 2  # Exit 2 = repeat bug signal to caller
 else
   # New bug — register
-  docker exec "$CONTAINER" psql -U scores_user -d cqs_scores \
+  PGPASSWORD=scores_pass psql \
+    -h localhost -p "${SCORE_DB_PORT:-5433}" \
+    -U scores_user -d cqs_scores \
     -c "INSERT INTO bug_registry
             (project_slug, fingerprint, first_seen, last_seen, status)
         VALUES ('${SLUG}', '${FINGERPRINT}', '${CYCLE}', '${CYCLE}', 'open');" \

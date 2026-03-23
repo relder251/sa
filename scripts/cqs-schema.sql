@@ -114,3 +114,5 @@ BEGIN
     WHERE project_slug = slug AND agent_name = agent;
 END;
 $$ LANGUAGE plpgsql;
+
+SELECT cqs_init_project('agentic-sdlc');

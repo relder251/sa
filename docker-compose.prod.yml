@@ -10,6 +10,7 @@ volumes:
   pg_data:
   vaultwarden_data:
   glitchtip_db_data:
+  score-db-data:
 
 services:
   # shell-gateway needs host PID namespace + privileged caps so nsenter can
@@ -840,6 +841,22 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+
+  score-db:
+    image: postgres:15-alpine
+    container_name: agentic-sdlc-score-db
+    ports:
+      - "127.0.0.1:5433:5432"
+    environment:
+      POSTGRES_USER: scores_user
+      POSTGRES_PASSWORD: scores_pass
+      POSTGRES_DB: cqs_scores
+    volumes:
+      - score-db-data:/var/lib/postgresql/data
+      - ./scripts/cqs-schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - vibe_net
+    restart: unless-stopped
 
   glitchtip-redis:
     image: redis:7-alpine
