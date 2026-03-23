@@ -24,7 +24,7 @@ cd "$REPO_DIR"
 
 echo "=== Deploy starting from $REPO_DIR ==="
 echo "--- git pull ---"
-git pull
+git pull --autostash
 
 echo "--- docker compose up -d --build ---"
 docker compose \
@@ -33,9 +33,7 @@ docker compose \
   -f docker-compose.prod.yml \
   up -d --build
 
-# n8n runs as uid=1000 (node) but git pull creates files as root.
-# Ensure the portal data files n8n needs to write are group/world-writable.
-echo "--- fixing portal data permissions ---"
-chmod 666 "$REPO_DIR/portal/services.json" 2>/dev/null || true
+echo "--- fixing runtime permissions ---"
+bash "$REPO_DIR/scripts/fix-permissions.sh"
 
 echo "=== Deploy complete ==="

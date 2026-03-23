@@ -10,8 +10,13 @@
 # This scripts/ copy is the reference source — re-deploy after edits.
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMMIT=$(git rev-parse HEAD)
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Fix runtime file permissions — git pull resets tracked files to 644/755
+# n8n (uid=1000) needs group-write on services.json and shared output dirs
+bash "$REPO_DIR/scripts/fix-permissions.sh" 2>/dev/null || true
 
 # Resolve n8n host — prefer the container network name, fall back to localhost
 N8N_HOST="${N8N_HOST:-localhost}"

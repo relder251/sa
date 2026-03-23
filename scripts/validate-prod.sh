@@ -82,8 +82,7 @@ fi
 echo ""
 echo "── Syncing scripts to VPS ──────────────────────"
 ssh "$VPS" "cd $REPO_DIR_VPS && git pull --rebase --autostash origin master" 2>&1 | tail -3
-# Fix services.json permissions — git pull/checkout resets to 644, but n8n (uid=1000) needs group-write
-ssh "$VPS" "chmod 664 $REPO_DIR_VPS/portal/services.json && chown root:1000 $REPO_DIR_VPS/portal/services.json" 2>/dev/null || true
+ssh "$VPS" "bash $REPO_DIR_VPS/scripts/fix-permissions.sh" 2>/dev/null || true
 echo -e "  ${green}✅${reset}  Scripts synced"
 
 # ── Suite 1: smoke_test.sh (on VPS) ──────────────────────────────────────────
