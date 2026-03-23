@@ -311,8 +311,7 @@ async def _check_service(client: httpx.AsyncClient, name: str, url: str, path: s
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     ctx = _board_context()
-    ctx["request"] = request
-    return templates.TemplateResponse("index.html", ctx)
+    return templates.TemplateResponse(request, "index.html", ctx)
 
 
 @app.get("/runs/{name}", response_class=HTMLResponse)
@@ -321,19 +320,15 @@ async def run_detail(request: Request, name: str):
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{name}' not found")
     return templates.TemplateResponse(
+        request,
         "run_detail.html",
-        {
-            "request": request,
-            "run": run,
-            "phases": run.get("phases", _default_phases()),
-            "elapsed": _elapsed_str(run.get("created_at")),
-        },
+        {"run": run, "phases": run.get("phases", _default_phases()), "elapsed": _elapsed_str(run.get("created_at"))},
     )
 
 
 @app.get("/system", response_class=HTMLResponse)
 async def system_health(request: Request):
-    return templates.TemplateResponse("system_health.html", {"request": request})
+    return templates.TemplateResponse(request, "system_health.html")
 
 
 # ---------------------------------------------------------------------------
@@ -344,15 +339,13 @@ async def system_health(request: Request):
 @app.get("/partials/stats", response_class=HTMLResponse)
 async def partial_stats(request: Request):
     ctx = _board_context()
-    ctx["request"] = request
-    return templates.TemplateResponse("partials/stats.html", ctx)
+    return templates.TemplateResponse(request, "partials/stats.html", ctx)
 
 
 @app.get("/partials/board", response_class=HTMLResponse)
 async def partial_board(request: Request):
     ctx = _board_context()
-    ctx["request"] = request
-    return templates.TemplateResponse("partials/board.html", ctx)
+    return templates.TemplateResponse(request, "partials/board.html", ctx)
 
 
 @app.get("/partials/run/{name}/phases", response_class=HTMLResponse)
@@ -361,8 +354,9 @@ async def partial_phases(request: Request, name: str):
     if not run:
         raise HTTPException(status_code=404, detail=f"Run '{name}' not found")
     return templates.TemplateResponse(
+        request,
         "partials/phase_badges.html",
-        {"request": request, "run": run, "phases": run.get("phases", _default_phases())},
+        {"run": run, "phases": run.get("phases", _default_phases())},
     )
 
 
@@ -375,8 +369,9 @@ async def partial_files(request: Request, name: str):
     files = _list_project_files(project_base) if project_base else []
     grouped = _group_files_by_dir(files)
     return templates.TemplateResponse(
+        request,
         "partials/file_tree.html",
-        {"request": request, "run": run, "files": files, "grouped": grouped},
+        {"run": run, "files": files, "grouped": grouped},
     )
 
 
@@ -404,9 +399,9 @@ async def partial_file_content(request: Request, name: str, path: str = Query(..
     rendered_html = render_markdown(content) if is_markdown else None
 
     return templates.TemplateResponse(
+        request,
         "partials/file_content.html",
         {
-            "request": request,
             "filename": safe_path.name,
             "ext": ext,
             "content": content,
@@ -444,8 +439,9 @@ async def partial_system_health(request: Request):
         models = []
 
     return templates.TemplateResponse(
+        request,
         "partials/system_health_panel.html",
-        {"request": request, "services": services, "models": models},
+        {"services": services, "models": models},
     )
 
 
@@ -458,8 +454,9 @@ async def partial_approvals(request: Request):
         if approval and approval.get("status") == "pending":
             pending_approvals.append(run)
     return templates.TemplateResponse(
+        request,
         "partials/approvals_list.html",
-        {"request": request, "approvals": pending_approvals},
+        {"approvals": pending_approvals},
     )
 
 
@@ -598,8 +595,9 @@ async def approve_run(
             pending_approvals.append(run)
 
     return templates.TemplateResponse(
+        request,
         "partials/approvals_list.html",
-        {"request": request, "approvals": pending_approvals},
+        {"approvals": pending_approvals},
     )
 
 
@@ -624,8 +622,9 @@ async def reject_run(
             pending_approvals.append(run)
 
     return templates.TemplateResponse(
+        request,
         "partials/approvals_list.html",
-        {"request": request, "approvals": pending_approvals},
+        {"approvals": pending_approvals},
     )
 
 

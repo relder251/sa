@@ -440,6 +440,8 @@ services:
     build:
       context: ./webui
     container_name: webui
+    ports:
+      - "127.0.0.1:3000:3000"
     volumes:
       - ./output:/data/output:ro
       - ./output/opportunities:/data/output/opportunities
