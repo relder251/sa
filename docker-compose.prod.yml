@@ -236,7 +236,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     volumes:
       - n8n_data:/home/node/.n8n
@@ -326,7 +326,7 @@ services:
         condition: service_healthy
       ollama:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
@@ -380,7 +380,7 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
 
   test-runner:
@@ -407,7 +407,7 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\" "]
@@ -449,7 +449,7 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\" "]
@@ -485,7 +485,7 @@ services:
     depends_on:
       pipeline-server:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" "]
@@ -573,7 +573,7 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:8888/api || exit 1"]
@@ -760,7 +760,7 @@ services:
       - vibe_net
     restart: unless-stopped
     depends_on:
-      vault_sync:
+      vault-sync:
         condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://localhost:80/ > /dev/null || exit 1"]
