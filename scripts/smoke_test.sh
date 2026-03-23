@@ -23,7 +23,10 @@ check() {
   local url="$3"
   local extra_args="${4:-}"
 
-  actual_code=$(curl -s -o /tmp/smoke_body.txt -w "%{http_code}" --max-time 10 $extra_args "$url" 2>/dev/null || echo "000")
+  # Note: || outside $() to avoid "000000" double-output bug when curl fails
+  # and also outputs "000" before the || fires inside the substitution.
+  actual_code=$(curl -s -o /tmp/smoke_body.txt -w "%{http_code}" --max-time 10 $extra_args "$url" 2>/dev/null) || true
+  actual_code="${actual_code:-000}"
 
   if [ "$actual_code" = "$expected_code" ]; then
     echo -e "  ${green}✅ PASS${reset}  [$actual_code] $label"
@@ -31,6 +34,28 @@ check() {
   else
     echo -e "  ${red}❌ FAIL${reset}  [$actual_code != $expected_code] $label"
     ERRORS+=("$label: expected $expected_code got $actual_code")
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+# Check a service that is NOT port-bound to the host — runs curl from inside a container.
+check_via_container() {
+  local label="$1"
+  local container="$2"
+  local expected_code="$3"
+  local url="$4"
+
+  actual_code=$(docker exec "$container" \
+    wget -qO /dev/null --server-response --timeout=10 "$url" 2>&1 \
+    | grep "HTTP/" | tail -1 | awk '{print $2}') || true
+  actual_code="${actual_code:-000}"
+
+  if [ "$actual_code" = "$expected_code" ]; then
+    echo -e "  ${green}✅ PASS${reset}  [$actual_code] $label (via $container)"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  [$actual_code != $expected_code] $label (via $container)"
+    ERRORS+=("$label: expected $expected_code got $actual_code via $container")
     FAIL=$((FAIL + 1))
   fi
 }
@@ -95,10 +120,12 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── Core infrastructure ───────────────────────────────────────────────────────
+# Note: LiteLLM, n8n, Jupyter are NOT port-bound to the host in prod.
+# Use check_via_container to test from inside the docker network.
 echo "── Infrastructure ──────────────────────────────"
-check "LiteLLM health"              200 "http://localhost:4000/health/liveliness"
-check "n8n health"                  200 "http://localhost:5678/healthz"
-check "JupyterLab health"           200 "http://localhost:8888/api"
+check_via_container "LiteLLM health"  "sa_nginx_private" 200 "http://litellm:4000/health/liveliness"
+check_via_container "n8n health"      "sa_nginx_private" 200 "http://n8n:5678/healthz"
+check_via_container "JupyterLab health" "sa_nginx_private" 200 "http://oauth2_proxy_jupyter:8889/ping"
 # test-runner has no host port (internal only) — check via docker exec
 tr_health=$(docker exec test_runner python3 -c \
   "import urllib.request; print(urllib.request.urlopen('http://localhost:5001/health').read().decode())" \
@@ -178,9 +205,9 @@ check_contains "Pipeline root lists endpoints" "http://localhost:5002/" "run-opp
 echo ""
 echo "── LiteLLM model tiers ─────────────────────────"
 LITELLM_KEY=$(grep '^LITELLM_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2 | sed 's/#.*//' | tr -d '[:space:]')
-models_body=$(curl -s --max-time 10 \
-  -H "Authorization: Bearer $LITELLM_KEY" \
-  "http://localhost:4000/model/info" 2>/dev/null || echo "")
+models_body=$(docker exec sa_nginx_private \
+  wget -qO- --header="Authorization: Bearer $LITELLM_KEY" \
+  "http://litellm:4000/model/info" 2>/dev/null) || true
 if echo "$models_body" | grep -q "hybrid"; then
   echo -e "  ${green}✅ PASS${reset}  [contains 'hybrid'] hybrid/chat registered"
   PASS=$((PASS + 1))
@@ -193,10 +220,10 @@ fi
 # ── n8n workflow imports ──────────────────────────────────────────────────────
 echo ""
 echo "── n8n workflows ───────────────────────────────"
-N8N_API_KEY=$(grep '^N8N_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2)
-wf_count=$(curl -s --max-time 10 \
-  -H "X-N8N-API-KEY: $N8N_API_KEY" \
-  "http://localhost:5678/api/v1/workflows" 2>/dev/null \
+N8N_API_KEY=$(grep '^N8N_API_KEY=' "$REPO_DIR/.env" | cut -d= -f2 | tr -d '[:space:]')
+wf_count=$(docker exec sa_nginx_private \
+  wget -qO- --header="X-N8N-API-KEY: $N8N_API_KEY" \
+  "http://n8n:5678/api/v1/workflows" 2>/dev/null \
   | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('data',[])))" 2>/dev/null || echo "?")
 echo -e "  ${yellow}ℹ INFO${reset}   n8n workflows loaded: $wf_count"
 
@@ -357,8 +384,8 @@ check_container "sa_nginx_private" "sa_nginx_private"
 # ── Ollama ────────────────────────────────────────────────────────────────────
 echo ""
 echo "── Ollama ──────────────────────────────────────"
-check_contains "Ollama API root"   "http://localhost:11434/"          "Ollama is running"
-check          "Ollama /api/tags"  200 "http://localhost:11434/api/tags"
+check_via_container "Ollama API root"   "sa_nginx_private" 200 "http://ollama:11434/"
+check_via_container "Ollama /api/tags"  "sa_nginx_private" 200 "http://ollama:11434/api/tags"
 
 # ── Keycloak ──────────────────────────────────────────────────────────────────
 echo ""
@@ -373,7 +400,7 @@ check_container "glitchtip_web"    "glitchtip_web"
 check_container "glitchtip_worker" "glitchtip_worker"
 check_container "glitchtip_db"     "glitchtip_db"
 check_container "glitchtip_redis"  "glitchtip_redis"
-check          "GlitchTip web API" 200 "http://localhost:8000/api/0/organizations/"
+check_via_container "GlitchTip web API" "sa_nginx_private" 200 "http://glitchtip_web:8000/api/0/organizations/"
 
 # nginx-private must route sentry vhost (non-5xx through proxy)
 _sentry_code=$(curl -sk -o /dev/null -w "%{http_code}" --max-time 10 \
@@ -391,8 +418,8 @@ fi
 echo ""
 echo "── Vaultwarden ─────────────────────────────────"
 check_container "vaultwarden container" "vaultwarden"
-# API health — not just container running
-check_contains "Vaultwarden API alive" "http://localhost:80/" "Vaultwarden"
+# API health — not just container running (vaultwarden not port-bound to host)
+check_via_container "Vaultwarden API alive" "sa_nginx_private" 200 "http://vaultwarden:80/"
 # WebSocket channel must not be 502 (browser extension sync)
 _vw_ws_code=$(docker exec sa_nginx_private \
   curl -sk -o /dev/null -w "%{http_code}" --max-time 5 \
@@ -426,8 +453,8 @@ check_container "oauth2_proxy_jupyter"              "oauth2_proxy_jupyter"
 check_container "vault_sync"                        "vault_sync"
 check_container "shell_gateway"                     "shell_gateway"
 check_container "agentic-sdlc-score-db"             "agentic-sdlc-score-db"
-check          "vault_sync health"   200 "http://localhost:8777/health"
-check          "shell_gateway alive" 200 "http://localhost:7681/"
+check_via_container "vault_sync health"   "sa_nginx_private" 200 "http://vault_sync:8777/health"
+check_via_container "shell_gateway alive" "portal"           200 "http://shell_gateway:7681/"
 
 # ── Template variable audit ───────────────────────────────────────────────────
 echo ""

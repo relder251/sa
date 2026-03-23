@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # validate-browser.sh — headless browser validation of key private URLs via Twingate
-# Requires: python3 + playwright installed locally, Twingate connected
+# Requires: Node.js + playwright (from gsd-pi or local install), Twingate connected
 # Usage: bash scripts/validate-browser.sh [--screenshots-dir DIR]
 set -euo pipefail
 
@@ -16,124 +16,109 @@ red='\033[0;31m'
 yellow='\033[0;33m'
 reset='\033[0m'
 
+# Resolve playwright module — try common locations
+PW_MODULE=""
+for candidate in \
+  "/home/user/.npm-global/lib/node_modules/gsd-pi/node_modules/playwright" \
+  "/usr/local/lib/node_modules/playwright" \
+  "$(npm root -g)/playwright" \
+  "$(npm root -g)/gsd-pi/node_modules/playwright"; do
+  [ -f "$candidate/package.json" ] && PW_MODULE="$candidate" && break
+done
+
 echo ""
 echo "╔══════════════════════════════════════════════╗"
 echo "║     Browser Validation (Playwright)         ║"
 echo "╚══════════════════════════════════════════════╝"
 echo ""
 
-# Check playwright is available
-if ! python3 -c "import playwright" 2>/dev/null; then
-  echo -e "  ${yellow}⚠ SKIP${reset}  Playwright not installed (pip install playwright + playwright install chromium)"
-  echo "  Browser validation skipped — install Playwright to enable."
+if [ -z "$PW_MODULE" ]; then
+  echo -e "  ${yellow}⚠ SKIP${reset}  Playwright not found. To enable: npm install -g playwright && npx playwright install chromium"
+  echo "  Browser validation skipped."
   exit 0
 fi
 
-# Validate a URL: loads it, checks title/body, takes screenshot on failure
-validate_url() {
-  local label="$1"
-  local url="$2"
-  local expect_text="$3"      # text that must appear in page content
-  local expect_not="$4:-"    # text that must NOT appear (error indicators)
-  local screenshot_name
-  screenshot_name=$(echo "$label" | tr ' /.' '-' | tr '[:upper:]' '[:lower:]')
-
-  result=$(python3 - <<PYEOF 2>/tmp/bv_err_${screenshot_name}
-import sys
-from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
-
-url = "$url"
-expect = "$expect_text"
-expect_not = "$expect_not"
-screenshot = "$SCREENSHOTS_DIR/${screenshot_name}.png"
-
-try:
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        ctx = browser.new_context(ignore_https_errors=True)
-        page = ctx.new_page()
-        page.goto(url, timeout=20000, wait_until="domcontentloaded")
-        content = page.content()
-        title = page.title()
-
-        passed = True
-        reason = ""
-
-        if expect and expect not in content:
-            passed = False
-            reason = f"expected text '{expect}' not found in page"
-
-        if expect_not and expect_not != "-" and expect_not in content:
-            passed = False
-            reason = f"error text '{expect_not}' found in page"
-
-        if not passed:
-            page.screenshot(path=screenshot)
-
-        print(f"{'PASS' if passed else 'FAIL'}|{title}|{reason}")
-        browser.close()
-except PWTimeout:
-    print(f"FAIL||timeout loading {url}")
-except Exception as e:
-    print(f"FAIL||{str(e)[:120]}")
-PYEOF
-  )
-
-  status=$(echo "$result" | cut -d'|' -f1)
-  title=$(echo "$result" | cut -d'|' -f2)
-  reason=$(echo "$result" | cut -d'|' -f3)
-  err_output=$(cat "/tmp/bv_err_${screenshot_name}" 2>/dev/null | tail -3 || true)
-
-  if [ "$status" = "PASS" ]; then
-    echo -e "  ${green}✅ PASS${reset}  $label — \"$title\""
-    PASS=$((PASS + 1))
-  else
-    echo -e "  ${red}❌ FAIL${reset}  $label — ${reason:-$err_output}"
-    [ -f "$SCREENSHOTS_DIR/${screenshot_name}.png" ] && \
-      echo -e "         Screenshot: $SCREENSHOTS_DIR/${screenshot_name}.png"
-    ERRORS+=("$label: $reason")
-    FAIL=$((FAIL + 1))
-  fi
-}
-
-# Check Twingate is connected first
-if ! resolvectl query sentry.private.sovereignadvisory.ai &>/dev/null && \
-   ! dig +short sentry.private.sovereignadvisory.ai @100.95.0.251 2>/dev/null | grep -q '^100\.'; then
-  echo -e "  ${yellow}⚠ WARN${reset}  Twingate may not be connected — DNS resolution may fail"
-  echo "  Run: sudo systemctl start twingate (or connect via Twingate client)"
+# Check Twingate DNS is working
+if ! resolvectl query sentry.private.sovereignadvisory.ai &>/dev/null 2>&1 && \
+   ! dig +short sentry.private.sovereignadvisory.ai 2>/dev/null | grep -q '^100\.'; then
+  echo -e "  ${yellow}⚠ WARN${reset}  Twingate DNS may not be resolving — private URLs may fail"
 fi
 
 echo "── Private portal URLs (via Twingate) ──────────"
+echo "   Playwright module: $PW_MODULE"
+echo ""
 
-# Portal — should show the portal UI (not a login error, not blank)
-validate_url "Portal home" \
-  "https://home.private.sovereignadvisory.ai" \
-  "" \
-  "502 Bad Gateway"
+# Run a single browser session for all checks to avoid repeated launch overhead
+RESULTS=$(node - "$PW_MODULE" "$SCREENSHOTS_DIR" 2>/tmp/bv_node_err <<'NODESCRIPT'
+const [,, PW_MODULE, SCREENSHOTS_DIR] = process.argv;
+const { chromium } = require(PW_MODULE);
+const fs = require('fs');
+const path = require('path');
 
-# GlitchTip — should show the login page or dashboard
-validate_url "GlitchTip (Sentry)" \
-  "https://sentry.private.sovereignadvisory.ai" \
-  "" \
-  "502 Bad Gateway"
+const checks = [
+  { label: 'Portal home',        url: 'https://home.private.sovereignadvisory.ai',    expect_not: '502 Bad Gateway' },
+  { label: 'GlitchTip (Sentry)', url: 'https://sentry.private.sovereignadvisory.ai',  expect_not: '502 Bad Gateway' },
+  { label: 'Keycloak SSO',       url: 'https://kc.private.sovereignadvisory.ai/realms/sovereign/account', expect_not: '502 Bad Gateway' },
+  { label: 'Vaultwarden vault',  url: 'https://vault.private.sovereignadvisory.ai',   expect_not: '502 Bad Gateway' },
+  { label: 'n8n (SSO redirect)', url: 'https://n8n.private.sovereignadvisory.ai',     expect_not: '502 Bad Gateway' },
+];
 
-# Keycloak — should show the Keycloak admin/login
-validate_url "Keycloak SSO" \
-  "https://kc.private.sovereignadvisory.ai/realms/sovereign/account" \
-  "" \
-  "502 Bad Gateway"
+(async () => {
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ ignoreHTTPSErrors: true });
 
-# Vaultwarden — web vault should load
-validate_url "Vaultwarden web vault" \
-  "https://vault.private.sovereignadvisory.ai" \
-  "" \
-  "502 Bad Gateway"
+  for (const check of checks) {
+    const slugName = check.label.replace(/[\s\/\.]+/g, '-').toLowerCase();
+    const screenshotPath = path.join(SCREENSHOTS_DIR, `${slugName}.png`);
+    try {
+      const page = await context.newPage();
+      const resp = await page.goto(check.url, { timeout: 20000, waitUntil: 'domcontentloaded' });
+      const title = await page.title();
+      const content = await page.content();
+      const status = resp ? resp.status() : 0;
 
-# n8n — should redirect to SSO (not 502)
-validate_url "n8n (SSO redirect)" \
-  "https://n8n.private.sovereignadvisory.ai" \
-  "" \
-  "502 Bad Gateway"
+      let passed = true;
+      let reason = '';
+
+      if (check.expect_not && content.includes(check.expect_not)) {
+        passed = false;
+        reason = `page contains '${check.expect_not}'`;
+      }
+      if (status === 502 || status === 503) {
+        passed = false;
+        reason = `HTTP ${status}`;
+      }
+      if (!passed) {
+        await page.screenshot({ path: screenshotPath, fullPage: false });
+      }
+      console.log(`${passed ? 'PASS' : 'FAIL'}|${check.label}|${title}|${status}|${reason}`);
+      await page.close();
+    } catch (e) {
+      console.log(`FAIL|${check.label}||0|${e.message.slice(0, 100)}`);
+    }
+  }
+  await browser.close();
+})().catch(e => {
+  console.error('FATAL:', e.message);
+  process.exit(1);
+});
+NODESCRIPT
+) || { echo -e "  ${red}❌ FAIL${reset}  Node.js playwright error: $(cat /tmp/bv_node_err | tail -3)"; ERRORS+=("playwright: fatal error"); FAIL=$((FAIL+1)); }
+
+# Parse results
+while IFS='|' read -r status label title http_status reason; do
+  [ -z "$status" ] && continue
+  if [ "$status" = "PASS" ]; then
+    echo -e "  ${green}✅ PASS${reset}  $label — \"$title\" [HTTP $http_status]"
+    PASS=$((PASS + 1))
+  else
+    echo -e "  ${red}❌ FAIL${reset}  $label — ${reason} [HTTP $http_status]"
+    slug=$(echo "$label" | tr ' /.' '-' | tr '[:upper:]' '[:lower:]')
+    [ -f "$SCREENSHOTS_DIR/${slug}.png" ] && echo -e "         Screenshot: $SCREENSHOTS_DIR/${slug}.png"
+    ERRORS+=("$label: $reason")
+    FAIL=$((FAIL + 1))
+  fi
+done <<< "$RESULTS"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
@@ -141,7 +126,6 @@ echo "════════════════════════�
 TOTAL=$((PASS + FAIL))
 if [ $FAIL -eq 0 ]; then
   echo -e "${green}✅ ALL $TOTAL BROWSER CHECKS PASSED${reset}"
-  echo "  Screenshots: $SCREENSHOTS_DIR (none — all passed)"
 else
   echo -e "${red}❌ $FAIL/$TOTAL BROWSER CHECKS FAILED${reset}"
   echo "  Failure screenshots: $SCREENSHOTS_DIR"
