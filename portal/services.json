@@ -160,7 +160,8 @@
       "icon": "🔐",
       "category": "security",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "vaultwarden"
     },
     {
       "id": "keycloak-admin",
@@ -171,7 +172,8 @@
       "category": "security",
       "favorite": false,
       "ssoTier": 2,
-      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/keycloak"
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/keycloak",
+      "sshTarget": "keycloak"
     },
     {
       "id": "keycloak-account",
@@ -181,7 +183,8 @@
       "icon": "👤",
       "category": "security",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "sshTarget": "keycloak"
     },
     {
       "id": "notion",

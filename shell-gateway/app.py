@@ -35,13 +35,16 @@ socketio = SocketIO(
 # ── Allowed targets ──────────────────────────────────────────────────────────
 # Keep this list explicit — never interpolate user input into a shell command.
 TARGETS: dict[str, list[str]] = {
-    "n8n":     ["docker", "exec", "-it", "n8n",     "sh"],      # n8n image has sh only
-    "webui":   ["docker", "exec", "-it", "webui",   "bash"],
-    "litellm": ["docker", "exec", "-it", "litellm", "bash"],
-    "jupyter": ["docker", "exec", "-it", "jupyter", "bash"],
+    "n8n":          ["docker", "exec", "-it", "n8n",          "sh"],   # n8n image has sh only
+    "webui":        ["docker", "exec", "-it", "webui",        "bash"],
+    "litellm":      ["docker", "exec", "-it", "litellm",      "bash"],
+    "jupyter":      ["docker", "exec", "-it", "jupyter",      "bash"],
+    "glitchtip_web":["docker", "exec", "-it", "glitchtip_web","bash"],
+    "vaultwarden":  ["docker", "exec", "-it", "vaultwarden",  "sh"],   # alpine-based, sh only
+    "keycloak":     ["docker", "exec", "-it", "keycloak",     "bash"],
     # nsenter enters host namespaces; requires pid:host + privileged in compose
-    "vps":      ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
-    "hostinger": ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
+    "vps":          ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
+    "hostinger":    ["nsenter", "-t", "1", "-m", "-u", "-i", "-n", "-p", "--", "bash"],
 }
 
 # ── Terminal HTML (xterm.js + socket.io) ─────────────────────────────────────
