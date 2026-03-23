@@ -1,6 +1,11 @@
 {
+  "updatedAt": "2026-03-23T21:04:14.159Z",
+  "createdAt": "2026-03-23T00:17:03.055Z",
   "id": "1RsF3H3rv0Z9RAOE",
   "name": "PCIRT Framework Orchestrator",
+  "description": null,
+  "active": true,
+  "isArchived": false,
   "nodes": [
     {
       "parameters": {
@@ -185,11 +190,11 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Alert: agentic-sdlc CRITICAL/HIGH \u2014 \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"Patch proposals written to .patches/. Approve: touch .patches/{filename}.APPROVED\\n\\nAudit:\\n\" + ($('Run Audit Agent').item.json.stdout || '').slice(0,1800) + \"\\n\\nBreak-fix:\\n\" + ($json.stdout || '').slice(0,800)}}]}}]}",
+        "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Alert: agentic-sdlc CRITICAL/HIGH — \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"Patch proposals written to .patches/. Approve: touch .patches/{filename}.APPROVED\\n\\nAudit:\\n\" + ($('Run Audit Agent').item.json.stdout || '').slice(0,1800) + \"\\n\\nBreak-fix:\\n\" + ($json.stdout || '').slice(0,800)}}]}}]}",
         "options": {}
       },
       "id": "notify-hitl-proposal",
-      "name": "Notify HITL \u2014 Patch Proposal Ready",
+      "name": "Notify HITL — Patch Proposal Ready",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -221,7 +226,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Audit Clean: agentic-sdlc \u2014 \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"No CRITICAL or HIGH findings.\\n\\n\" + ($json.stdout || '').slice(0,2000)}}]}}]}",
+        "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Audit Clean: agentic-sdlc — \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"No CRITICAL or HIGH findings.\\n\\n\" + ($json.stdout || '').slice(0,2000)}}]}}]}",
         "options": {}
       },
       "id": "notify-audit-clean",
@@ -233,6 +238,19 @@
         420
       ],
       "continueOnFail": true
+    },
+    {
+      "id": "doc-agent-001",
+      "name": "Run Doc Agent",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        1600,
+        300
+      ],
+      "parameters": {
+        "command": "bash /opt/agentic-sdlc/scripts/cqs-score.sh doc 5 docs_current 'cycle complete' >> /opt/agentic-sdlc/logs/pcirt.log 2>&1"
+      }
     }
   ],
   "connections": {
@@ -307,7 +325,29 @@
       "main": [
         [
           {
-            "node": "Notify HITL \u2014 Patch Proposal Ready",
+            "node": "Notify HITL — Patch Proposal Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify HITL — Patch Proposal Ready": {
+      "main": [
+        [
+          {
+            "node": "Run Doc Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Audit Clean": {
+      "main": [
+        [
+          {
+            "node": "Run Doc Agent",
             "type": "main",
             "index": 0
           }
@@ -321,5 +361,412 @@
     "executionOrder": "v1",
     "saveManualExecutions": true
   },
-  "active": true
+  "staticData": {
+    "node:Cron Daily Audit": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "3513f495-8b6d-45cd-a49c-95bdfa5d95ec",
+  "activeVersionId": "3513f495-8b6d-45cd-a49c-95bdfa5d95ec",
+  "versionCounter": 9,
+  "triggerCount": 2,
+  "shared": [
+    {
+      "updatedAt": "2026-03-23T00:17:03.055Z",
+      "createdAt": "2026-03-23T00:17:03.055Z",
+      "role": "workflow:owner",
+      "workflowId": "1RsF3H3rv0Z9RAOE",
+      "projectId": "9nfbed6kWhG9AlzC",
+      "project": {
+        "updatedAt": "2026-03-14T17:20:00.372Z",
+        "createdAt": "2026-03-12T21:41:24.639Z",
+        "id": "9nfbed6kWhG9AlzC",
+        "name": "Unnamed Project",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "22098edd-6722-4a81-acf5-8996c4d72365"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-03-23T21:04:14.164Z",
+    "createdAt": "2026-03-23T21:04:14.164Z",
+    "versionId": "3513f495-8b6d-45cd-a49c-95bdfa5d95ec",
+    "workflowId": "1RsF3H3rv0Z9RAOE",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "POST",
+          "path": "pcirt-push",
+          "responseMode": "responseNode",
+          "options": {}
+        },
+        "id": "git-push-webhook",
+        "name": "Git Push Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          200,
+          200
+        ],
+        "webhookId": "pcirt-push"
+      },
+      {
+        "parameters": {
+          "respondWith": "json",
+          "responseBody": "={{ JSON.stringify({\"status\":\"accepted\",\"message\":\"PCIRT audit triggered\",\"timestamp\": new Date().toISOString()}) }}",
+          "options": {}
+        },
+        "id": "respond-immediately",
+        "name": "Respond 200 Immediately",
+        "type": "n8n-nodes-base.respondToWebhook",
+        "typeVersion": 1,
+        "position": [
+          440,
+          100
+        ]
+      },
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 3 * * *"
+              }
+            ]
+          }
+        },
+        "id": "cron-daily-audit",
+        "name": "Cron Daily Audit",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1,
+        "position": [
+          200,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "assignments": {
+            "assignments": [
+              {
+                "id": "trigger-type",
+                "name": "trigger",
+                "value": "={{ $json.trigger || ($json.commit ? 'git-push' : 'cron') }}",
+                "type": "string"
+              },
+              {
+                "id": "commit-hash",
+                "name": "commit",
+                "value": "={{ $json.commit || 'HEAD' }}",
+                "type": "string"
+              },
+              {
+                "id": "branch-name",
+                "name": "branch",
+                "value": "={{ $json.branch || 'master' }}",
+                "type": "string"
+              },
+              {
+                "id": "project-slug",
+                "name": "project",
+                "value": "agentic-sdlc",
+                "type": "string"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "id": "set-trigger-context",
+        "name": "Set Trigger Context",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 3.4,
+        "position": [
+          440,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "command": "cd /opt/agentic-sdlc && bash .openclaw/run-audit.sh agentic-sdlc 2>&1 || echo 'AUDIT_ERROR: run-audit.sh failed'"
+        },
+        "id": "run-audit-agent",
+        "name": "Run Audit Agent",
+        "type": "n8n-nodes-base.executeCommand",
+        "typeVersion": 1,
+        "position": [
+          680,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": true,
+              "leftValue": "",
+              "typeValidation": "strict"
+            },
+            "conditions": [
+              {
+                "id": "has-critical",
+                "leftValue": "={{ $json.stdout }}",
+                "rightValue": "CRITICAL",
+                "operator": {
+                  "type": "string",
+                  "operation": "contains"
+                }
+              },
+              {
+                "id": "has-high",
+                "leftValue": "={{ $json.stdout }}",
+                "rightValue": "HIGH",
+                "operator": {
+                  "type": "string",
+                  "operation": "contains"
+                }
+              }
+            ],
+            "combinator": "or"
+          },
+          "options": {}
+        },
+        "id": "check-severity",
+        "name": "Check for CRITICAL or HIGH",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2,
+        "position": [
+          920,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "command": "cd /opt/agentic-sdlc && CYCLE_ID=$(date +%Y%m%d-%H%M) && echo \"[${CYCLE_ID}] Break-fix stage 1: reviewing audit findings\" && mkdir -p .patches && echo \"BREAKFIX_STUB: No claude agent available - manual review required for cycle ${CYCLE_ID}\" | tee .patches/${CYCLE_ID}-breakfix.log 2>&1"
+        },
+        "id": "run-breakfix-stage1",
+        "name": "Run Break-Fix Stage 1",
+        "type": "n8n-nodes-base.executeCommand",
+        "typeVersion": 1,
+        "position": [
+          1160,
+          180
+        ]
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.notion.com/v1/pages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{NOTION_API_TOKEN}}"
+              },
+              {
+                "name": "Notion-Version",
+                "value": "2022-06-28"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Alert: agentic-sdlc CRITICAL/HIGH — \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"Patch proposals written to .patches/. Approve: touch .patches/{filename}.APPROVED\\n\\nAudit:\\n\" + ($('Run Audit Agent').item.json.stdout || '').slice(0,1800) + \"\\n\\nBreak-fix:\\n\" + ($json.stdout || '').slice(0,800)}}]}}]}",
+          "options": {}
+        },
+        "id": "notify-hitl-proposal",
+        "name": "Notify HITL — Patch Proposal Ready",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1400,
+          180
+        ],
+        "continueOnFail": true
+      },
+      {
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.notion.com/v1/pages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{NOTION_API_TOKEN}}"
+              },
+              {
+                "name": "Notion-Version",
+                "value": "2022-06-28"
+              },
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          },
+          "sendBody": true,
+          "specifyBody": "json",
+          "jsonBody": "={\"parent\":{\"type\":\"page_id\",\"page_id\":\"32b99de0e9dd81f786fce90fdc2636fe\"},\"properties\":{\"title\":{\"title\":[{\"text\":{\"content\":\"PCIRT Audit Clean: agentic-sdlc — \" + new Date().toISOString()}}]}},\"children\":[{\"object\":\"block\",\"type\":\"paragraph\",\"paragraph\":{\"rich_text\":[{\"type\":\"text\",\"text\":{\"content\":\"No CRITICAL or HIGH findings.\\n\\n\" + ($json.stdout || '').slice(0,2000)}}]}}]}",
+          "options": {}
+        },
+        "id": "notify-audit-clean",
+        "name": "Notify Audit Clean",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1160,
+          420
+        ],
+        "continueOnFail": true
+      },
+      {
+        "id": "doc-agent-001",
+        "name": "Run Doc Agent",
+        "type": "n8n-nodes-base.executeCommand",
+        "typeVersion": 1,
+        "position": [
+          1600,
+          300
+        ],
+        "parameters": {
+          "command": "bash /opt/agentic-sdlc/scripts/cqs-score.sh doc 5 docs_current 'cycle complete' >> /opt/agentic-sdlc/logs/pcirt.log 2>&1"
+        }
+      }
+    ],
+    "connections": {
+      "Git Push Webhook": {
+        "main": [
+          [
+            {
+              "node": "Respond 200 Immediately",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "Set Trigger Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cron Daily Audit": {
+        "main": [
+          [
+            {
+              "node": "Set Trigger Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set Trigger Context": {
+        "main": [
+          [
+            {
+              "node": "Run Audit Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Audit Agent": {
+        "main": [
+          [
+            {
+              "node": "Check for CRITICAL or HIGH",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Check for CRITICAL or HIGH": {
+        "main": [
+          [
+            {
+              "node": "Run Break-Fix Stage 1",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Notify Audit Clean",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Run Break-Fix Stage 1": {
+        "main": [
+          [
+            {
+              "node": "Notify HITL — Patch Proposal Ready",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify HITL — Patch Proposal Ready": {
+        "main": [
+          [
+            {
+              "node": "Run Doc Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Notify Audit Clean": {
+        "main": [
+          [
+            {
+              "node": "Run Doc Agent",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "null null",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-03-23T21:04:14.247Z",
+        "id": 220,
+        "workflowId": "1RsF3H3rv0Z9RAOE",
+        "versionId": "3513f495-8b6d-45cd-a49c-95bdfa5d95ec",
+        "event": "deactivated",
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
+      },
+      {
+        "createdAt": "2026-03-23T21:04:14.274Z",
+        "id": 221,
+        "workflowId": "1RsF3H3rv0Z9RAOE",
+        "versionId": "3513f495-8b6d-45cd-a49c-95bdfa5d95ec",
+        "event": "activated",
+        "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
+      }
+    ]
+  }
 }
