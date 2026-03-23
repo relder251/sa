@@ -717,7 +717,7 @@ services:
   # Static HTML/JS portal served by Nginx, gated by oauth2_proxy_portal
   # -----------------------------------------
   portal:
-    image: nginx:alpine
+    image: nginx:1.27-alpine
     container_name: portal
     environment:
       - LITELLM_API_KEY=${LITELLM_API_KEY}
