@@ -47,7 +47,7 @@ check_via_container() {
 
   actual_code=$(docker exec "$container" \
     wget -qO /dev/null --server-response --timeout=10 "$url" 2>&1 \
-    | grep "HTTP/" | tail -1 | awk '{print $2}') || true
+    | grep "HTTP/" | head -1 | awk '{print $2}') || true
   actual_code="${actual_code:-000}"
 
   if [ "$actual_code" = "$expected_code" ]; then
