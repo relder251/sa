@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.mirror.example
+*.mirror
 !refactor/*.md
 *.pem
 *.key
