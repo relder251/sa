@@ -88,37 +88,53 @@ def _authenticate():
     """Configure server, log in with API key, unlock with master password, cache session."""
     global _BW_SESSION
 
-    # Clear any stale bw state; a corrupt/outdated data.json crashes bw on startup.
-    data_json = os.path.expanduser("~/.config/Bitwarden CLI/data.json")
-    if os.path.exists(data_json):
-        os.remove(data_json)
-        log.info("Cleared stale bw data.json")
-
-    log.info("Configuring bw server: %s", BW_SERVER)
-    _run(["config", "server", BW_SERVER])
-
-    log.info("Logging in with API key...")
     env = os.environ.copy()
     env["BW_SERVER"] = BW_SERVER
     env["BW_CLIENTID"] = BW_CLIENTID
     env["BW_CLIENTSECRET"] = BW_CLIENTSECRET
-    subprocess.run(
-        ["bw", "login", "--apikey"],
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,  # may fail if already logged in; that is fine
-    )
 
-    log.info("Unlocking vault...")
+    log.info("Configuring bw server: %s", BW_SERVER)
+    subprocess.run(["bw", "config", "server", BW_SERVER], capture_output=True, env=env)
+
+    # Attempt unlock without a full re-login first. bw login --apikey deletes
+    # its own data.json internally in CLI 2026.x and then fails to re-initialise,
+    # producing an empty session token. By trying unlock first we avoid that bug
+    # when a valid login state already exists.
+    log.info("Attempting vault unlock...")
     result = subprocess.run(
         ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS", "--raw"],
         capture_output=True,
         text=True,
         env={**env, "BW_MASTER_PASS": BW_MASTER_PASS},
-        check=True,
+        check=False,
     )
-    _BW_SESSION = result.stdout.strip()
+    session = result.stdout.strip()
+
+    if not session:
+        # Unlock failed — not logged in yet. Clear state and do a full login.
+        log.info("Unlock returned empty session; performing full API-key login...")
+        data_json = os.path.expanduser("~/.config/Bitwarden CLI/data.json")
+        if os.path.exists(data_json):
+            os.remove(data_json)
+            log.info("Cleared stale bw data.json")
+        subprocess.run(["bw", "config", "server", BW_SERVER], capture_output=True, env=env)
+        subprocess.run(
+            ["bw", "login", "--apikey"],
+            capture_output=True,
+            text=True,
+            env=env,
+            check=False,
+        )
+        result = subprocess.run(
+            ["bw", "unlock", "--passwordenv", "BW_MASTER_PASS", "--raw"],
+            capture_output=True,
+            text=True,
+            env={**env, "BW_MASTER_PASS": BW_MASTER_PASS},
+            check=True,
+        )
+        session = result.stdout.strip()
+
+    _BW_SESSION = session
     log.info("Vault unlocked; session token cached.")
 
     log.info("Syncing vault to populate local cache...")
