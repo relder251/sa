@@ -611,7 +611,7 @@ _ALLOWED_API_KEYS = {
 _KEY_VALIDATORS: dict[str, dict] = {
     "GROQ_API_KEY":        {"url": "https://api.groq.com/openai/v1/models",         "auth": "Bearer"},
     "DEEPSEEK_API_KEY":    {"url": "https://api.deepseek.com/models",                "auth": "Bearer"},
-    "PERPLEXITY_API_KEY":  {"url": "https://api.perplexity.ai/models",               "auth": "Bearer"},
+    "PERPLEXITY_API_KEY":  {"url": "https://api.perplexity.ai/v1/models",             "auth": "Bearer"},
     "XAI_API_KEY":         {"url": "https://api.x.ai/v1/models",                     "auth": "Bearer"},
     "ANTHROPIC_API_KEY":   {"url": "https://api.anthropic.com/v1/models",            "auth": "x-api-key"},
     "OPENAI_API_KEY":      {"url": "https://api.openai.com/v1/models",               "auth": "Bearer"},
