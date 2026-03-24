@@ -221,7 +221,6 @@ services:
       - DB_POSTGRESDB_USER=${N8N_DB_USER:-n8n_user}
       - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD:-CHANGE_ME_n8n}
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - N8N_RUNNERS_ENABLED=false
       - N8N_TRUST_PROXY=true
       - N8N_LOG_LEVEL=info
       - N8N_LOG_OUTPUT=console
