@@ -617,7 +617,8 @@ _KEY_VALIDATORS: dict[str, dict] = {
     "OPENAI_API_KEY":      {"url": "https://api.openai.com/v1/models",               "auth": "Bearer"},
     "GEMINI_API_KEY":      {"url": "https://generativelanguage.googleapis.com/v1beta/models", "auth": "key"},
     "CLOUDFLARE_API_TOKEN":{"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "Bearer"},
-    "GREPTILE_API_KEY":    {"url": "https://api.greptile.com/v2/repositories",       "auth": "Bearer"},
+    # GREPTILE_API_KEY: /v2/repositories returns 404 for both valid and invalid keys (no repos indexed)
+    # — no reliable validation endpoint available, so we skip it
 }
 
 
