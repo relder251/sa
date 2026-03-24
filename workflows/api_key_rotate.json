@@ -4,7 +4,7 @@
   "nodes": [
     {
       "id": "akr-0001",
-      "name": "Webhook — Receive New Key",
+      "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [200, 300],
@@ -139,7 +139,7 @@
     }
   ],
   "connections": {
-    "Webhook — Receive New Key": {
+    "Webhook": {
       "main": [[{"node": "Validate Input", "type": "main", "index": 0}]]
     },
     "Validate Input": {
