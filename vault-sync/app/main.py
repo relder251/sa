@@ -75,7 +75,7 @@ def _keycloak_watcher():
             items = vault.list_items()
             current_hash = _credential_hash(items)
             if current_hash == _last_kc_hash:
-                log.debug("Keycloak watcher: no credential changes")
+                log.info("Keycloak watcher: poll OK — no credential changes")
                 continue
             log.info("Keycloak watcher: credential change detected, syncing")
             _last_kc_hash = current_hash
