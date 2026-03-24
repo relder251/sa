@@ -64,7 +64,7 @@
       "typeVersion": 1.2,
       "position": [1080, 220],
       "parameters": {
-        "chatId": "={{ $env.TELEGRAM_CHAT_ID || '-1001234567890' }}",
+        "chatId": "8761521211",
         "text": "={{ $json.message }}",
         "additionalFields": {"parse_mode": "Markdown"}
       },
