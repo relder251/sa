@@ -599,6 +599,8 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8777:8777"
+    volumes:
+      - ./.env:/app/.env.host:rw
     environment:
       - BW_SERVER=https://vault.private.sovereignadvisory.ai
       - BW_CLIENTID=${BW_CLIENTID}
@@ -612,6 +614,7 @@ services:
       - KEYCLOAK_SYNC_INTERVAL=300
       - SENTRY_DSN=${SENTRY_DSN_VAULTSYNC:-}
       - ENVIRONMENT=production
+      - HOST_ENV_FILE=/app/.env.host
     networks:
       - vibe_net
     healthcheck:

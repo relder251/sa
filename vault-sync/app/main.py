@@ -21,8 +21,11 @@ Optional Keycloak sync (enables /update-keycloak and atomic sync on /update):
 import hashlib
 import logging
 import os
+import re
 import threading
 import time
+import urllib.request
+import urllib.error
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -588,3 +591,142 @@ def rotate_credential(service: str):
     except Exception as exc:
         log.error("rotate(%s) unhandled exception: %s", service, exc)
         raise HTTPException(status_code=500, detail=str(exc))
+
+
+# ---------------------------------------------------------------------------
+# API Key management — read/validate/update keys in the host .env file
+# Only accessible internally (127.0.0.1:8777). Mount .env as HOST_ENV_FILE.
+# ---------------------------------------------------------------------------
+
+_HOST_ENV_FILE = os.environ.get("HOST_ENV_FILE", "/app/.env.host")
+
+# Keys allowed to be read or updated via this API
+_ALLOWED_API_KEYS = {
+    "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
+    "GROQ_API_KEY", "DEEPSEEK_API_KEY", "PERPLEXITY_API_KEY",
+    "XAI_API_KEY", "GREPTILE_API_KEY", "CLOUDFLARE_API_TOKEN",
+}
+
+# Per-key validation: GET the URL with Bearer auth, expect 2xx
+_KEY_VALIDATORS: dict[str, dict] = {
+    "GROQ_API_KEY":        {"url": "https://api.groq.com/openai/v1/models",         "auth": "Bearer"},
+    "DEEPSEEK_API_KEY":    {"url": "https://api.deepseek.com/models",                "auth": "Bearer"},
+    "PERPLEXITY_API_KEY":  {"url": "https://api.perplexity.ai/models",               "auth": "Bearer"},
+    "XAI_API_KEY":         {"url": "https://api.x.ai/v1/models",                     "auth": "Bearer"},
+    "ANTHROPIC_API_KEY":   {"url": "https://api.anthropic.com/v1/models",            "auth": "x-api-key"},
+    "OPENAI_API_KEY":      {"url": "https://api.openai.com/v1/models",               "auth": "Bearer"},
+    "GEMINI_API_KEY":      {"url": "https://generativelanguage.googleapis.com/v1beta/models", "auth": "key"},
+    "CLOUDFLARE_API_TOKEN":{"url": "https://api.cloudflare.com/client/v4/user/tokens/verify", "auth": "Bearer"},
+    "GREPTILE_API_KEY":    {"url": "https://api.greptile.com/v2/repositories",       "auth": "Bearer"},
+}
+
+
+def _parse_host_env() -> dict[str, str]:
+    """Parse the host .env file into a key→value dict."""
+    result: dict[str, str] = {}
+    try:
+        with open(_HOST_ENV_FILE) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, _, v = line.partition("=")
+                v = re.sub(r"\s+#.*", "", v).strip().strip('"').strip("'")
+                result[k.strip()] = v
+    except FileNotFoundError:
+        pass
+    return result
+
+
+def _validate_key(key_name: str, key_value: str) -> dict:
+    """Test a key against its provider API. Returns {ok, status_code, error}."""
+    if not key_value:
+        return {"ok": False, "status_code": None, "error": "key is empty"}
+    spec = _KEY_VALIDATORS.get(key_name)
+    if not spec:
+        return {"ok": True, "status_code": None, "error": "no validator for this key"}
+    try:
+        url = spec["url"]
+        auth_type = spec["auth"]
+        if auth_type == "key":
+            url = f"{url}?key={key_value}"
+            req = urllib.request.Request(url)
+        elif auth_type == "x-api-key":
+            req = urllib.request.Request(url, headers={
+                "x-api-key": key_value,
+                "anthropic-version": "2023-06-01",
+            })
+        else:
+            req = urllib.request.Request(url, headers={"Authorization": f"Bearer {key_value}"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return {"ok": True, "status_code": resp.status, "error": None}
+    except urllib.error.HTTPError as e:
+        return {"ok": False, "status_code": e.code, "error": f"HTTP {e.code}"}
+    except Exception as exc:
+        return {"ok": False, "status_code": None, "error": str(exc)}
+
+
+class EnvKeyUpdateRequest(BaseModel):
+    key_name: str
+    key_value: str
+
+
+@app.get("/env/keys")
+def env_keys():
+    """List which allowed API keys are present (prefix only) in the host .env."""
+    if not os.path.exists(_HOST_ENV_FILE):
+        raise HTTPException(status_code=503, detail=f"Host .env not mounted at {_HOST_ENV_FILE}")
+    env = _parse_host_env()
+    result = {}
+    for k in _ALLOWED_API_KEYS:
+        v = env.get(k, "")
+        result[k] = {"present": bool(v), "prefix": (v[:12] + "...") if len(v) > 12 else v}
+    return {"status": "ok", "keys": result}
+
+
+@app.post("/env/validate")
+def env_validate_all():
+    """Validate all known API keys against their provider APIs. Returns per-key pass/fail."""
+    if not os.path.exists(_HOST_ENV_FILE):
+        raise HTTPException(status_code=503, detail=f"Host .env not mounted at {_HOST_ENV_FILE}")
+    env = _parse_host_env()
+    results = {}
+    for key_name in _KEY_VALIDATORS:
+        val = env.get(key_name, "")
+        result = _validate_key(key_name, val)
+        results[key_name] = {
+            "present": bool(val),
+            **result,
+        }
+        log.info("validate %s: ok=%s code=%s", key_name, result["ok"], result.get("status_code"))
+    failures = [k for k, v in results.items() if not v["ok"]]
+    return {"status": "ok", "results": results, "failures": failures, "all_ok": len(failures) == 0}
+
+
+@app.post("/env/update")
+def env_update(req: EnvKeyUpdateRequest):
+    """Update a specific API key in the host .env file. Restricted to allowed keys."""
+    if req.key_name not in _ALLOWED_API_KEYS:
+        raise HTTPException(status_code=400, detail=f"Key {req.key_name!r} not in allowed list")
+    if not req.key_value:
+        raise HTTPException(status_code=400, detail="key_value is required")
+    if not os.path.exists(_HOST_ENV_FILE):
+        raise HTTPException(status_code=503, detail=f"Host .env not mounted at {_HOST_ENV_FILE}")
+
+    with open(_HOST_ENV_FILE) as f:
+        content = f.read()
+
+    pattern = re.compile(rf"^{re.escape(req.key_name)}=.*$", re.MULTILINE)
+    new_line = f"{req.key_name}={req.key_value}"
+    if pattern.search(content):
+        content = pattern.sub(new_line, content)
+    else:
+        content = content.rstrip("\n") + f"\n{new_line}\n"
+
+    with open(_HOST_ENV_FILE, "w") as f:
+        f.write(content)
+
+    # Validate the new key
+    validation = _validate_key(req.key_name, req.key_value)
+    log.info("env/update %s: valid=%s", req.key_name, validation["ok"])
+    return {"status": "ok", "key_name": req.key_name, "updated": True, "validation": validation}
