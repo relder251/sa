@@ -226,6 +226,7 @@ services:
       - N8N_LOG_OUTPUT=console
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
+      - NODE_OPTIONS=--max-listeners=25
       - N8N_SECURE_COOKIE=true
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
