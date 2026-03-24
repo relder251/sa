@@ -144,6 +144,34 @@
               "value": "={{ $('Extract Issue Data').item.json.issue_name }}"
             },
             {
+              "id": "fp-severity",  "name": "severity",     "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.severity }}"
+            },
+            {
+              "id": "fp-type",      "name": "issue_type",   "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.issue_type }}"
+            },
+            {
+              "id": "fp-component", "name": "component",    "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.component }}"
+            },
+            {
+              "id": "fp-phase",     "name": "phase",        "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.phase }}"
+            },
+            {
+              "id": "fp-desc",      "name": "description",  "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.description }}"
+            },
+            {
+              "id": "fp-root",      "name": "root_cause",   "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.root_cause }}"
+            },
+            {
+              "id": "fp-repro",     "name": "repro_steps",  "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.repro_steps }}"
+            },
+            {
               "id": "fp-prompt",
               "name": "fixer_prompt",
               "type": "string",
@@ -161,7 +189,7 @@
       "onError": "continueRegularOutput",
       "position": [1740, 200],
       "parameters": {
-        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.fixer_prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty fixer_prompt'}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\nconst tmpFile = '/tmp/bi_fixer_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 600000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n    stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message\n  }}];\n}\n"
+        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst item = $input.item.json;\nconst fixerPrompt = item.fixer_prompt;\nconst issueNum    = item.issue_num    || '';\nconst issueName   = item.issue_name   || '';\nconst severity    = item.severity     || '';\nconst component   = item.component    || '';\nconst description = item.description  || '';\nconst rootCause   = item.root_cause   || '';\nconst reproSteps  = item.repro_steps  || '';\n\nif (!fixerPrompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty fixer_prompt', agentsUsed: 0, helpNeeded: false}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set', agentsUsed: 0, helpNeeded: false}}];\n}\n\nfunction runClaude(prompt, timeoutMs, label) {\n  const tmpFile = '/tmp/bi_' + label + '_' + Date.now() + '.txt';\n  fs.writeFileSync(tmpFile, prompt, 'utf8');\n  try {\n    const out = execFileSync(\n      'node',\n      ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n      {\n        input: fs.readFileSync(tmpFile),\n        env: {ANTHROPIC_API_KEY: apiKey, HOME: '/home/node', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'},\n        timeout: timeoutMs,\n        maxBuffer: 10 * 1024 * 1024,\n        cwd: '/opt/agentic-sdlc'\n      }\n    );\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {exitCode: 0, stdout: out.toString('utf8').trim(), stderr: '', timedOut: false};\n  } catch (e) {\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {\n      exitCode: e.status || 1,\n      stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n      stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message,\n      timedOut: e.killed === true || e.signal === 'SIGTERM' || e.signal === 'SIGKILL'\n    };\n  }\n}\n\n// --- Primary fixer agent (10 min) ---\nconst fixerResult = runClaude(fixerPrompt, 600000, 'fixer');\n\nif (fixerResult.exitCode === 0) {\n  return [{json: {exitCode: 0, stdout: fixerResult.stdout, stderr: '', agentsUsed: 1, helpNeeded: false}}];\n}\n\n// Hard failure (not a timeout) — helpers won't change the outcome\nif (!fixerResult.timedOut) {\n  return [{json: {exitCode: fixerResult.exitCode, stdout: fixerResult.stdout, stderr: fixerResult.stderr, agentsUsed: 1, helpNeeded: false}}];\n}\n\n// --- Fixer timed out: spawn continuation helper ---\nconst partial = fixerResult.stdout.substring(0, 800) || '(no output captured before timeout)';\n\nconst helperPrompt =\n  'You are a continuation agent for an Agentic SDLC infrastructure issue.\\n'\n  + 'A previous fix agent ran for 10 minutes but did not complete the task.\\n'\n  + 'Project root: /opt/agentic-sdlc on VPS 187.77.208.197. Read CLAUDE.md first.\\n\\n'\n  + 'ORIGINAL ISSUE:\\n'\n  + 'ID: ' + issueNum + '\\n'\n  + 'Name: ' + issueName + '\\n'\n  + 'Severity: ' + severity + '\\n'\n  + 'Component: ' + component + '\\n'\n  + 'Description: ' + description + '\\n'\n  + 'Root Cause: ' + rootCause + '\\n'\n  + 'Reproduction Steps: ' + reproSteps + '\\n\\n'\n  + 'PREVIOUS AGENT PARTIAL WORK (captured before 10-min timeout):\\n'\n  + partial + '\\n\\n'\n  + 'YOUR TASK:\\n'\n  + '1. Run: git -C /opt/agentic-sdlc status  — review any changes left by the previous agent\\n'\n  + '2. Assess current state vs. what is still needed to fully resolve the issue\\n'\n  + '3. Complete the fix without undoing previous agent work\\n'\n  + '4. Follow the Completion Gate in CLAUDE.md\\n'\n  + '5. End with a RESOLUTION SUMMARY of what you completed\\n\\n'\n  + 'This is a fresh isolated session. Complete the fix end-to-end.';\n\nconst helperResult = runClaude(helperPrompt, 600000, 'helper');\n\nreturn [{json: {\n  exitCode: helperResult.exitCode,\n  stdout: helperResult.stdout,\n  stderr: helperResult.timedOut\n    ? 'TIMEOUT: fixer (10 min) and helper (10 min) both exceeded time limit. Manual intervention required.'\n    : helperResult.stderr,\n  agentsUsed: 2,\n  helpNeeded: true,\n  helperTimedOut: helperResult.timedOut\n}}];\n"
       }
     },
     {
