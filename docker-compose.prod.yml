@@ -686,6 +686,33 @@ services:
       - vibe_net
     restart: unless-stopped
 
+  # oauth2-proxy — GlitchTip (port 4186); /api/ routes bypass auth for SDK ingestion
+  oauth2-proxy-glitchtip:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    container_name: oauth2_proxy_glitchtip
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
+      - --client-id=glitchtip
+      - --client-secret=${GLITCHTIP_OIDC_CLIENT_SECRET}
+      - --redirect-url=https://sentry.private.sovereignadvisory.ai/oauth2/callback
+      - --upstream=http://glitchtip_web:8000
+      - --http-address=0.0.0.0:4186
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=true
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --insecure-oidc-allow-unverified-email=true
+      - --allowed-role=agentic-sdlc:admin
+      - --code-challenge-method=S256
+      - --skip-auth-route=^/api/
+      - --skip-auth-route=^/api/0/
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      - glitchtip-web
+
   # oauth2-proxy — LiteLLM UI (port 4001)
   oauth2-proxy-litellm:
     image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
