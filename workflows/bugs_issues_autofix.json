@@ -1,0 +1,457 @@
+{
+  "name": "Bugs & Issues Auto-Fix",
+  "active": true,
+  "nodes": [
+    {
+      "id": "bi-schedule",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 5}]
+        }
+      }
+    },
+    {
+      "id": "bi-query",
+      "name": "Query Open Bugs & Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300],
+      "parameters": {
+        "url": "https://api.notion.com/v1/databases/c519df34-d2ff-41d0-82b6-2f1afa3a1d16/query",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"filter\": {\n    \"property\": \"Status\",\n    \"select\": {\n      \"equals\": \"Open\"\n    }\n  },\n  \"sorts\": [\n    {\n      \"timestamp\": \"created_time\",\n      \"direction\": \"ascending\"\n    }\n  ]\n}",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+      }
+    },
+    {
+      "id": "bi-has-issues",
+      "name": "Has Open Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [640, 300],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "has-results",
+              "operator": {"type": "number", "operation": "gt"},
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-split",
+      "name": "Split Into Issues",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [860, 200],
+      "parameters": {
+        "fieldToSplitOut": "results",
+        "options": {}
+      }
+    },
+    {
+      "id": "bi-extract",
+      "name": "Extract Issue Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1080, 200],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {"id": "e-page-id",    "name": "page_id",     "type": "string", "value": "={{ $json.id }}"},
+            {"id": "e-issue-num",  "name": "issue_num",   "type": "string", "value": "=ISSU-{{ $json.properties['ID']?.unique_id?.number ?? '?' }}"},
+            {"id": "e-name",       "name": "issue_name",  "type": "string", "value": "={{ ($json.properties['Name']?.title || []).map(t => t.plain_text).join('') }}"},
+            {"id": "e-severity",   "name": "severity",    "type": "string", "value": "={{ $json.properties['Severity']?.select?.name ?? 'Unknown' }}"},
+            {"id": "e-type",       "name": "issue_type",  "type": "string", "value": "={{ $json.properties['Type']?.select?.name ?? 'Issue' }}"},
+            {"id": "e-component",  "name": "component",   "type": "string", "value": "={{ $json.properties['Component']?.select?.name ?? 'unknown' }}"},
+            {"id": "e-phase",      "name": "phase",       "type": "string", "value": "={{ $json.properties['Phase']?.select?.name ?? '' }}"},
+            {"id": "e-desc",       "name": "description", "type": "string", "value": "={{ ($json.properties['Description']?.rich_text || []).map(t => t.plain_text).join('') }}"},
+            {"id": "e-root",       "name": "root_cause",  "type": "string", "value": "={{ ($json.properties['Root Cause']?.rich_text || []).map(t => t.plain_text).join('') }}"},
+            {"id": "e-repro",      "name": "repro_steps", "type": "string", "value": "={{ ($json.properties['Reproduction Steps']?.rich_text || []).map(t => t.plain_text).join('') }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-mark-inprogress",
+      "name": "Mark In Progress",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1300, 200],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "method": "PATCH",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"select\": {\n        \"name\": \"In Progress\"\n      }\n    },\n    \"Resolution\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify(\"Auto-fix agent picked up at \" + new Date().toISOString()) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+      }
+    },
+    {
+      "id": "bi-build-fixer-prompt",
+      "name": "Build Fixer Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1520, 200],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fp-page-id",   "name": "page_id",      "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.page_id }}"
+            },
+            {
+              "id": "fp-issue-num", "name": "issue_num",    "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.issue_num }}"
+            },
+            {
+              "id": "fp-name",      "name": "issue_name",   "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.issue_name }}"
+            },
+            {
+              "id": "fp-prompt",
+              "name": "fixer_prompt",
+              "type": "string",
+              "value": "=You are a specialized bug-fixing subagent for the Agentic SDLC infrastructure stack.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md first for project context and mandatory completion requirements.\n\nISSUE TO FIX:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nType: {{ $('Extract Issue Data').item.json.issue_type }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nPhase: {{ $('Extract Issue Data').item.json.phase }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nRoot Cause: {{ $('Extract Issue Data').item.json.root_cause }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nYOUR TASK:\n1. Investigate the issue thoroughly\n2. Implement a complete fix\n3. Test that it works — follow the Completion Gate in CLAUDE.md (smoke_test.sh + upstream health + E2E where applicable)\n4. End your response with a concise RESOLUTION SUMMARY covering:\n   - Exactly what you changed (files, configs, commands)\n   - How you confirmed the fix works\n\nDo not mark done without actually verifying end-to-end. This is a fresh isolated session."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-run-fixer",
+      "name": "Run Fixer Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [1740, 200],
+      "parameters": {
+        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.fixer_prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty fixer_prompt'}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\nconst tmpFile = '/tmp/bi_fixer_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 600000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n    stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message\n  }}];\n}\n"
+      }
+    },
+    {
+      "id": "bi-fixer-ok",
+      "name": "Fixer Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1960, 200],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "fixer-exit-check",
+              "operator": {"type": "number", "operation": "equals"},
+              "leftValue": "={{ $json.exitCode }}",
+              "rightValue": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-build-validator-prompt",
+      "name": "Build Validator Prompt",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2180, 100],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "vp-page-id",  "name": "page_id",         "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.page_id }}"
+            },
+            {
+              "id": "vp-issue-num", "name": "issue_num",      "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.issue_num }}"
+            },
+            {
+              "id": "vp-name",      "name": "issue_name",     "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.issue_name }}"
+            },
+            {
+              "id": "vp-fixer-out", "name": "fixer_summary",  "type": "string",
+              "value": "={{ $json.stdout.length > 3000 ? $json.stdout.substring(0, 3000) + '\\n...[truncated]' : $json.stdout }}"
+            },
+            {
+              "id": "vp-prompt",
+              "name": "validator_prompt",
+              "type": "string",
+              "value": "=You are a validation subagent. A fixer agent worked on an issue and claims it is resolved.\nYour ONLY job is to independently verify the fix is complete and correct.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md for the mandatory Completion Gate.\n\nISSUE BEING VALIDATED:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nFIXER'S REPORTED WORK:\n{{ $json.stdout.length > 3000 ? $json.stdout.substring(0, 3000) + '\\n...[truncated]' : $json.stdout }}\n\nVALIDATION INSTRUCTIONS:\n1. Do NOT rely on the fixer's word — independently verify by following the reproduction steps yourself\n2. Run bash scripts/validate-prod.sh if the fix touches any service, endpoint, config, or nginx rule\n3. Confirm the specific symptom described is gone\n4. Your response MUST end with EXACTLY one of these two lines (no other text on that line):\n   VALIDATED: <one-sentence explanation of what you confirmed>\n   NOT_VALIDATED: <one-sentence explanation of what is still broken or unconfirmed>\n\nOnly output VALIDATED if you personally confirmed end-to-end resolution. This is a fresh isolated session."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-run-validator",
+      "name": "Run Validator Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [2400, 100],
+      "parameters": {
+        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.validator_prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty validator_prompt'}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\nconst tmpFile = '/tmp/bi_validator_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 300000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n    stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message\n  }}];\n}\n"
+      }
+    },
+    {
+      "id": "bi-validator-passed",
+      "name": "Validator Passed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2620, 100],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "validated-check",
+              "operator": {"type": "string", "operation": "contains"},
+              "leftValue": "={{ $json.stdout }}",
+              "rightValue": "VALIDATED:"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-prepare-resolved",
+      "name": "Prepare Resolved Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2840, 0],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "r-page-id",  "name": "page_id",          "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.page_id }}"
+            },
+            {
+              "id": "r-note",     "name": "resolution_note",  "type": "string",
+              "value": "=FIXER: {{ $('Build Validator Prompt').item.json.fixer_summary.substring(0, 1200) }}\n\nVALIDATOR: {{ $json.stdout.length > 800 ? $json.stdout.substring(0, 800) + '...' : $json.stdout }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-mark-resolved",
+      "name": "Mark Resolved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3060, 0],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "method": "PATCH",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"select\": {\n        \"name\": \"Resolved\"\n      }\n    },\n    \"Completed Date\": {\n      \"date\": {\n        \"start\": {{ JSON.stringify(new Date().toISOString().split('T')[0]) }}\n      }\n    },\n    \"Resolution\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.resolution_note.substring(0, 2000)) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+      }
+    },
+    {
+      "id": "bi-prepare-not-validated",
+      "name": "Prepare Not Validated Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2840, 200],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "nv-page-id",  "name": "page_id",       "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.page_id }}"
+            },
+            {
+              "id": "nv-note",     "name": "needs_info_note", "type": "string",
+              "value": "=Auto-fix attempted but NOT validated ({{ new Date().toISOString() }}).\nValidator output: {{ $json.stdout.length > 900 ? $json.stdout.substring(0, 900) + '...' : $json.stdout }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-mark-needs-info-notvalidated",
+      "name": "Mark Needs Info (Not Validated)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [3060, 200],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "method": "PATCH",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"select\": {\n        \"name\": \"Needs Info\"\n      }\n    },\n    \"Resolution\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.needs_info_note.substring(0, 2000)) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+      }
+    },
+    {
+      "id": "bi-prepare-fixer-failed",
+      "name": "Prepare Fixer Failed Output",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2180, 340],
+      "parameters": {
+        "options": {},
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ff-page-id",  "name": "page_id",       "type": "string",
+              "value": "={{ $('Extract Issue Data').item.json.page_id }}"
+            },
+            {
+              "id": "ff-note",     "name": "needs_info_note", "type": "string",
+              "value": "=Auto-fix agent failed (exit {{ $json.exitCode }}, {{ new Date().toISOString() }}).\nError: {{ ($json.stderr || $json.stdout || 'Unknown error').substring(0, 900) }}"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-mark-needs-info-fixerfailed",
+      "name": "Mark Needs Info (Fixer Failed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2400, 340],
+      "parameters": {
+        "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+        "method": "PATCH",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"select\": {\n        \"name\": \"Needs Info\"\n      }\n    },\n    \"Resolution\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.needs_info_note.substring(0, 2000)) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+        "sendHeaders": true,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "headerParameters": {
+          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+        },
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [[{"node": "Query Open Bugs & Issues", "type": "main", "index": 0}]]
+    },
+    "Query Open Bugs & Issues": {
+      "main": [[{"node": "Has Open Issues?", "type": "main", "index": 0}]]
+    },
+    "Has Open Issues?": {
+      "main": [
+        [{"node": "Split Into Issues", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Split Into Issues": {
+      "main": [[{"node": "Extract Issue Data", "type": "main", "index": 0}]]
+    },
+    "Extract Issue Data": {
+      "main": [[{"node": "Mark In Progress", "type": "main", "index": 0}]]
+    },
+    "Mark In Progress": {
+      "main": [[{"node": "Build Fixer Prompt", "type": "main", "index": 0}]]
+    },
+    "Build Fixer Prompt": {
+      "main": [[{"node": "Run Fixer Claude", "type": "main", "index": 0}]]
+    },
+    "Run Fixer Claude": {
+      "main": [[{"node": "Fixer Succeeded?", "type": "main", "index": 0}]]
+    },
+    "Fixer Succeeded?": {
+      "main": [
+        [{"node": "Build Validator Prompt", "type": "main", "index": 0}],
+        [{"node": "Prepare Fixer Failed Output", "type": "main", "index": 0}]
+      ]
+    },
+    "Build Validator Prompt": {
+      "main": [[{"node": "Run Validator Claude", "type": "main", "index": 0}]]
+    },
+    "Run Validator Claude": {
+      "main": [[{"node": "Validator Passed?", "type": "main", "index": 0}]]
+    },
+    "Validator Passed?": {
+      "main": [
+        [{"node": "Prepare Resolved Output", "type": "main", "index": 0}],
+        [{"node": "Prepare Not Validated Output", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Resolved Output": {
+      "main": [[{"node": "Mark Resolved", "type": "main", "index": 0}]]
+    },
+    "Prepare Not Validated Output": {
+      "main": [[{"node": "Mark Needs Info (Not Validated)", "type": "main", "index": 0}]]
+    },
+    "Prepare Fixer Failed Output": {
+      "main": [[{"node": "Mark Needs Info (Fixer Failed)", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}
