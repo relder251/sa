@@ -7,10 +7,18 @@
       "name": "Every 5 Minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [200, 300],
+      "position": [
+        200,
+        300
+      ],
       "parameters": {
         "rule": {
-          "interval": [{"field": "minutes", "minutesInterval": 5}]
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
         }
       }
     },
@@ -19,7 +27,10 @@
       "name": "Query Open Bugs & Issues",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [420, 300],
+      "position": [
+        420,
+        300
+      ],
       "parameters": {
         "url": "https://api.notion.com/v1/databases/c519df34-d2ff-41d0-82b6-2f1afa3a1d16/query",
         "method": "POST",
@@ -31,12 +42,20 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "headerParameters": {
-          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
         },
         "options": {}
       },
       "credentials": {
-        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+        "httpHeaderAuth": {
+          "id": "Fd9gwjnr6Vi7sRUN",
+          "name": "Notion Tasks API"
+        }
       }
     },
     {
@@ -44,16 +63,72 @@
       "name": "Has Open Issues?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [640, 300],
+      "position": [
+        640,
+        300
+      ],
       "parameters": {
         "options": {},
         "conditions": {
-          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
           "combinator": "and",
           "conditions": [
             {
               "id": "has-results",
-              "operator": {"type": "number", "operation": "gt"},
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
+              "leftValue": "={{ $json.results.length }}",
+              "rightValue": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "bi-lead-fixer-dedup",
+      "name": "Lead Fixer \u2014 Dedup Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "onError": "continueRegularOutput",
+      "position": [
+        860,
+        200
+      ],
+      "parameters": {
+        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst results = $input.item.json.results || [];\n\n// A single issue cannot duplicate itself\nif (results.length < 2) {\n  return [{json: {results: results}}];\n}\n\nconst apiKey    = $env.ANTHROPIC_API_KEY;\nconst notionKey = $env.NOTION_API_KEY;\nif (!apiKey || !notionKey) {\n  return [{json: {results: results}}];\n}\n\nfunction txt(arr) { return (arr || []).map(t => t.plain_text).join(''); }\n\nconst issues = results.map(r => {\n  const p = r.properties;\n  return {\n    pageId: r.id,\n    num:    'ISSU-' + (p['ID']?.unique_id?.number ?? '?'),\n    name:   txt(p['Name']?.title),\n    comp:   p['Component']?.select?.name || '',\n    type:   p['Type']?.select?.name || '',\n    desc:   txt(p['Description']?.rich_text).substring(0, 200),\n    root:   txt(p['Root Cause']?.rich_text).substring(0, 120)\n  };\n});\n\nconst listText = issues.map(i =>\n  '- ' + i.num + ' [' + i.comp + ' / ' + i.type + ']: ' + i.name\n  + (i.desc ? '\\n    Desc: ' + i.desc : '')\n  + (i.root ? '\\n    Root: ' + i.root : '')\n).join('\\n');\n\nconst prompt =\n  'Review these open bug/issue tickets and identify any DUPLICATES.\\n\\n'\n  + 'OPEN ISSUES:\\n' + listText + '\\n\\n'\n  + 'Rules:\\n'\n  + '- Duplicates = same underlying problem (fixing one fixes the other)\\n'\n  + '- Different symptoms of the identical root cause = duplicate\\n'\n  + '- Keep the OLDEST ticket (lowest ISSU number), close the rest\\n'\n  + '- Different components with unrelated causes = NOT duplicates\\n\\n'\n  + 'Respond with ONLY valid JSON, no markdown fences, no explanation:\\n'\n  + '{\"duplicates\":[{\"keep\":\"ISSU-X\",\"close\":[\"ISSU-Y\"],\"reason\":\"one sentence\"}]}\\n'\n  + 'If no duplicates: {\"duplicates\":[]}';\n\nconst tmpFile = '/tmp/bi_dedup_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\nlet dupGroups = [];\ntry {\n  const out = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {ANTHROPIC_API_KEY: apiKey, HOME: '/home/node', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'},\n      timeout: 60000,\n      maxBuffer: 1 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  const text = out.toString('utf8').trim();\n  const match = text.match(/\\{[\\s\\S]*\\}/);\n  if (match) {\n    dupGroups = JSON.parse(match[0]).duplicates || [];\n  }\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  // Dedup check failed \u2014 proceed with all issues unchanged\n  return [{json: {results: results}}];\n}\n\nif (!dupGroups.length) {\n  return [{json: {results: results}}];\n}\n\n// Build map: issue number \u2192 pageId\nconst numToPageId = {};\nissues.forEach(i => { numToPageId[i.num] = i.pageId; });\n\n// Collect pages to close and their notes\nconst toClose = {};\nfor (const grp of dupGroups) {\n  for (const closeNum of (grp.close || [])) {\n    const pageId = numToPageId[closeNum];\n    if (pageId) {\n      toClose[pageId] = ('DUPLICATE of ' + grp.keep + '. ' + (grp.reason || '')).substring(0, 500);\n    }\n  }\n}\n\nif (!Object.keys(toClose).length) {\n  return [{json: {results: results}}];\n}\n\n// Mark each duplicate in Notion \u2014 use Wont Fix + Resolution note\nfor (const [pageId, note] of Object.entries(toClose)) {\n  const body = JSON.stringify({\n    properties: {\n      Status: {select: {name: 'Wont Fix'}},\n      Resolution: {rich_text: [{type: 'text', text: {content: note}}]}\n    }\n  });\n  const bodyFile = '/tmp/notion_dup_' + pageId + '.json';\n  fs.writeFileSync(bodyFile, body, 'utf8');\n  try {\n    execFileSync('curl', [\n      '-s', '-X', 'PATCH',\n      'https://api.notion.com/v1/pages/' + pageId,\n      '-H', 'Content-Type: application/json',\n      '-H', 'Notion-Version: 2022-06-28',\n      '-H', 'Authorization: Bearer ' + notionKey,\n      '-d', '@' + bodyFile\n    ], {timeout: 10000});\n  } catch (_) {}\n  try { fs.unlinkSync(bodyFile); } catch (_) {}\n}\n\n// Return only the surviving (non-duplicate) issues\nconst closeSet = new Set(Object.keys(toClose));\nreturn [{json: {results: results.filter(r => !closeSet.has(r.id))}}];\n"
+      }
+    },
+    {
+      "id": "bi-issues-remain",
+      "name": "Issues Remain After Dedup?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1060,
+        200
+      ],
+      "parameters": {
+        "options": {},
+        "conditions": {
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "remain-check",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              },
               "leftValue": "={{ $json.results.length }}",
               "rightValue": 0
             }
@@ -66,7 +141,10 @@
       "name": "Split Into Issues",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [860, 200],
+      "position": [
+        860,
+        200
+      ],
       "parameters": {
         "fieldToSplitOut": "results",
         "options": {}
@@ -77,21 +155,74 @@
       "name": "Extract Issue Data",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1080, 200],
+      "position": [
+        1080,
+        200
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
-            {"id": "e-page-id",    "name": "page_id",     "type": "string", "value": "={{ $json.id }}"},
-            {"id": "e-issue-num",  "name": "issue_num",   "type": "string", "value": "=ISSU-{{ $json.properties['ID']?.unique_id?.number ?? '?' }}"},
-            {"id": "e-name",       "name": "issue_name",  "type": "string", "value": "={{ ($json.properties['Name']?.title || []).map(t => t.plain_text).join('') }}"},
-            {"id": "e-severity",   "name": "severity",    "type": "string", "value": "={{ $json.properties['Severity']?.select?.name ?? 'Unknown' }}"},
-            {"id": "e-type",       "name": "issue_type",  "type": "string", "value": "={{ $json.properties['Type']?.select?.name ?? 'Issue' }}"},
-            {"id": "e-component",  "name": "component",   "type": "string", "value": "={{ $json.properties['Component']?.select?.name ?? 'unknown' }}"},
-            {"id": "e-phase",      "name": "phase",       "type": "string", "value": "={{ $json.properties['Phase']?.select?.name ?? '' }}"},
-            {"id": "e-desc",       "name": "description", "type": "string", "value": "={{ ($json.properties['Description']?.rich_text || []).map(t => t.plain_text).join('') }}"},
-            {"id": "e-root",       "name": "root_cause",  "type": "string", "value": "={{ ($json.properties['Root Cause']?.rich_text || []).map(t => t.plain_text).join('') }}"},
-            {"id": "e-repro",      "name": "repro_steps", "type": "string", "value": "={{ ($json.properties['Reproduction Steps']?.rich_text || []).map(t => t.plain_text).join('') }}"}
+            {
+              "id": "e-page-id",
+              "name": "page_id",
+              "type": "string",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "id": "e-issue-num",
+              "name": "issue_num",
+              "type": "string",
+              "value": "=ISSU-{{ $json.properties['ID']?.unique_id?.number ?? '?' }}"
+            },
+            {
+              "id": "e-name",
+              "name": "issue_name",
+              "type": "string",
+              "value": "={{ ($json.properties['Name']?.title || []).map(t => t.plain_text).join('') }}"
+            },
+            {
+              "id": "e-severity",
+              "name": "severity",
+              "type": "string",
+              "value": "={{ $json.properties['Severity']?.select?.name ?? 'Unknown' }}"
+            },
+            {
+              "id": "e-type",
+              "name": "issue_type",
+              "type": "string",
+              "value": "={{ $json.properties['Type']?.select?.name ?? 'Issue' }}"
+            },
+            {
+              "id": "e-component",
+              "name": "component",
+              "type": "string",
+              "value": "={{ $json.properties['Component']?.select?.name ?? 'unknown' }}"
+            },
+            {
+              "id": "e-phase",
+              "name": "phase",
+              "type": "string",
+              "value": "={{ $json.properties['Phase']?.select?.name ?? '' }}"
+            },
+            {
+              "id": "e-desc",
+              "name": "description",
+              "type": "string",
+              "value": "={{ ($json.properties['Description']?.rich_text || []).map(t => t.plain_text).join('') }}"
+            },
+            {
+              "id": "e-root",
+              "name": "root_cause",
+              "type": "string",
+              "value": "={{ ($json.properties['Root Cause']?.rich_text || []).map(t => t.plain_text).join('') }}"
+            },
+            {
+              "id": "e-repro",
+              "name": "repro_steps",
+              "type": "string",
+              "value": "={{ ($json.properties['Reproduction Steps']?.rich_text || []).map(t => t.plain_text).join('') }}"
+            }
           ]
         }
       }
@@ -101,7 +232,10 @@
       "name": "Mark In Progress",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1300, 200],
+      "position": [
+        1300,
+        200
+      ],
       "parameters": {
         "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
         "method": "PATCH",
@@ -113,12 +247,20 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "headerParameters": {
-          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
         },
         "options": {}
       },
       "credentials": {
-        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+        "httpHeaderAuth": {
+          "id": "Fd9gwjnr6Vi7sRUN",
+          "name": "Notion Tasks API"
+        }
       }
     },
     {
@@ -126,56 +268,79 @@
       "name": "Build Fixer Prompt",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [1520, 200],
+      "position": [
+        1520,
+        200
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
             {
-              "id": "fp-page-id",   "name": "page_id",      "type": "string",
+              "id": "fp-page-id",
+              "name": "page_id",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.page_id }}"
             },
             {
-              "id": "fp-issue-num", "name": "issue_num",    "type": "string",
+              "id": "fp-issue-num",
+              "name": "issue_num",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.issue_num }}"
             },
             {
-              "id": "fp-name",      "name": "issue_name",   "type": "string",
+              "id": "fp-name",
+              "name": "issue_name",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.issue_name }}"
             },
             {
-              "id": "fp-severity",  "name": "severity",     "type": "string",
+              "id": "fp-severity",
+              "name": "severity",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.severity }}"
             },
             {
-              "id": "fp-type",      "name": "issue_type",   "type": "string",
+              "id": "fp-type",
+              "name": "issue_type",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.issue_type }}"
             },
             {
-              "id": "fp-component", "name": "component",    "type": "string",
+              "id": "fp-component",
+              "name": "component",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.component }}"
             },
             {
-              "id": "fp-phase",     "name": "phase",        "type": "string",
+              "id": "fp-phase",
+              "name": "phase",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.phase }}"
             },
             {
-              "id": "fp-desc",      "name": "description",  "type": "string",
+              "id": "fp-desc",
+              "name": "description",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.description }}"
             },
             {
-              "id": "fp-root",      "name": "root_cause",   "type": "string",
+              "id": "fp-root",
+              "name": "root_cause",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.root_cause }}"
             },
             {
-              "id": "fp-repro",     "name": "repro_steps",  "type": "string",
+              "id": "fp-repro",
+              "name": "repro_steps",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.repro_steps }}"
             },
             {
               "id": "fp-prompt",
               "name": "fixer_prompt",
               "type": "string",
-              "value": "=You are a specialized bug-fixing subagent for the Agentic SDLC infrastructure stack.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md first for project context and mandatory completion requirements.\n\nISSUE TO FIX:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nType: {{ $('Extract Issue Data').item.json.issue_type }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nPhase: {{ $('Extract Issue Data').item.json.phase }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nRoot Cause: {{ $('Extract Issue Data').item.json.root_cause }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nYOUR TASK:\n1. Investigate the issue thoroughly\n2. Implement a complete fix\n3. Test that it works — follow the Completion Gate in CLAUDE.md (smoke_test.sh + upstream health + E2E where applicable)\n4. End your response with a concise RESOLUTION SUMMARY covering:\n   - Exactly what you changed (files, configs, commands)\n   - How you confirmed the fix works\n\nDo not mark done without actually verifying end-to-end. This is a fresh isolated session."
+              "value": "=You are a specialized bug-fixing subagent for the Agentic SDLC infrastructure stack.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md first for project context and mandatory completion requirements.\n\nISSUE TO FIX:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nType: {{ $('Extract Issue Data').item.json.issue_type }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nPhase: {{ $('Extract Issue Data').item.json.phase }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nRoot Cause: {{ $('Extract Issue Data').item.json.root_cause }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nYOUR TASK:\n1. Investigate the issue thoroughly\n2. Implement a complete fix\n3. Test that it works \u2014 follow the Completion Gate in CLAUDE.md (smoke_test.sh + upstream health + E2E where applicable)\n4. End your response with a concise RESOLUTION SUMMARY covering:\n   - Exactly what you changed (files, configs, commands)\n   - How you confirmed the fix works\n\nDo not mark done without actually verifying end-to-end. This is a fresh isolated session."
             }
           ]
         }
@@ -187,9 +352,12 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "onError": "continueRegularOutput",
-      "position": [1740, 200],
+      "position": [
+        1740,
+        200
+      ],
       "parameters": {
-        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst item = $input.item.json;\nconst fixerPrompt = item.fixer_prompt;\nconst issueNum    = item.issue_num    || '';\nconst issueName   = item.issue_name   || '';\nconst severity    = item.severity     || '';\nconst component   = item.component    || '';\nconst description = item.description  || '';\nconst rootCause   = item.root_cause   || '';\nconst reproSteps  = item.repro_steps  || '';\n\nif (!fixerPrompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty fixer_prompt', agentsUsed: 0, helpNeeded: false}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set', agentsUsed: 0, helpNeeded: false}}];\n}\n\nfunction runClaude(prompt, timeoutMs, label) {\n  const tmpFile = '/tmp/bi_' + label + '_' + Date.now() + '.txt';\n  fs.writeFileSync(tmpFile, prompt, 'utf8');\n  try {\n    const out = execFileSync(\n      'node',\n      ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n      {\n        input: fs.readFileSync(tmpFile),\n        env: {ANTHROPIC_API_KEY: apiKey, HOME: '/home/node', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'},\n        timeout: timeoutMs,\n        maxBuffer: 10 * 1024 * 1024,\n        cwd: '/opt/agentic-sdlc'\n      }\n    );\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {exitCode: 0, stdout: out.toString('utf8').trim(), stderr: '', timedOut: false};\n  } catch (e) {\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {\n      exitCode: e.status || 1,\n      stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n      stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message,\n      timedOut: e.killed === true || e.signal === 'SIGTERM' || e.signal === 'SIGKILL'\n    };\n  }\n}\n\n// --- Primary fixer agent (10 min) ---\nconst fixerResult = runClaude(fixerPrompt, 600000, 'fixer');\n\nif (fixerResult.exitCode === 0) {\n  return [{json: {exitCode: 0, stdout: fixerResult.stdout, stderr: '', agentsUsed: 1, helpNeeded: false}}];\n}\n\n// Hard failure (not a timeout) — helpers won't change the outcome\nif (!fixerResult.timedOut) {\n  return [{json: {exitCode: fixerResult.exitCode, stdout: fixerResult.stdout, stderr: fixerResult.stderr, agentsUsed: 1, helpNeeded: false}}];\n}\n\n// --- Fixer timed out: spawn continuation helper ---\nconst partial = fixerResult.stdout.substring(0, 800) || '(no output captured before timeout)';\n\nconst helperPrompt =\n  'You are a continuation agent for an Agentic SDLC infrastructure issue.\\n'\n  + 'A previous fix agent ran for 10 minutes but did not complete the task.\\n'\n  + 'Project root: /opt/agentic-sdlc on VPS 187.77.208.197. Read CLAUDE.md first.\\n\\n'\n  + 'ORIGINAL ISSUE:\\n'\n  + 'ID: ' + issueNum + '\\n'\n  + 'Name: ' + issueName + '\\n'\n  + 'Severity: ' + severity + '\\n'\n  + 'Component: ' + component + '\\n'\n  + 'Description: ' + description + '\\n'\n  + 'Root Cause: ' + rootCause + '\\n'\n  + 'Reproduction Steps: ' + reproSteps + '\\n\\n'\n  + 'PREVIOUS AGENT PARTIAL WORK (captured before 10-min timeout):\\n'\n  + partial + '\\n\\n'\n  + 'YOUR TASK:\\n'\n  + '1. Run: git -C /opt/agentic-sdlc status  — review any changes left by the previous agent\\n'\n  + '2. Assess current state vs. what is still needed to fully resolve the issue\\n'\n  + '3. Complete the fix without undoing previous agent work\\n'\n  + '4. Follow the Completion Gate in CLAUDE.md\\n'\n  + '5. End with a RESOLUTION SUMMARY of what you completed\\n\\n'\n  + 'This is a fresh isolated session. Complete the fix end-to-end.';\n\nconst helperResult = runClaude(helperPrompt, 600000, 'helper');\n\nreturn [{json: {\n  exitCode: helperResult.exitCode,\n  stdout: helperResult.stdout,\n  stderr: helperResult.timedOut\n    ? 'TIMEOUT: fixer (10 min) and helper (10 min) both exceeded time limit. Manual intervention required.'\n    : helperResult.stderr,\n  agentsUsed: 2,\n  helpNeeded: true,\n  helperTimedOut: helperResult.timedOut\n}}];\n"
+        "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst item = $input.item.json;\nconst fixerPrompt = item.fixer_prompt;\nconst issueNum    = item.issue_num    || '';\nconst issueName   = item.issue_name   || '';\nconst severity    = item.severity     || '';\nconst component   = item.component    || '';\nconst description = item.description  || '';\nconst rootCause   = item.root_cause   || '';\nconst reproSteps  = item.repro_steps  || '';\nconst issueType   = item.issue_type   || '';\n\nif (!fixerPrompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty fixer_prompt', agentsUsed: 0, helpNeeded: false}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set', agentsUsed: 0, helpNeeded: false}}];\n}\n\nfunction runClaude(prompt, timeoutMs, label) {\n  const tmpFile = '/tmp/bi_' + label + '_' + Date.now() + '.txt';\n  fs.writeFileSync(tmpFile, prompt, 'utf8');\n  try {\n    const out = execFileSync(\n      'node',\n      ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n      {\n        input: fs.readFileSync(tmpFile),\n        env: {ANTHROPIC_API_KEY: apiKey, HOME: '/home/node', PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'},\n        timeout: timeoutMs,\n        maxBuffer: 10 * 1024 * 1024,\n        cwd: '/opt/agentic-sdlc'\n      }\n    );\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {exitCode: 0, stdout: out.toString('utf8').trim(), stderr: '', timedOut: false};\n  } catch (e) {\n    try { fs.unlinkSync(tmpFile); } catch (_) {}\n    return {\n      exitCode: e.status || 1,\n      stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n      stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message,\n      timedOut: e.killed === true || e.signal === 'SIGTERM' || e.signal === 'SIGKILL'\n    };\n  }\n}\n\n// Decide if spawning a continuation helper is warranted after a timeout.\n// Skip helper when: issue is a Question, fixer made no progress,\n// or partial output indicates a blocking/waiting/linear situation.\nfunction needsHelper(partial, type) {\n  if (type === 'Question') return false;\n  if (!partial || partial.trim().length < 50) return false;\n  const blockPatterns = [\n    /waiting for/i,\n    /need(s)? to wait/i,\n    /monitoring\\s+(the\\s+)?logs?/i,\n    /manual\\s+(review|intervention|action|setup)\\s+required/i,\n    /cannot\\s+(automate|be\\s+automated)/i,\n    /requires?\\s+(human|manual)/i,\n    /waiting\\s+for\\s+(results?|output|completion|response)/i,\n    /scheduled\\s+(job|task|cron|sync)/i,\n    /will\\s+(run|execute|trigger)\\s+(tonight|tomorrow|next|at\\s+\\d)/i\n  ];\n  return !blockPatterns.some(p => p.test(partial));\n}\n\n// --- Primary fixer agent (10 min) ---\nconst fixerResult = runClaude(fixerPrompt, 600000, 'fixer');\n\nif (fixerResult.exitCode === 0) {\n  return [{json: {exitCode: 0, stdout: fixerResult.stdout, stderr: '', agentsUsed: 1, helpNeeded: false}}];\n}\n\n// Hard failure (not a timeout) \u2014 helpers won't change outcome\nif (!fixerResult.timedOut) {\n  return [{json: {exitCode: fixerResult.exitCode, stdout: fixerResult.stdout, stderr: fixerResult.stderr, agentsUsed: 1, helpNeeded: false}}];\n}\n\n// Fixer timed out \u2014 check if a helper agent is warranted\nconst partial = fixerResult.stdout;\nif (!needsHelper(partial, issueType)) {\n  return [{json: {\n    exitCode: 1,\n    stdout: partial,\n    stderr: 'Fixer timed out; helper not spawned (linear/waiting issue or insufficient progress detected).',\n    agentsUsed: 1,\n    helpNeeded: false\n  }}];\n}\n\n// --- Spawn continuation helper agent ---\nconst helperPrompt =\n  'You are a continuation agent for an Agentic SDLC infrastructure issue.\\n'\n  + 'A previous fix agent ran for 10 minutes but did not complete the task.\\n'\n  + 'Project root: /opt/agentic-sdlc on VPS 187.77.208.197. Read CLAUDE.md first.\\n\\n'\n  + 'ORIGINAL ISSUE:\\n'\n  + 'ID: ' + issueNum + '\\n'\n  + 'Name: ' + issueName + '\\n'\n  + 'Severity: ' + severity + '\\n'\n  + 'Component: ' + component + '\\n'\n  + 'Description: ' + description + '\\n'\n  + 'Root Cause: ' + rootCause + '\\n'\n  + 'Reproduction Steps: ' + reproSteps + '\\n\\n'\n  + 'PREVIOUS AGENT PARTIAL WORK (captured before 10-min timeout):\\n'\n  + (partial.substring(0, 800) || '(no output captured)') + '\\n\\n'\n  + 'YOUR TASK:\\n'\n  + '1. Run: git -C /opt/agentic-sdlc status  \u2014 review any changes left by the previous agent\\n'\n  + '2. Assess current state vs. what still needs to be done\\n'\n  + '3. Complete the fix without undoing previous agent work\\n'\n  + '4. Follow the Completion Gate in CLAUDE.md\\n'\n  + '5. End with a RESOLUTION SUMMARY of what you completed\\n\\n'\n  + 'This is a fresh isolated session. Complete the fix end-to-end.';\n\nconst helperResult = runClaude(helperPrompt, 600000, 'helper');\n\nreturn [{json: {\n  exitCode: helperResult.exitCode,\n  stdout: helperResult.stdout,\n  stderr: helperResult.timedOut\n    ? 'TIMEOUT: fixer (10 min) and helper (10 min) both exceeded time limit. Manual intervention required.'\n    : helperResult.stderr,\n  agentsUsed: 2,\n  helpNeeded: true,\n  helperTimedOut: helperResult.timedOut\n}}];\n"
       }
     },
     {
@@ -197,16 +365,26 @@
       "name": "Fixer Succeeded?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [1960, 200],
+      "position": [
+        1960,
+        200
+      ],
       "parameters": {
         "options": {},
         "conditions": {
-          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
           "combinator": "and",
           "conditions": [
             {
               "id": "fixer-exit-check",
-              "operator": {"type": "number", "operation": "equals"},
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              },
               "leftValue": "={{ $json.exitCode }}",
               "rightValue": 0
             }
@@ -219,32 +397,43 @@
       "name": "Build Validator Prompt",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [2180, 100],
+      "position": [
+        2180,
+        100
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
             {
-              "id": "vp-page-id",  "name": "page_id",         "type": "string",
+              "id": "vp-page-id",
+              "name": "page_id",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.page_id }}"
             },
             {
-              "id": "vp-issue-num", "name": "issue_num",      "type": "string",
+              "id": "vp-issue-num",
+              "name": "issue_num",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.issue_num }}"
             },
             {
-              "id": "vp-name",      "name": "issue_name",     "type": "string",
+              "id": "vp-name",
+              "name": "issue_name",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.issue_name }}"
             },
             {
-              "id": "vp-fixer-out", "name": "fixer_summary",  "type": "string",
+              "id": "vp-fixer-out",
+              "name": "fixer_summary",
+              "type": "string",
               "value": "={{ $json.stdout.length > 3000 ? $json.stdout.substring(0, 3000) + '\\n...[truncated]' : $json.stdout }}"
             },
             {
               "id": "vp-prompt",
               "name": "validator_prompt",
               "type": "string",
-              "value": "=You are a validation subagent. A fixer agent worked on an issue and claims it is resolved.\nYour ONLY job is to independently verify the fix is complete and correct.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md for the mandatory Completion Gate.\n\nISSUE BEING VALIDATED:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nFIXER'S REPORTED WORK:\n{{ $json.stdout.length > 3000 ? $json.stdout.substring(0, 3000) + '\\n...[truncated]' : $json.stdout }}\n\nVALIDATION INSTRUCTIONS:\n1. Do NOT rely on the fixer's word — independently verify by following the reproduction steps yourself\n2. Run bash scripts/validate-prod.sh if the fix touches any service, endpoint, config, or nginx rule\n3. Confirm the specific symptom described is gone\n4. Your response MUST end with EXACTLY one of these two lines (no other text on that line):\n   VALIDATED: <one-sentence explanation of what you confirmed>\n   NOT_VALIDATED: <one-sentence explanation of what is still broken or unconfirmed>\n\nOnly output VALIDATED if you personally confirmed end-to-end resolution. This is a fresh isolated session."
+              "value": "=You are a validation subagent. A fixer agent worked on an issue and claims it is resolved.\nYour ONLY job is to independently verify the fix is complete and correct.\nProject root: /opt/agentic-sdlc on VPS 187.77.208.197\nRead CLAUDE.md for the mandatory Completion Gate.\n\nISSUE BEING VALIDATED:\nID: {{ $('Extract Issue Data').item.json.issue_num }}\nName: {{ $('Extract Issue Data').item.json.issue_name }}\nSeverity: {{ $('Extract Issue Data').item.json.severity }}\nComponent: {{ $('Extract Issue Data').item.json.component }}\nDescription: {{ $('Extract Issue Data').item.json.description }}\nReproduction Steps: {{ $('Extract Issue Data').item.json.repro_steps }}\n\nFIXER'S REPORTED WORK:\n{{ $json.stdout.length > 3000 ? $json.stdout.substring(0, 3000) + '\\n...[truncated]' : $json.stdout }}\n\nVALIDATION INSTRUCTIONS:\n1. Do NOT rely on the fixer's word \u2014 independently verify by following the reproduction steps yourself\n2. Run bash scripts/validate-prod.sh if the fix touches any service, endpoint, config, or nginx rule\n3. Confirm the specific symptom described is gone\n4. Your response MUST end with EXACTLY one of these two lines (no other text on that line):\n   VALIDATED: <one-sentence explanation of what you confirmed>\n   NOT_VALIDATED: <one-sentence explanation of what is still broken or unconfirmed>\n\nOnly output VALIDATED if you personally confirmed end-to-end resolution. This is a fresh isolated session."
             }
           ]
         }
@@ -256,7 +445,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "onError": "continueRegularOutput",
-      "position": [2400, 100],
+      "position": [
+        2400,
+        100
+      ],
       "parameters": {
         "jsCode": "const { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.validator_prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty validator_prompt'}}];\n}\n\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\nconst tmpFile = '/tmp/bi_validator_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 300000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8').trim() : '',\n    stderr: e.stderr ? e.stderr.toString('utf8').trim() : e.message\n  }}];\n}\n"
       }
@@ -266,16 +458,26 @@
       "name": "Validator Passed?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [2620, 100],
+      "position": [
+        2620,
+        100
+      ],
       "parameters": {
         "options": {},
         "conditions": {
-          "options": {"leftValue": "", "caseSensitive": true, "typeValidation": "strict"},
+          "options": {
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
           "combinator": "and",
           "conditions": [
             {
               "id": "validated-check",
-              "operator": {"type": "string", "operation": "contains"},
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              },
               "leftValue": "={{ $json.stdout }}",
               "rightValue": "VALIDATED:"
             }
@@ -288,17 +490,24 @@
       "name": "Prepare Resolved Output",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [2840, 0],
+      "position": [
+        2840,
+        0
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
             {
-              "id": "r-page-id",  "name": "page_id",          "type": "string",
+              "id": "r-page-id",
+              "name": "page_id",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.page_id }}"
             },
             {
-              "id": "r-note",     "name": "resolution_note",  "type": "string",
+              "id": "r-note",
+              "name": "resolution_note",
+              "type": "string",
               "value": "=FIXER: {{ $('Build Validator Prompt').item.json.fixer_summary.substring(0, 1200) }}\n\nVALIDATOR: {{ $json.stdout.length > 800 ? $json.stdout.substring(0, 800) + '...' : $json.stdout }}"
             }
           ]
@@ -310,7 +519,10 @@
       "name": "Mark Resolved",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3060, 0],
+      "position": [
+        3060,
+        0
+      ],
       "parameters": {
         "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
         "method": "PATCH",
@@ -322,12 +534,20 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "headerParameters": {
-          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
         },
         "options": {}
       },
       "credentials": {
-        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+        "httpHeaderAuth": {
+          "id": "Fd9gwjnr6Vi7sRUN",
+          "name": "Notion Tasks API"
+        }
       }
     },
     {
@@ -335,17 +555,24 @@
       "name": "Prepare Not Validated Output",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [2840, 200],
+      "position": [
+        2840,
+        200
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
             {
-              "id": "nv-page-id",  "name": "page_id",       "type": "string",
+              "id": "nv-page-id",
+              "name": "page_id",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.page_id }}"
             },
             {
-              "id": "nv-note",     "name": "needs_info_note", "type": "string",
+              "id": "nv-note",
+              "name": "needs_info_note",
+              "type": "string",
               "value": "=Auto-fix attempted but NOT validated ({{ new Date().toISOString() }}).\nValidator output: {{ $json.stdout.length > 900 ? $json.stdout.substring(0, 900) + '...' : $json.stdout }}"
             }
           ]
@@ -357,7 +584,10 @@
       "name": "Mark Needs Info (Not Validated)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [3060, 200],
+      "position": [
+        3060,
+        200
+      ],
       "parameters": {
         "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
         "method": "PATCH",
@@ -369,12 +599,20 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "headerParameters": {
-          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
         },
         "options": {}
       },
       "credentials": {
-        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+        "httpHeaderAuth": {
+          "id": "Fd9gwjnr6Vi7sRUN",
+          "name": "Notion Tasks API"
+        }
       }
     },
     {
@@ -382,17 +620,24 @@
       "name": "Prepare Fixer Failed Output",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [2180, 340],
+      "position": [
+        2180,
+        340
+      ],
       "parameters": {
         "options": {},
         "assignments": {
           "assignments": [
             {
-              "id": "ff-page-id",  "name": "page_id",       "type": "string",
+              "id": "ff-page-id",
+              "name": "page_id",
+              "type": "string",
               "value": "={{ $('Extract Issue Data').item.json.page_id }}"
             },
             {
-              "id": "ff-note",     "name": "needs_info_note", "type": "string",
+              "id": "ff-note",
+              "name": "needs_info_note",
+              "type": "string",
               "value": "=Auto-fix agent failed (exit {{ $json.exitCode }}, {{ new Date().toISOString() }}).\nError: {{ ($json.stderr || $json.stdout || 'Unknown error').substring(0, 900) }}"
             }
           ]
@@ -404,7 +649,10 @@
       "name": "Mark Needs Info (Fixer Failed)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2400, 340],
+      "position": [
+        2400,
+        340
+      ],
       "parameters": {
         "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
         "method": "PATCH",
@@ -416,70 +664,229 @@
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "headerParameters": {
-          "parameters": [{"name": "Notion-Version", "value": "2022-06-28"}]
+          "parameters": [
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            }
+          ]
         },
         "options": {}
       },
       "credentials": {
-        "httpHeaderAuth": {"id": "Fd9gwjnr6Vi7sRUN", "name": "Notion Tasks API"}
+        "httpHeaderAuth": {
+          "id": "Fd9gwjnr6Vi7sRUN",
+          "name": "Notion Tasks API"
+        }
       }
     }
   ],
   "connections": {
     "Every 5 Minutes": {
-      "main": [[{"node": "Query Open Bugs & Issues", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Query Open Bugs & Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Query Open Bugs & Issues": {
-      "main": [[{"node": "Has Open Issues?", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Has Open Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Open Issues?": {
       "main": [
-        [{"node": "Split Into Issues", "type": "main", "index": 0}],
+        [
+          {
+            "node": "Lead Fixer \u2014 Dedup Check",
+            "type": "main",
+            "index": 0
+          }
+        ],
         []
       ]
     },
     "Split Into Issues": {
-      "main": [[{"node": "Extract Issue Data", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Extract Issue Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract Issue Data": {
-      "main": [[{"node": "Mark In Progress", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Mark In Progress",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Mark In Progress": {
-      "main": [[{"node": "Build Fixer Prompt", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Build Fixer Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Fixer Prompt": {
-      "main": [[{"node": "Run Fixer Claude", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Run Fixer Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Run Fixer Claude": {
-      "main": [[{"node": "Fixer Succeeded?", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Fixer Succeeded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fixer Succeeded?": {
       "main": [
-        [{"node": "Build Validator Prompt", "type": "main", "index": 0}],
-        [{"node": "Prepare Fixer Failed Output", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Build Validator Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Fixer Failed Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Build Validator Prompt": {
-      "main": [[{"node": "Run Validator Claude", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Run Validator Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Run Validator Claude": {
-      "main": [[{"node": "Validator Passed?", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Validator Passed?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validator Passed?": {
       "main": [
-        [{"node": "Prepare Resolved Output", "type": "main", "index": 0}],
-        [{"node": "Prepare Not Validated Output", "type": "main", "index": 0}]
+        [
+          {
+            "node": "Prepare Resolved Output",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Not Validated Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepare Resolved Output": {
-      "main": [[{"node": "Mark Resolved", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Mark Resolved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Not Validated Output": {
-      "main": [[{"node": "Mark Needs Info (Not Validated)", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Mark Needs Info (Not Validated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Fixer Failed Output": {
-      "main": [[{"node": "Mark Needs Info (Fixer Failed)", "type": "main", "index": 0}]]
+      "main": [
+        [
+          {
+            "node": "Mark Needs Info (Fixer Failed)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead Fixer \u2014 Dedup Check": {
+      "main": [
+        [
+          {
+            "node": "Issues Remain After Dedup?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Issues Remain After Dedup?": {
+      "main": [
+        [
+          {
+            "node": "Split Into Issues",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
     }
   },
-  "settings": {"executionOrder": "v1"}
+  "settings": {
+    "executionOrder": "v1"
+  }
 }
