@@ -1,22 +1,34 @@
+# =============================================================================
+# docker-compose.yml — CORE / BASE
+# All services present in every environment.
+# No host port mappings here (moved to override/prod delta).
+# No prod-only services (nginx-public, certbot, twingate, vaultwarden).
+# Keycloak defaults to start-dev (H2, no postgres dep) — overridden in prod.
+# All env-sensitive values use ${VAR} substitution.
+# =============================================================================
+
 networks:
-  vibe_net:
-    driver: bridge
   sa_web:
+    driver: bridge
+  vibe_net:
     driver: bridge
 
 volumes:
   n8n_data:
   ollama_data:
+  open_webui_data:
+  redis_data:
   pg_data:
   vaultwarden_data:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
 
 services:
-  # -----------------------------------------
-  # PostgreSQL - LiteLLM Database
-  # Pin to a major version (e.g. postgres:15) so Watchtower picks up
-  # patch releases (15.x) but never auto-jumps to postgres:16.
-  # To upgrade major versions: update the tag manually, test, then redeploy.
-  # -----------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # PostgreSQL — shared DB for LiteLLM, n8n, lead-review
+  # ---------------------------------------------------------------------------
   postgres:
     image: postgres:15
     container_name: litellm_db
@@ -30,6 +42,11 @@ services:
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${LITELLM_USER:-litellm} -d ${LITELLM_DB:-litellm}"]
       interval: 10s
@@ -39,58 +56,202 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # -----------------------------------------
-  # n8n - The Workflow Engine
-  # Uses "latest" so Watchtower always pulls the newest release.
-  # -----------------------------------------
+  # ---------------------------------------------------------------------------
+  # Redis — LiteLLM caching
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Qdrant — vector database
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # Ollama — local model host (GPU enabled)
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - OLLAMA_KEEP_ALIVE=10m
+      - OLLAMA_MAX_LOADED_MODELS=1
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # LiteLLM — AI traffic proxy
+  # ---------------------------------------------------------------------------
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    environment:
+      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+      - STORE_MODEL_IN_DB=True
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+      - VENICE_API_KEY=${VENICE_API_KEY}
+      - VENICE_ADMIN_API_KEY=${VENICE_ADMIN_API_KEY}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://ollama:11434}
+      - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
+      - QDRANT_API_BASE=http://qdrant:6333
+      - QDRANT_API_KEY=
+      # Keycloak SSO for LiteLLM UI (parameterized per env)
+      - GENERIC_CLIENT_ID=litellm
+      - GENERIC_CLIENT_SECRET=${LITELLM_OIDC_CLIENT_SECRET}
+      - GENERIC_AUTHORIZATION_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/auth
+      - GENERIC_TOKEN_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/token
+      - GENERIC_USERINFO_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/userinfo
+      - GENERIC_REDIRECT_URI=${LITELLM_REDIRECT_URL}
+      - GENERIC_CLIENT_NAME=Keycloak SSO
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+      - ./factual_verifier.py:/app/factual_verifier.py
+      - ./consensus_checker.py:/app/consensus_checker.py
+      - ./ab_testing.py:/app/ab_testing.py
+      - ./ab_dashboard.py:/app/ab_dashboard.py
+      - ./ab_manage.py:/app/ab_manage.py
+      - ./rag_manager.py:/app/rag_manager.py
+      - ./rag_retrieval.py:/app/rag_retrieval.py
+    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # n8n — workflow engine
+  # ---------------------------------------------------------------------------
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
-    ports:
-      - "5678:5678"
     environment:
       - N8N_PORT=5678
       - NODE_ENV=production
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
-      - N8N_HOST=${N8N_HOST:-localhost}
+      - WEBHOOK_URL=${N8N_BASE_URL:-http://localhost:5678}
+      - N8N_HOST=${N8N_HOSTNAME:-localhost}
       - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-http://localhost:5678}
+      - N8N_EDITOR_BASE_URL=${N8N_BASE_URL:-http://localhost:5678}
       - NODES_EXCLUDE=[]
-      # Database — use Postgres so workflow state survives container rebuilds
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
       - DB_POSTGRESDB_DATABASE=n8n
       - DB_POSTGRESDB_USER=${LITELLM_USER:-litellm}
       - DB_POSTGRESDB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      # Encryption key for credentials (must stay stable across restarts)
       - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      # Disable task runners to avoid partial-init issues with webhook registration
       - N8N_RUNNERS_ENABLED=false
-      - N8N_SECURE_COOKIE=false
       - N8N_TRUST_PROXY=true
       - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
       - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
-      # ── SA Lead Pipeline variables (accessible as $env.VAR in workflows) ──────
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
       - LEAD_REVIEW_BASE_URL=${LEAD_REVIEW_BASE_URL}
       - NOTION_LEADS_DB_ID=${NOTION_LEADS_DB_ID}
       - NOTIFY_EMAIL=${NOTIFY_EMAIL}
-      - TWILIO_SMS_FROM=${TWILIO_SMS_FROM}
-      - NOTIFY_SMS_TO=${NOTIFY_SMS_TO}
+      - NOTIFY_SMS_EMAIL=${NOTIFY_SMS_EMAIL}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
       - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
       - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
       - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
-      # ── Portal provisioning secrets ──────────────────────────────────────────
+      - TWILIO_SMS_FROM=${TWILIO_SMS_FROM}
+      - NOTIFY_SMS_TO=${NOTIFY_SMS_TO}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      # ── Keycloak OIDC SSO (enable after configuring Keycloak realm) ─────────
       - N8N_SSO_OIDC_ENABLED=true
-      - N8N_SSO_OIDC_ISSUER_URL=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
+      - N8N_SSO_OIDC_ISSUER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
       - N8N_SSO_OIDC_CLIENT_ID=n8n
       - N8N_SSO_OIDC_CLIENT_SECRET=${N8N_OIDC_CLIENT_SECRET}
-      - N8N_SSO_OIDC_REDIRECT_URL=https://n8n.private.sovereignadvisory.ai/rest/sso/oidc/callback
+      - N8N_SSO_OIDC_REDIRECT_URL=${N8N_BASE_URL}/rest/sso/oidc/callback
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,6 +266,11 @@ services:
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
       interval: 30s
@@ -114,244 +280,436 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # -----------------------------------------
-  # Ollama - The Local Model Host
-  # -----------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
+  # ---------------------------------------------------------------------------
+  # Keycloak — SSO / Identity Provider
+  # Base: start-dev mode (H2 in-memory, no postgres dep).
+  # Prod delta overrides command to 'start' with postgres backend.
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0.5
+    container_name: keycloak
+    command: ${KC_START_CMD:-start-dev}
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_HOSTNAME=${KC_HOSTNAME:-localhost}
+      - KC_HTTP_ENABLED=true
+      - KC_HEALTH_ENABLED=true
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD-SHELL", "ollama list > /dev/null 2>&1 || exit 1"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — LiteLLM UI (port 4001)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-litellm:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_litellm
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=litellm
+      - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
+      - --redirect-url=${LITELLM_REDIRECT_URL}
+      - --upstream=http://litellm:4000
+      - --http-address=0.0.0.0:4001
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+      - --skip-jwt-bearer-tokens=true
+      - --skip-auth-regex=^/v1/.*
+      - --skip-auth-regex=^/health
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "4001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — n8n UI (port 5679)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-n8n:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_n8n
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=n8n
+      - --client-secret=${N8N_OIDC_CLIENT_SECRET}
+      - --redirect-url=${N8N_REDIRECT_URL}
+      - --upstream=http://n8n:5678
+      - --http-address=0.0.0.0:5679
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --allowed-role=agentic-sdlc:admin
+      - --code-challenge-method=S256
+      - --skip-auth-route=^/webhook/
+      - --skip-auth-route=^/webhook-test/
+      - --skip-auth-route=^/healthz
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "5679"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — JupyterLab (port 8889)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-jupyter:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_jupyter
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=jupyter
+      - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
+      - --redirect-url=${JUPYTER_REDIRECT_URL}
+      - --upstream=http://jupyter:8888
+      - --http-address=0.0.0.0:8889
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "8889"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      jupyter:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Pipeline WebUI (port 3001)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-webui:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_webui
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=webui
+      - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
+      - --redirect-url=${WEBUI_REDIRECT_URL}
+      - --upstream=http://webui:3000
+      - --http-address=0.0.0.0:3001
+      - --email-domain=*
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+      - --allowed-role=agentic-sdlc:user
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "3001"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Internal Access Portal (port 4185)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-portal:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_portal
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=portal
+      - --client-secret=${PORTAL_OIDC_CLIENT_SECRET}
+      - --redirect-url=${PORTAL_REDIRECT_URL}
+      - --upstream=http://portal:80
+      - --http-address=0.0.0.0:4185
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --insecure-oidc-allow-unverified-email=true
+      - --code-challenge-method=S256
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "4185"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      portal:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Agent Zero (port 50081)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-agent-zero:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_agent_zero
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=agent-zero
+      - --client-secret=${AGENT_ZERO_OIDC_CLIENT_SECRET}
+      - --redirect-url=${A0_REDIRECT_URL}
+      - --upstream=http://agent_zero:80
+      - --http-address=0.0.0.0:50081
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_A0}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+      - --proxy-websockets=true
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "50081"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      agent-zero:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Portal — internal home page
+  # ---------------------------------------------------------------------------
+  portal:
+    image: nginx:alpine
+    container_name: portal
+    volumes:
+      - ./portal:/usr/share/nginx/html:ro
+      - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # Agent Zero — autonomous AI agent framework
+  # ---------------------------------------------------------------------------
+  agent-zero:
+    build:
+      context: /root/cc_work/agent-zero
+      dockerfile: DockerfileLocal
+    image: agent-zero-local:latest
+    container_name: agent_zero
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:80/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+    labels:
+      com.sovereignadvisory.service: "agent-zero"
+
+  # ---------------------------------------------------------------------------
+  # JupyterLab — interactive dev environment
+  # ---------------------------------------------------------------------------
+  jupyter:
+    image: quay.io/jupyter/scipy-notebook:latest
+    container_name: jupyter
+    environment:
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:?JUPYTER_TOKEN must be set in .env}
+      - JUPYTER_ENABLE_LAB=yes
+      - LITELLM_BASE_URL=http://litellm:4000
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - N8N_BASE_URL=http://n8n:5678
+      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    volumes:
+      - ./notebooks:/home/jovyan/notebooks
+      - ./output:/home/jovyan/output
+      - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
+      - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
+    command:
+      - bash
+      - -c
+      - |
+        pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
+        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8888/api || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # ---------------------------------------------------------------------------
+  # Lead Review Portal — HITM review UI
+  # ---------------------------------------------------------------------------
+  lead-review:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.lead_review
+    image: sa_lead_review:latest
+    container_name: sa_lead_review
+    environment:
+      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+      - LEAD_REVIEW_PASSWORD=${LEAD_REVIEW_PASSWORD}
+      - N8N_BASE_URL=http://n8n:5678
+      - PDF_OUTPUT_DIR=/data/output/lead_pdfs
+      - LITELLM_BASE_URL=http://litellm:4000
+      - OIDC_ENABLED=${OIDC_ENABLED:-false}
+      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/agentic-sdlc
+      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL}
+      - KEYCLOAK_CLIENT_ID=lead-review
+      - KEYCLOAK_CLIENT_SECRET=${LEAD_REVIEW_OIDC_CLIENT_SECRET}
+      - LEAD_REVIEW_PUBLIC_URL=${LEAD_REVIEW_PUBLIC_URL}
+      - NEO_SMTP_HOST=${NEO_SMTP_HOST:-smtp.resend.com}
+      - NEO_SMTP_PORT=${NEO_SMTP_PORT:-465}
+      - NEO_SMTP_USER=${NEO_SMTP_USER:-resend}
+      - NEO_SMTP_PASS=${NEO_SMTP_PASS}
+      - NOTIFY_EMAIL=${NOTIFY_EMAIL}
+    volumes:
+      - ./output:/data/output
+    networks:
+      - vibe_net
+      - sa_web
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
-    environment:
-      # Keep model loaded for 10 min idle before unloading VRAM
-      - OLLAMA_KEEP_ALIVE=10m
-      # Only load one model at a time to stay within 8GB VRAM
-      - OLLAMA_MAX_LOADED_MODELS=1
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-    # RTX 3070 8GB VRAM — GPU enabled
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+      com.sovereignadvisory.service: "lead-review"
 
-  # -----------------------------------------
-  # LiteLLM - The Traffic Cop
-  # Uses main-latest so we always get the newest build including security
-  # patches. The cosmetic P1012 Prisma warning self-heals on every start
-  # and does not affect operation. Watchtower will pull new images nightly.
-  # -----------------------------------------
-  litellm:
-    image: ghcr.io/berriai/litellm:main-latest
-    container_name: litellm
-    ports:
-      - "4000:4000"
-    environment:
-      # ── Database ──────────────────────────────────────────────────────────
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-      - STORE_MODEL_IN_DB=True
-
-      # ── Proxy master key ──────────────────────────────────────────────────
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-
-      # ── Cloud LLM providers ───────────────────────────────────────────────
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
-      - VENICE_API_KEY=${VENICE_API_KEY}
-      - VENICE_ADMIN_API_KEY=${VENICE_ADMIN_API_KEY}
-      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
-
-      # ── Ollama Cloud (VPS) — optional, set in .env if you have a remote instance
-      - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://localhost:11434}
-      - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
-
-    volumes:
-      - ./litellm_config.yaml:/app/config.yaml
-    command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # -----------------------------------------
-  # Watchtower - Automatic Image Updater
-  #
-  # Checks for new image versions every night at 3 AM and rolls out updates
-  # one container at a time. If a container's healthcheck fails after update,
-  # Docker's restart policy handles recovery.
-  #
-  # Watchtower is intentionally NOT labelled for self-update to avoid it
-  # updating itself mid-run. Update it manually when needed.
-  # -----------------------------------------
-  watchtower:
-    image: containrrr/watchtower:latest
-    container_name: watchtower
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # config.json only needed for private registry auth — omit for public images
-      # - ${HOME}/.docker/config.json:/config.json:ro
-    environment:
-      # Only update containers with the watchtower enable label
-      - WATCHTOWER_LABEL_ENABLE=true
-      # Run at 03:00 every night (cron: min hour dom month dow)
-      - WATCHTOWER_SCHEDULE=0 0 3 * * *
-      # Gracefully stop containers before updating (honours restart policies)
-      - WATCHTOWER_STOP_TIMEOUT=30s
-      # Clean up old images after updating to save disk space
-      - WATCHTOWER_CLEANUP=true
-      # Rolling restart — update one container at a time
-      - WATCHTOWER_ROLLING_RESTART=true
-      # Send a notification on update (optional — see below to enable)
-      # - WATCHTOWER_NOTIFICATION_URL=${WATCHTOWER_NOTIFICATION_URL}
-      # Force Docker client API version to match the host daemon minimum (1.40+)
-      - DOCKER_API_VERSION=1.41
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    # No watchtower label on this service — update Watchtower itself manually
-
-  # -----------------------------------------
-  # Free Model Sync - Discovers and registers
-  # free/rate-limited models from OpenRouter,
-  # Groq, and Gemini into LiteLLM every 6hrs.
-  # -----------------------------------------
-  free-model-sync:
-    image: python:3.12-slim
-    container_name: free_model_sync
-    volumes:
-      - ./free_model_sync.py:/app/free_model_sync.py:ro
-    working_dir: /app
-    environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-    command: >
-      bash -c "pip install requests -q &&
-               python free_model_sync.py &&
-               echo 'Initial sync done — ofelia handles scheduling.' &&
-               sleep infinity"
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      litellm:
-        condition: service_healthy
-
-  # -----------------------------------------
-  # Backup — daily pg_dumpall + tar snapshots
-  # Stays alive via sleep infinity so Ofelia
-  # can job-exec into it on schedule.
-  # Output: ./backup/postgres_YYYY-MM-DD.sql.gz
-  #         ./backup/output_YYYY-MM-DD.tar.gz
-  #         ./backup/opportunities_YYYY-MM-DD.tar.gz
-  #         ./backup/ssl_YYYY-MM-DD.tar.gz
-  # -----------------------------------------
-  backup:
-    image: postgres:15
-    container_name: backup
-    volumes:
-      - ./backup:/backup
-      - ./output:/data/output:ro
-      - ./opportunities:/data/opportunities:ro
-      - /opt/sovereignadvisory/ssl:/ssl:ro
-      - ./scripts/backup.sh:/backup.sh:ro
-    environment:
-      - PGHOST=postgres
-      # litellm is the bootstrap superuser (POSTGRES_USER in docker-compose).
-      # pg_dumpall requires superuser — do not replace with an app-scoped role.
-      - PGUSER=${LITELLM_USER:-litellm}
-      - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
-    command: ["sleep", "infinity"]
-    networks:
-      - vibe_net
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    # No watchtower label — postgres:15 is pinned; update manually
-
-  # -----------------------------------------
-  # Test Runner - Phase 3 Python test executor
-  # Exposes POST /run → pip install + pytest + LLM fix loop
-  # Internal only (no host port mapping needed)
-  # -----------------------------------------
-  test-runner:
-    image: python:3.12-slim
-    container_name: test_runner
-    volumes:
-      - ./output:/data/output
-      - ./scripts:/data/scripts:ro
-    working_dir: /app
-    environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - PHASE3_MAX_ATTEMPTS=3
-    command: >
-      bash -c "pip install flask requests -q &&
-               python /data/scripts/test_runner_server.py"
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      litellm:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\""]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-
-  # -----------------------------------------
-  # Pipeline Server - Phases 1-10 orchestrator
-  # Extends test-runner with phase state tracking,
-  # per-run log files, and phases 5-10 (quality gate,
-  # docs, git push, deploy, monitor, approval gate).
-  # Port 5002 — internal only
-  # -----------------------------------------
+  # ---------------------------------------------------------------------------
+  # Pipeline Server — phases 1-10 orchestrator
+  # ---------------------------------------------------------------------------
   pipeline-server:
     build:
       context: .
       dockerfile: Dockerfile.pipeline
     container_name: pipeline_server
-    ports:
-      - "5002:5002"
     volumes:
       - ./output:/data/output
       - ./scripts:/data/scripts:ro
@@ -370,15 +728,20 @@ services:
       - DEPLOY_SSH_KEY_PATH=${DEPLOY_SSH_KEY_PATH:-}
       - ENABLE_APPROVAL_GATE=${ENABLE_APPROVAL_GATE:-false}
       - APPROVAL_TIMEOUT_HOURS=${APPROVAL_TIMEOUT_HOURS:-24}
-      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-http://localhost:3000}
+      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       litellm:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\" "]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -386,18 +749,48 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # -----------------------------------------
-  # Web UI — Single pane of glass
-  # Submit opportunities, track pipeline runs,
-  # view live logs, browse outputs, approve deploys.
-  # Port 3000 — exposed to host
-  # -----------------------------------------
+  # ---------------------------------------------------------------------------
+  # Test Runner — phase 3 Python test executor
+  # ---------------------------------------------------------------------------
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test_runner
+    image: sa_test_runner:latest
+    container_name: test_runner
+    volumes:
+      - ./output:/data/output
+      - ./scripts:/data/scripts:ro
+    working_dir: /app
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - PHASE3_MAX_ATTEMPTS=3
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5001/health')\" "]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # WebUI — single pane of glass
+  # ---------------------------------------------------------------------------
   webui:
     build:
       context: ./webui
     container_name: webui
-    ports:
-      - "3000:3000"
     volumes:
       - ./output:/data/output:ro
       - ./output/opportunities:/data/output/opportunities
@@ -408,14 +801,19 @@ services:
       - N8N_BASE_URL=http://n8n:5678
       - PIPELINE_SERVER_URL=http://pipeline-server:5002
       - TEST_RUNNER_URL=http://test-runner:5001
-      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-http://localhost:3000}
+      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       - pipeline-server
     healthcheck:
-      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\""]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" "]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -423,8 +821,77 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
 
-  # Ofelia — lightweight cron scheduler for Docker
-  # Triggers free_model_sync.py every 6 hours
+  # ---------------------------------------------------------------------------
+  # Open WebUI — Ollama model management & chat UI
+  # ---------------------------------------------------------------------------
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open_webui
+    volumes:
+      - open_webui_data:/app/backend/data
+    environment:
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY}
+      # Keycloak OIDC SSO
+      - ENABLE_OAUTH_SIGNUP=true
+      - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
+      - OAUTH_PROVIDER_NAME=Keycloak
+      - OPENID_PROVIDER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/.well-known/openid-configuration
+      - OAUTH_CLIENT_ID=open-webui
+      - OAUTH_CLIENT_SECRET=${OPEN_WEBUI_OIDC_CLIENT_SECRET}
+      - OAUTH_SCOPES=openid email profile
+      - WEBUI_URL=https://ollama-ui.private.sovereignadvisory.ai
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # Free Model Sync — discovers/registers free models into LiteLLM every 6h
+  # ---------------------------------------------------------------------------
+  free-model-sync:
+    build:
+      context: .
+      dockerfile: Dockerfile.free_model_sync
+    image: sa_free_model_sync:latest
+    container_name: free_model_sync
+    volumes:
+      - ./free_model_sync.py:/app/free_model_sync.py:ro
+    working_dir: /app
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      litellm:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Ofelia — lightweight Docker cron scheduler
+  # ---------------------------------------------------------------------------
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
@@ -434,89 +901,195 @@ services:
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       - free-model-sync
 
-  # -----------------------------------------
-  # JupyterLab - Interactive Development,
-  # Testing, and Audit Environment
-  #
-  # Access at: http://localhost:8888
-  # Token set via JUPYTER_TOKEN in .env
-  #
-  # Mounts:
-  #   ./notebooks   — your saved notebooks
-  #   ./output      — shared with n8n for data exchange
-  #   ./scripts     — shared scripts (e.g. free_model_sync.py)
-  #
-  # Pre-installed: requests, psycopg2, pandas,
-  #   openai-compatible client, sqlalchemy
-  # -----------------------------------------
-  jupyter:
-    image: quay.io/jupyter/scipy-notebook:latest
-    container_name: jupyter
-    ports:
-      - "8888:8888"
-    environment:
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:?JUPYTER_TOKEN must be set in .env}
-      - JUPYTER_ENABLE_LAB=yes
-
-      # ── Stack service URLs (use service names — same Docker network) ──────
-      - LITELLM_BASE_URL=http://litellm:4000
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - N8N_BASE_URL=http://n8n:5678
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-
-      # ── All API keys available in notebooks ───────────────────────────────
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
-
+  # ---------------------------------------------------------------------------
+  # Backup — daily pg_dumpall + output/opportunities/ssl tarballs
+  # ---------------------------------------------------------------------------
+  backup:
+    image: postgres:15
+    container_name: backup
     volumes:
-      - ./notebooks:/home/jovyan/notebooks
-      - ./output:/home/jovyan/output
-      - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
-      - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
-    command:
-      - bash
-      - -c
-      - |
-        pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
-        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
+      - ./backup:/backup
+      - ./output:/data/output:ro
+      - ./opportunities:/data/opportunities:ro
+      - /opt/agentic-sdlc/ssl:/ssl:ro
+      - ./scripts/backup.sh:/backup.sh:ro
+    environment:
+      - PGHOST=postgres
+      - PGUSER=${LITELLM_USER:-litellm}
+      - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    command: ["sleep", "infinity"]
+    networks:
+      - vibe_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.sovereignadvisory.service: "backup"
+
+  # ---------------------------------------------------------------------------
+  # Watchtower — automatic image updater
+  # ---------------------------------------------------------------------------
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - WATCHTOWER_LABEL_ENABLE=true
+      - WATCHTOWER_SCHEDULE=0 0 3 * * *
+      - WATCHTOWER_STOP_TIMEOUT=30s
+      - WATCHTOWER_CLEANUP=true
+      - WATCHTOWER_ROLLING_RESTART=true
+      - DOCKER_API_VERSION=1.41
     networks:
       - vibe_net
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Prometheus — metrics collection
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     depends_on:
       litellm:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8888/api || exit 1"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 60s
+      start_period: 15s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+      com.sovereignadvisory.service: "prometheus"
 
-  # -----------------------------------------
-  # Certbot DNS-01 (Cloudflare) — wildcard cert
-  # Issues + auto-renews *.private.sovereignadvisory.ai
-  # Reloads sa_nginx_private after each renewal.
-  # -----------------------------------------
+  # ---------------------------------------------------------------------------
+  # Grafana — observability dashboards
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-sovereign2026!}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_HTTP_PORT=3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      com.sovereignadvisory.service: "grafana"
+
+  # ---------------------------------------------------------------------------
+  # nginx-private — TLS termination for private subdomains (via Twingate)
+  # ---------------------------------------------------------------------------
+  nginx-private:
+    image: nginx:1.27-alpine
+    container_name: sa_nginx_private
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./nginx-private/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx-private/conf.d:/etc/nginx/conf.d:ro
+      - ./logs/nginx-private:/var/log/nginx
+      - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
+    depends_on:
+      n8n:
+        condition: service_started
+      litellm:
+        condition: service_started
+      webui:
+        condition: service_started
+      jupyter:
+        condition: service_started
+      ollama:
+        condition: service_started
+      pipeline-server:
+        condition: service_started
+      agent-zero:
+        condition: service_started
+      open-webui:
+        condition: service_started
+    networks:
+      - vibe_net
+    labels:
+      com.sovereignadvisory.service: "nginx-private"
+
+  # ---------------------------------------------------------------------------
+  # Certbot DNS (Cloudflare) — wildcard cert for *.private.sovereignadvisory.ai
+  # ---------------------------------------------------------------------------
   certbot-dns:
     image: certbot/dns-cloudflare:latest
     container_name: sa_certbot_dns
     restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     environment:
       - CF_API_TOKEN=${CF_API_TOKEN}
     volumes:
-      - /opt/sovereignadvisory/ssl:/etc/letsencrypt
+      - /opt/agentic-sdlc/ssl:/etc/letsencrypt
       - ./certbot/nginx-reload.py:/nginx-reload.py:ro
       - ./certbot/entrypoint.sh:/entrypoint.sh:ro
       - /var/run/docker.sock:/var/run/docker.sock
@@ -526,278 +1099,35 @@ services:
     labels:
       com.sovereignadvisory.service: "certbot-dns"
 
-  # -----------------------------------------
-  # SA Lead Review Portal - HITM review UI
-  # Serves the password-gated lead review page
-  # and bridges reviewer actions back to n8n.
-  # Port 5003 — exposed to host for local dev
-  # -----------------------------------------
-  lead-review:
+  # ---------------------------------------------------------------------------
+  # Company Research Service — web-based company enrichment for lead pipeline
+  # ---------------------------------------------------------------------------
+  company-research:
     build:
       context: ./scripts
-      dockerfile: Dockerfile.lead_review
-    image: sa_lead_review:latest
-    container_name: sa_lead_review
-    ports:
-      - "5003:5003"
+      dockerfile: Dockerfile.company_research
+    image: sa_company_research:latest
+    container_name: sa_company_research
     environment:
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-      - LEAD_REVIEW_PASSWORD=${LEAD_REVIEW_PASSWORD}
-      - N8N_BASE_URL=http://n8n:5678
-      - PDF_OUTPUT_DIR=/data/output/lead_pdfs
-      # ── Keycloak OIDC SSO (enable after configuring Keycloak realm) ─────────
-      - OIDC_ENABLED=${OIDC_ENABLED:-false}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/agentic-sdlc
-      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL:-https://kc.sovereignadvisory.ai}
-      - KEYCLOAK_CLIENT_ID=lead-review
-      - KEYCLOAK_CLIENT_SECRET=${LEAD_REVIEW_OIDC_CLIENT_SECRET:-}
-      - LEAD_REVIEW_PUBLIC_URL=${LEAD_REVIEW_PUBLIC_URL:-https://sovereignadvisory.ai}
-      # ── Outbound SMTP (Resend) for approve action ────────────────────────
-      - NEO_SMTP_HOST=${NEO_SMTP_HOST:-smtp.resend.com}
-      - NEO_SMTP_PORT=${NEO_SMTP_PORT:-465}
-      - NEO_SMTP_USER=${NEO_SMTP_USER:-resend}
-      - NEO_SMTP_PASS=${NEO_SMTP_PASS}
-      - NOTIFY_EMAIL=${NOTIFY_EMAIL:-relder@sovereignadvisory.ai}
-    volumes:
-      - ./output:/data/output
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - RESEARCH_STRUCTURING_MODEL=${RESEARCH_STRUCTURING_MODEL:-_gemini-flash}
     networks:
       - vibe_net
-      - sa_web
     depends_on:
-      postgres:
+      litellm:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
     healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5003/health')"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5004/health')"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
     labels:
-      com.sovereignadvisory.service: "lead-review"
-
-  # -----------------------------------------
-  # Keycloak - Central SSO / Identity Provider
-  #
-  # Phase 1: human user login (n8n, lead-review, LiteLLM, Jupyter)
-  # Phase 2: service-to-service OAuth2 client credentials
-  #
-  # Admin UI: http://localhost:8080  (admin / KEYCLOAK_ADMIN_PASSWORD)
-  # Realm:    agentic-sdlc
-  #
-  # Production mode: 'start' with KC_PROXY=edge (nginx handles TLS termination).
-  # NOTE: Do NOT add watchtower label — major version upgrades require DB migration.
-  # -----------------------------------------
-  keycloak:
-    image: quay.io/keycloak/keycloak:24.0.5
-    container_name: keycloak
-    command: start
-    environment:
-      # Admin credentials
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      # Postgres backend (keycloak DB, same postgres instance)
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
-      - KC_DB_USERNAME=${LITELLM_USER:-litellm}
-      - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      # Production mode: trust nginx TLS termination via KC_PROXY=edge
-      - KC_HOSTNAME=kc.sovereignadvisory.ai
-      - KC_HOSTNAME_ADMIN=kc.private.sovereignadvisory.ai
-      - KC_HOSTNAME_STRICT=true
-      - KC_PROXY=edge
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
-    ports:
-      - "8080:8080"
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      # KC 24 UBI minimal has no curl/wget — use bash TCP redirect to check port is open
-      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/8080' 2>/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 90s
-    # No watchtower label — update Keycloak manually (requires DB migration)
-
-  # -----------------------------------------
-  # oauth2-proxy — LiteLLM UI (port 4001)
-  # Protects the LiteLLM admin UI with Keycloak SSO.
-  # LiteLLM API (:4000) remains direct for service-to-service calls.
-  # Enable after configuring the 'litellm' client in Keycloak.
-  # -----------------------------------------
-  oauth2-proxy-litellm:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-    container_name: oauth2_proxy_litellm
-    command:
-      - --provider=oidc
-      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      - --client-id=litellm
-      - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
-      - --redirect-url=https://litellm.private.sovereignadvisory.ai/oauth2/callback
-      - --upstream=http://litellm:4000
-      - --http-address=0.0.0.0:4001
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=true
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --insecure-oidc-allow-unverified-email=true
-    ports:
-      - "4001:4001"
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      litellm:
-        condition: service_healthy
-
-  # -----------------------------------------
-  # oauth2-proxy — JupyterLab (port 8889)
-  # Protects JupyterLab with Keycloak SSO.
-  # Direct port 8888 still works (token auth) for local dev convenience.
-  # Enable after configuring the 'jupyter' client in Keycloak.
-  # -----------------------------------------
-  oauth2-proxy-jupyter:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-    container_name: oauth2_proxy_jupyter
-    command:
-      - --provider=oidc
-      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      - --client-id=jupyter
-      - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
-      - --redirect-url=https://jupyter.private.sovereignadvisory.ai/oauth2/callback
-      - --upstream=http://jupyter:8888
-      - --http-address=0.0.0.0:8889
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=true
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --insecure-oidc-allow-unverified-email=true
-    ports:
-      - "8889:8889"
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      jupyter:
-        condition: service_healthy
-
-  # -----------------------------------------
-  # oauth2-proxy — Pipeline WebUI (port 3001)
-  # Protects the custom pipeline dashboard with Keycloak SSO.
-  # -----------------------------------------
-  oauth2-proxy-webui:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-    container_name: oauth2_proxy_webui
-    command:
-      - --provider=oidc
-      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      - --client-id=webui
-      - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
-      - --redirect-url=https://webui.private.sovereignadvisory.ai/oauth2/callback
-      - --upstream=http://webui:3000
-      - --http-address=0.0.0.0:3001
-      - --email-domain=*
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
-      - --cookie-secure=true
-      - --skip-provider-button=true
-      - --allowed-role=agentic-sdlc:admin
-      - --allowed-role=agentic-sdlc:user
-    networks:
-      - vibe_net
-    depends_on:
-      keycloak:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # -----------------------------------------
-  # Internal Access Portal — home.private.sovereignadvisory.ai
-  # Static HTML/JS portal served by Nginx, gated by oauth2_proxy_portal
-  # -----------------------------------------
-  portal:
-    image: nginx:alpine
-    container_name: portal
-    volumes:
-      - ./portal:/usr/share/nginx/html:ro
-      - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/default.conf:ro
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # -----------------------------------------
-  # oauth2-proxy — Internal Access Portal (port 4185)
-  # Authenticates portal access via Keycloak agentic-sdlc realm
-  # -----------------------------------------
-  oauth2-proxy-portal:
-    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
-    container_name: oauth2_proxy_portal
-    command:
-      - --provider=oidc
-      - --oidc-issuer-url=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      - --client-id=portal
-      - --client-secret=${PORTAL_OIDC_CLIENT_SECRET}
-      - --redirect-url=https://home.private.sovereignadvisory.ai/oauth2/callback
-      - --upstream=http://portal:80
-      - --http-address=0.0.0.0:4185
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=true
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --insecure-oidc-allow-unverified-email=true
-      - --code-challenge-method=S256
-    networks:
-      - vibe_net
-    restart: unless-stopped
-    depends_on:
-      keycloak:
-        condition: service_healthy
-      portal:
-        condition: service_started
-    labels:
-      - "com.centurylinklabs.watchtower.enable=true"
-
-  # -----------------------------------------
-  # Vaultwarden — self-hosted Bitwarden-compatible vault
-  # Accessible via browser extension / mobile app on Twingate.
-  # SSO via Keycloak requires Vaultwarden 1.32+.
-  # -----------------------------------------
-  vaultwarden:
-    image: vaultwarden/server:latest
-    container_name: vaultwarden
-    restart: unless-stopped
-    environment:
-      - DOMAIN=https://vault.private.sovereignadvisory.ai
-      - SIGNUPS_ALLOWED=false
-      - INVITATIONS_ALLOWED=true
-      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
-      # Keycloak OIDC SSO (requires Vaultwarden 1.32+)
-      - SSO_ENABLED=true
-      - SSO_ONLY=false                   # keeps master-password for admin recovery
-      - SSO_AUTHORITY=https://kc.sovereignadvisory.ai/realms/agentic-sdlc
-      - SSO_CLIENT_ID=vaultwarden
-      - SSO_CLIENT_SECRET=${VAULTWARDEN_OIDC_CLIENT_SECRET}
-      # Email
-      - SMTP_HOST=${NEO_SMTP_HOST}
-      - SMTP_PORT=${NEO_SMTP_PORT}
-      - SMTP_SECURITY=force_tls
-      - SMTP_USERNAME=${NEO_SMTP_USER}
-      - SMTP_PASSWORD=${NEO_SMTP_PASS}
-      - SMTP_FROM=${NOTIFY_EMAIL}
-      - SMTP_FROM_NAME=Sovereign Advisory Vault
-    volumes:
-      - vaultwarden_data:/data
-    networks:
-      - vibe_net
-    labels:
-      com.sovereignadvisory.service: "vaultwarden"
+      com.sovereignadvisory.service: "company-research"

@@ -1,0 +1,12 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+
+COPY requirements-company-research.txt .
+RUN pip install --no-cache-dir -r requirements-company-research.txt
+
+COPY company_research_server.py .
+
+EXPOSE 5004
+
+CMD ["python", "company_research_server.py"]

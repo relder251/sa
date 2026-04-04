@@ -528,7 +528,7 @@ async def list_leads(
     tokens: dict[str, str] = {}
     if leads:
         token_rows = await pool.fetch(
-            "SELECT lead_id::text, token FROM sa_review_tokens "
+            "SELECT lead_id::text, token::text FROM sa_review_tokens "
             "WHERE lead_id = ANY($1::uuid[]) AND is_active = TRUE",
             [r["id"] for r in leads],
         )

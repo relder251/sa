@@ -763,7 +763,7 @@ const categories = {};
 // ── Portal data loading ───────────────────────────────
 async function loadPortal() {
   try {
-    const res = await fetch('./services.json');
+    const res = await fetch('./services.json?v=' + Date.now());
     const data = await res.json();
     // Build categories object keyed by `key`
     (data.categories || []).forEach(cat => {
@@ -1309,6 +1309,8 @@ async function finishWizard() {
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', loadPortal);
+// Auto-refresh: reload portal data every 5 minutes
+setInterval(loadPortal, 5 * 60 * 1000);
 </script>
 </body>
 </html>
