@@ -298,7 +298,7 @@
       </thead>
       <tbody id="leadTableBody"></tbody>
     </table>
-    <div class="empty-state" id="emptyState" style="display:none">No leads match this filter.</div>
+    <div class="empty-state" id="emptyState" style="display:none"></div>
   </div>
 
   <!-- Detail -->
@@ -559,7 +559,25 @@
     if (subtitle) subtitle.textContent = `${rendered} lead${rendered !== 1 ? 's' : ''}`;
 
     const es = document.getElementById('emptyState');
-    es.style.display = rendered === 0 ? 'block' : 'none';
+    if (rendered === 0) {
+      const isNeedsAction = activePills.includes('needs_action') && !activePills.includes('all');
+      const q = (document.getElementById('searchInput')?.value || '').trim();
+      if (q) {
+        es.innerHTML = '<div style="font-size:1.8rem;margin-bottom:0.75rem">&#128269;</div>No leads match <strong>&ldquo;' + q + '&rdquo;</strong>.';
+      } else if (isNeedsAction) {
+        es.innerHTML = '<div style="font-size:1.8rem;margin-bottom:0.75rem">&#9989;</div><strong>You're all caught up.</strong><br><span style="font-size:0.8rem">No leads require action right now.</span>';
+        if (typeof window._emptyActionToastShown === 'undefined') {
+          window._emptyActionToastShown = true;
+          showToast('No leads require action — inbox is clear.', false);
+        }
+      } else {
+        es.innerHTML = '<div style="font-size:1.8rem;margin-bottom:0.75rem">&#128333;</div>No leads match this filter.';
+      }
+      es.style.display = 'block';
+    } else {
+      es.style.display = 'none';
+      window._emptyActionToastShown = undefined;
+    }
   }
 
   function onRowCheck() {
