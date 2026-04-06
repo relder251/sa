@@ -1117,7 +1117,7 @@ async function saveEdit() {
     const res = await fetch('/api/portal-update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id, fields: { name, url, description: desc, icon: emoji, category: newCat } })
+      body: JSON.stringify({ id, name, url, description: desc, icon: emoji, category: newCat })
     });
     if (!res.ok) { alert('Failed to save changes. Please try again.'); return; }
     await loadPortal();
