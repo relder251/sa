@@ -595,11 +595,7 @@ body {
       <span class="filter-label">Recently Used</span>
     </button>
 
-    <div id="recent-list">
-      <button class="recent-item" onclick="openService('n8n')"><span class="recent-icon">⚡</span><span class="recent-name">n8n</span><span class="recent-time">2m ago</span></button>
-      <button class="recent-item" onclick="openService('litellm')"><span class="recent-icon">🤖</span><span class="recent-name">LiteLLM</span><span class="recent-time">1h ago</span></button>
-      <button class="recent-item" onclick="openService('vaultwarden')"><span class="recent-icon">🔐</span><span class="recent-name">Vaultwarden</span><span class="recent-time">3h ago</span></button>
-    </div>
+    <div id="recent-list"></div>
 
     <hr class="sidebar-divider">
 
@@ -799,7 +795,40 @@ function escHtml(str) {
 // ── Labels map (extended dynamically from categories) ─
 const labels = { all: 'All Services', favorites: 'Favorites', recent: 'Recently Used' };
 let currentFilter = 'all';
-const recentOrder = [];
+// Recent — persisted as [{id,ts}] in localStorage
+const RECENT_KEY = 'sa_portal_recent_v1';
+function _loadRecent() { try { return JSON.parse(localStorage.getItem(RECENT_KEY)||'[]'); } catch { return []; } }
+function _saveRecent(e) { localStorage.setItem(RECENT_KEY,JSON.stringify(e)); }
+let _recentEntries = _loadRecent();
+const recentOrder = _recentEntries.map(e => e.id);
+function _relTime(ts) {
+  const s = Math.max(0,Math.floor((Date.now()-ts)/1000));
+  if (s<60) return 'just now';
+  if (s<3600) return Math.floor(s/60)+'m ago';
+  if (s<86400) return Math.floor(s/3600)+'h ago';
+  return Math.floor(s/86400)+'d ago';
+}
+function refreshRecentList() {
+  const list = document.getElementById('recent-list');
+  if (!list) return;
+  list.innerHTML = '';
+  const visible = _recentEntries.slice(0,5).filter(e => currentServices.find(s=>s.id===e.id));
+  if (!visible.length) {
+    list.innerHTML = '<span style="font-size:10px;color:var(--text-3);padding:4px 10px;">No recent services</span>';
+    return;
+  }
+  visible.forEach(({id,ts}) => {
+    const svc = currentServices.find(s=>s.id===id);
+    const btn = document.createElement('button');
+    btn.className = 'recent-item';
+    const icon = document.createElement('span'); icon.className='recent-icon'; icon.textContent=svc.icon||'\uD83D\uDD17';
+    const name = document.createElement('span'); name.className='recent-name'; name.textContent=svc.name;
+    const time = document.createElement('span'); time.className='recent-time'; time.textContent=_relTime(ts);
+    btn.append(icon,name,time);
+    btn.onclick = () => openService(id);
+    list.appendChild(btn);
+  });
+}
 let currentServices = [];
 
 // ── Category registry — populated from services.json ─
@@ -897,6 +926,7 @@ function renderCards(services) {
     grid.appendChild(card);
   });
   applyFilter(currentFilter);
+  refreshRecentList();
   updateCounts();
 }
 
@@ -1028,9 +1058,12 @@ function toggleStar(e, id) {
 
 function handleCardClick(id) {
   const idx = recentOrder.indexOf(id);
-  if (idx > -1) recentOrder.splice(idx, 1);
+  if (idx > -1) { recentOrder.splice(idx,1); _recentEntries.splice(idx,1); }
   recentOrder.unshift(id);
-  if (recentOrder.length > 5) recentOrder.pop();
+  _recentEntries.unshift({id,ts:Date.now()});
+  if (recentOrder.length > 5) { recentOrder.pop(); _recentEntries.pop(); }
+  _saveRecent(_recentEntries);
+  refreshRecentList();
   if (currentFilter === 'recent') applyFilter();
 }
 
