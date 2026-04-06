@@ -324,6 +324,16 @@
       "category": "communication",
       "favorite": false,
       "ssoTier": 3
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "url": "https://github.com/relder251",
+      "description": "",
+      "icon": "🐙",
+      "category": "dev",
+      "favorite": false,
+      "ssoTier": 3
     }
   ]
 }
