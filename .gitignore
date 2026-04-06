@@ -41,3 +41,19 @@ ssl/
 
 # Backup dirs
 backup_*/
+
+# Backup / archive files left by manual edits
+*.bak
+*.bak.*
+*.archive
+*.backup
+*.bak_*
+
+# Vault storage (runtime data, not config)
+vault/data/
+
+# Twingate private access backups
+.sa-private-access-backups/
+
+# One-off admin scripts
+reset_n8n_password.sh
