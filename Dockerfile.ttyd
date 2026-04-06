@@ -3,4 +3,4 @@ RUN apt-get update -qq && apt-get install -y --no-install-recommends docker.io &
 COPY exec_container.sh /exec_container.sh
 RUN chmod +x /exec_container.sh
 EXPOSE 7681
-CMD ["ttyd",      "--port", "7681",      "--max-clients", "10",      "--writable",      "-t", "titleFixed=Container Terminal",      "-t", "rendererType=canvas",      "-t", "fontSize=14",      "/exec_container.sh"]
+CMD ["ttyd",      "--port", "7681",      "--max-clients", "10",      "--writable",      "--permit-arguments",      "-t", "titleFixed=Container Terminal",      "-t", "rendererType=canvas",      "-t", "fontSize=14",      "/exec_container.sh"]
