@@ -173,6 +173,7 @@ services:
       - GENERIC_USERINFO_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/userinfo
       - GENERIC_REDIRECT_URI=${LITELLM_REDIRECT_URL}
       - GENERIC_CLIENT_NAME=Keycloak SSO
+      - AUTO_REDIRECT_UI_LOGIN_TO_SSO=True
     volumes:
       - ./litellm_config.yaml:/app/config.yaml
       - ./factual_verifier.py:/app/factual_verifier.py
@@ -627,7 +628,7 @@ services:
     image: quay.io/jupyter/scipy-notebook:latest
     container_name: jupyter
     environment:
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:?JUPYTER_TOKEN must be set in .env}
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-}
       - JUPYTER_ENABLE_LAB=yes
       - LITELLM_BASE_URL=http://litellm:4000
       - OLLAMA_BASE_URL=http://ollama:11434
