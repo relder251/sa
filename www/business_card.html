@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Robert Elder — Business Card</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* Lock html/body to exact card dimensions — no scrollbars, no overflow */
+  html, body {
+    width: 1050px;
+    height: 600px;
+    overflow: hidden;
+    background: #0b0f1c;
+  }
+
+  body {
+    font-family: 'Raleway', sans-serif;
+  }
+
+  /* ── Card wrapper ──────────────────────────────────────── */
+  .card {
+    width: 1050px;
+    height: 600px;
+    background: linear-gradient(135deg, #0d1120 0%, #111827 50%, #0b0f1c 100%);
+    position: relative;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* Border overlay — sits above all children so it's never occluded */
+  .card-border {
+    position: absolute;
+    inset: 0;
+    box-shadow: inset 0 0 0 2px #9e6428;
+    z-index: 100;
+    pointer-events: none;
+  }
+
+  /* Subtle inner glow border */
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 6px;
+    box-shadow: inset 0 0 0 0.5px rgba(192, 120, 56, 0.28);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Subtle background texture */
+  .card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(192, 120, 56, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 50%, rgba(192, 120, 56, 0.03) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── Left panel (logo) — widened to 45% to accommodate larger logo ── */
+  .panel-left {
+    width: 45%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 2;
+    padding: 12px;
+  }
+
+  .logo-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+  }
+
+  .logo-wrap img {
+    width: 540px;
+    max-width: 96%;
+    height: auto;
+    filter: drop-shadow(0 0 32px rgba(192, 120, 56, 0.6));
+  }
+
+  /* Vertical divider between panels */
+  .divider-v {
+    position: absolute;
+    left: 45%;
+    top: 10%;
+    height: 80%;
+    width: 0.5px;
+    background: linear-gradient(to bottom, transparent, #9e6428 30%, #9e6428 70%, transparent);
+    z-index: 3;
+  }
+
+  /* ── Right panel — single centred column ─────────────────── */
+  .panel-right {
+    width: 55%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    position: relative;
+    z-index: 2;
+    padding: 0 48px 0 52px;
+    gap: 0;
+  }
+
+  /* Name — 25% larger: 36 → 45px */
+  .name {
+    font-family: 'Raleway', sans-serif;
+    font-size: 45px;
+    font-weight: 600;
+    letter-spacing: 0.10em;
+    color: #e8ddd0;
+    text-transform: uppercase;
+    line-height: 1;
+    margin-bottom: 10px;
+  }
+
+  /* Sub-heading — 100% larger: 13 → 26px, brighter, bold */
+  .title {
+    font-family: 'Raleway', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: #f0a535;
+    text-transform: uppercase;
+    margin-bottom: 28px;
+  }
+
+  /* Horizontal rule — spans full right panel width */
+  .rule {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(to right,
+      #9e6428 0%,
+      #c07838 40%,
+      #9e6428 80%,
+      rgba(158, 100, 40, 0.3) 100%
+    );
+    margin-bottom: 24px;
+    flex-shrink: 0;
+  }
+
+  /* Contact list — 125% larger: 13 → 29px, brighter */
+  .contacts {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .contact-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .dot {
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #e0a050, #b07030);
+    flex-shrink: 0;
+    box-shadow: 0 0 7px rgba(192, 120, 56, 0.6);
+  }
+
+  .contact-text {
+    font-family: 'Raleway', sans-serif;
+    font-size: 29px;
+    font-weight: 400;
+    letter-spacing: 0.04em;
+    color: #ddd5c8;
+  }
+
+  /* ── Print / export settings ───────────────────────────── */
+  @media print {
+    body {
+      background: none;
+      margin: 0;
+    }
+    .card {
+      width: 3.5in;
+      height: 2in;
+      border: 1px solid #9e6428;
+    }
+    .name { font-size: 18pt; }
+    .title { font-size: 7pt; }
+    .contact-text { font-size: 7pt; }
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <!-- Border overlay (renders above all children) -->
+  <div class="card-border"></div>
+
+  <!-- Left: Logo -->
+  <div class="panel-left">
+    <div class="logo-wrap">
+      <img src="logo_full.png" alt="Sovereign Advisory">
+    </div>
+  </div>
+
+  <!-- Vertical divider -->
+  <div class="divider-v"></div>
+
+  <!-- Right: Identity + Contacts (single centred column) -->
+  <div class="panel-right">
+
+    <div class="name">Robert Elder</div>
+    <div class="title">Fractional CTO &amp; Technical Consultant</div>
+
+    <div class="rule"></div>
+
+    <div class="contacts">
+      <div class="contact-item">
+        <div class="dot"></div>
+        <span class="contact-text">+1 276 880 5651</span>
+      </div>
+      <div class="contact-item">
+        <div class="dot"></div>
+        <span class="contact-text">contact@sovereignadvisory.ai</span>
+      </div>
+      <div class="contact-item">
+        <div class="dot"></div>
+        <span class="contact-text">www.sovereignadvisory.ai</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</body>
+</html>

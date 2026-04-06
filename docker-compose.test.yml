@@ -1,0 +1,147 @@
+# =============================================================================
+# docker-compose.test.yml — TEST DELTA
+# Same shape as docker-compose.prod.yml but references test-domain env vars.
+# Apply on top of docker-compose.yml:
+#   docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up
+# =============================================================================
+
+services:
+
+  # Keycloak test override: start mode with postgres backend
+  keycloak:
+    command: start
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
+      - KC_DB_USERNAME=${LITELLM_USER:-litellm}
+      - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
+      - KC_HOSTNAME=${KC_HOSTNAME:-kc.test.sovereignadvisory.ai}
+      - KC_HOSTNAME_STRICT=false
+      - KC_PROXY_HEADERS=xforwarded
+      - KC_HTTP_ENABLED=true
+      - KC_HEALTH_ENABLED=true
+    depends_on:
+      postgres:
+        condition: service_healthy
+    labels:
+      com.sovereignadvisory.service: "keycloak"
+
+  # nginx-private: expose on loopback only
+  nginx-private:
+    ports:
+      - "127.0.0.1:443:443"
+
+  # Public-facing nginx for test environment
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: sa_nginx
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /opt/agentic-sdlc/nginx-public/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /opt/agentic-sdlc/nginx-public/conf.d:/etc/nginx/conf.d:ro
+      - /opt/agentic-sdlc/www:/usr/share/nginx/html:ro
+      - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
+      - /opt/agentic-sdlc/ssl/dhparam:/etc/nginx/dhparam:ro
+      - /opt/agentic-sdlc/certbot/www:/var/www/certbot:ro
+      - /opt/agentic-sdlc/logs:/var/log/nginx
+    networks:
+      - sa_web
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "sh", "-c", "nginx -t 2>/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      com.sovereignadvisory.service: "nginx"
+
+  # Certbot HTTP-01 for test domain
+  certbot:
+    image: certbot/certbot:latest
+    container_name: sa_certbot
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - /opt/agentic-sdlc/ssl:/etc/letsencrypt
+      - /opt/agentic-sdlc/certbot/www:/var/www/certbot
+    entrypoint: >
+      /bin/sh -c "trap exit TERM;
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet;
+          sleep 12h & wait $${!};
+        done"
+    networks:
+      - sa_web
+    labels:
+      com.sovereignadvisory.service: "certbot"
+
+  # Twingate connector for test environment
+  twingate:
+    image: twingate/connector:1
+    container_name: twingate-friendly-jaguar
+    pull_policy: always
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      TWINGATE_NETWORK:           ${TWINGATE_NETWORK}
+      TWINGATE_ACCESS_TOKEN:      ${TWINGATE_ACCESS_TOKEN}
+      TWINGATE_REFRESH_TOKEN:     ${TWINGATE_REFRESH_TOKEN}
+      TWINGATE_LABEL_HOSTNAME:    ${TWINGATE_LABEL_HOSTNAME:-}
+      TWINGATE_LOG_LEVEL:         ${TWINGATE_LOG_LEVEL:-3}
+      TWINGATE_LABEL_DEPLOYED_BY: docker
+    network_mode: host
+    labels:
+      com.sovereignadvisory.service: "twingate"
+
+  # Vaultwarden for test environment
+  vaultwarden:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      - DOMAIN=https://vault.private.${TEST_DOMAIN:-test.sovereignadvisory.ai}
+      - SIGNUPS_ALLOWED=false
+      - INVITATIONS_ALLOWED=true
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - SSO_ENABLED=true
+      - SSO_ONLY=false
+      - SSO_AUTHORITY=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - SSO_CLIENT_ID=vaultwarden
+      - SSO_CLIENT_SECRET=${VAULTWARDEN_OIDC_CLIENT_SECRET}
+      - SMTP_HOST=${NEO_SMTP_HOST}
+      - SMTP_PORT=${NEO_SMTP_PORT}
+      - SMTP_SECURITY=force_tls
+      - SMTP_USERNAME=${NEO_SMTP_USER}
+      - SMTP_PASSWORD=${NEO_SMTP_PASS}
+      - SMTP_FROM=${NOTIFY_EMAIL}
+      - SMTP_FROM_NAME=Sovereign Advisory Vault (Test)
+    volumes:
+      - vaultwarden_data:/data
+    networks:
+      - vibe_net
+    labels:
+      com.sovereignadvisory.service: "vaultwarden"

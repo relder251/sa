@@ -1,0 +1,4 @@
+FROM lscr.io/linuxserver/webtop:kali-rolling
+
+# Install Maltego CE from Kali repositories
+RUN apt-get update &&     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends         maltego     && apt-get clean     && rm -rf /var/lib/apt/lists/*

@@ -1,0 +1,20 @@
+log:
+  level: info
+
+store:
+  type: "postgres"
+  postgres:
+    dsn: "postgres://litellm:litellm_password@postgres:5432/zep?sslmode=disable"
+
+auth:
+  required: false
+  secret: ""
+
+server:
+  port: 8000
+
+llm:
+  anthropic_api_key: ""
+  openai:
+    endpoint: "http://litellm:4000"
+    api_key: "sk-vibe-coding-key-123"

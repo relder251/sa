@@ -1,0 +1,5 @@
+# Extends the official oauth2-proxy with a static nc binary for health checks.
+# oauth2-proxy is distroless (scratch-based) — no shell or tools available.
+# busybox:musl provides a statically-linked nc that works in scratch images.
+FROM quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+COPY --from=busybox:musl /bin/nc /nc
