@@ -47,6 +47,14 @@
       "color": "rgba(56,189,248,0.08)",
       "text": "#7dd3fc",
       "border": "rgba(56,189,248,0.15)"
+    },
+    {
+      "key": "communication",
+      "label": "Communication",
+      "icon": "🏷️",
+      "color": "hsla(200,60%,70%,0.08)",
+      "text": "hsla(200,80%,80%,1)",
+      "border": "hsla(200,60%,70%,0.2)"
     }
   ],
   "services": [
@@ -57,16 +65,16 @@
       "description": "Workflow automation · 6 active",
       "icon": "⚡",
       "category": "automation",
-      "favorite": false,
+      "favorite": true,
       "ssoTier": 1,
       "terminal": "n8n"
     },
     {
       "id": "pipeline",
-      "name": "Open WebUI",
+      "name": "Automated Development",
       "url": "https://webui.private.sovereignadvisory.ai",
-      "description": "Automated development pipeline interface",
-      "icon": "🎯",
+      "description": "AI chat interface",
+      "icon": "🌐",
       "category": "automation",
       "favorite": false,
       "ssoTier": 1,
@@ -79,7 +87,7 @@
       "description": "AI proxy · 4 model tiers",
       "icon": "🤖",
       "category": "ai",
-      "favorite": false,
+      "favorite": true,
       "ssoTier": 1,
       "terminal": "litellm"
     },
@@ -192,7 +200,7 @@
       "description": "Private network access — resource dashboard",
       "icon": "🛡️",
       "category": "infra",
-      "favorite": false,
+      "favorite": true,
       "ssoTier": 3,
       "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/twingate"
     },
@@ -214,7 +222,7 @@
       "description": "Domain & hosting",
       "icon": "🖥️",
       "category": "infra",
-      "favorite": false,
+      "favorite": true,
       "ssoTier": 3,
       "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/hostinger"
     },
@@ -225,7 +233,7 @@
       "description": "Autonomous AI agent framework",
       "icon": "🤖",
       "category": "ai",
-      "favorite": false,
+      "favorite": true,
       "ssoTier": 1,
       "terminal": "agent_zero"
     },
@@ -306,6 +314,16 @@
       "favorite": false,
       "ssoTier": 1,
       "terminal": "mirofish"
+    },
+    {
+      "id": "sa-email",
+      "name": "SA Email",
+      "url": "https://app.neo.space/mail/",
+      "description": "",
+      "icon": "📦",
+      "category": "communication",
+      "favorite": false,
+      "ssoTier": 3
     }
   ]
 }
