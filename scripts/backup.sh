@@ -8,10 +8,11 @@
 #   BACKUP_DIR                 — defaults to /backup
 #
 # Volumes expected:
-#   /backup            — output directory (host: ./backup)
-#   /data/output       — lead PDFs and pipeline output (read-only)
+#   /backup             — output directory (host: ./backup)
+#   /data/output        — lead PDFs and pipeline output (read-only)
 #   /data/opportunities — pipeline input data (read-only)
-#   /ssl               — TLS certs at /opt/sovereignadvisory/ssl (read-only)
+#   /data/open_webui    — Open WebUI SQLite data dir (read-only)
+#   /ssl                — TLS certs at /opt/sovereignadvisory/ssl (read-only)
 
 set -euo pipefail
 
@@ -23,7 +24,6 @@ BACKUP_DIR="${BACKUP_DIR:-/backup}"
 
 run() {
   if $DRY_RUN; then
-    # printf '%q ' safely quotes args without shell metacharacter expansion
     echo "[dry-run] $(printf '%q ' "$@")"
   else
     "$@"
@@ -38,6 +38,16 @@ echo "=== Backup starting: $DATE (dry-run: $DRY_RUN) ==="
 # Write to .tmp first; atomic rename on success prevents corrupt partial files.
 echo "--- postgres ---"
 run bash -c "pg_dumpall | gzip > \"$BACKUP_DIR/postgres_${DATE}.sql.gz.tmp\" && mv \"$BACKUP_DIR/postgres_${DATE}.sql.gz.tmp\" \"$BACKUP_DIR/postgres_${DATE}.sql.gz\""
+
+# --- Open WebUI SQLite ---
+# cp is safe at 2am with no active writes; copies main db file.
+# The WAL file is also copied so the backup is consistent even mid-checkpoint.
+echo "--- open_webui ---"
+run bash -c "
+  cp /data/open_webui/webui.db \"$BACKUP_DIR/open_webui_${DATE}.db.tmp\"
+  [ -f /data/open_webui/webui.db-wal ] && cp /data/open_webui/webui.db-wal \"$BACKUP_DIR/open_webui_${DATE}.db-wal\" || true
+  mv \"$BACKUP_DIR/open_webui_${DATE}.db.tmp\" \"$BACKUP_DIR/open_webui_${DATE}.db\"
+"
 
 # --- Output directory ---
 echo "--- output ---"
@@ -59,17 +69,21 @@ fi
 # --- Retention: 7 daily + 4 weekly (Sunday) backups ---
 echo "--- pruning old backups ---"
 
-# Collect the 4 most recent Sunday dates to preserve as weekly snapshots
 SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done \
   | tr '\n' '|' | sed 's/|$//')
 
-# Pass 1: delete non-Sunday files older than 7 days
-# grep -vE exits 1 when no lines match (no old files) — || true prevents pipefail abort
+# Pass 1: delete non-Sunday .gz files older than 7 days
 find "$BACKUP_DIR" -name "*.gz" -mtime +7 \
   | grep -vE "($SUNDAYS)" \
   | xargs -r rm -f || true
 
-# Pass 2: delete ALL files older than 28 days (hard cutoff — even Sunday snapshots expire)
+# Pass 2: delete non-Sunday .db / .db-wal files older than 7 days
+find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +7 \
+  | grep -vE "($SUNDAYS)" \
+  | xargs -r rm -f || true
+
+# Pass 3: hard cutoff — delete everything older than 28 days
 find "$BACKUP_DIR" -name "*.gz" -mtime +28 | xargs -r rm -f
+find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +28 | xargs -r rm -f
 
 echo "=== Backup complete: $DATE ==="

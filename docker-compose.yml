@@ -942,6 +942,7 @@ services:
       - ./output:/data/output:ro
       - ./opportunities:/data/opportunities:ro
       - /opt/agentic-sdlc/ssl:/ssl:ro
+      - open_webui_data:/data/open_webui:ro
       - ./scripts/backup.sh:/backup.sh:ro
     environment:
       - PGHOST=postgres
