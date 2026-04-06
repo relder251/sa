@@ -1044,6 +1044,12 @@ function toggleFavorite(e, btn) {
   btn.title = isFav ? 'Add to favorites' : 'Remove from favorites';
   updateCounts();
   if (currentFilter === 'favorites') applyFilter();
+  // Persist to backend so favorites survive reload
+  fetch('/api/portal-update', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: card.dataset.id, favorite: !isFav })
+  }).catch(() => {});
 }
 
 // Keep backward-compatible toggleStar for any remaining references
