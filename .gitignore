@@ -28,3 +28,16 @@ deerflow/
 # Jupyter checkpoints
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+
+# API keys / tier config
+tier_keys.json
+
+# Temp fix scripts
+vps_fix*.py
+
+# Logs and SSL certs (large / sensitive)
+logs/
+ssl/
+
+# Backup dirs
+backup_*/

@@ -303,12 +303,13 @@ def register_model(model: FreeModel, dry_run: bool = False) -> bool:
         return False
 
 
-def deregister_model(model_name: str, dry_run: bool = False) -> bool:
-    """Remove a stale free model from LiteLLM."""
+def deregister_model(model_name: str, model_id: str = "", dry_run: bool = False) -> bool:
+    """Remove a stale free model from LiteLLM by its internal DB id."""
     if dry_run:
-        log.info(f"[DRY RUN] Would REMOVE: {model_name}")
+        log.info(f"[DRY RUN] Would REMOVE: {model_name} (id={model_id})")
         return True
 
+    delete_id = model_id if model_id else model_name
     try:
         resp = requests.post(
             f"{LITELLM_BASE_URL}/model/delete",
@@ -316,16 +317,15 @@ def deregister_model(model_name: str, dry_run: bool = False) -> bool:
                 "Authorization": f"Bearer {LITELLM_API_KEY}",
                 "Content-Type": "application/json",
             },
-            json={"id": model_name},
+            json={"id": delete_id},
             timeout=10,
         )
         resp.raise_for_status()
-        log.info(f"  🗑️  Removed stale: {model_name}")
+        log.info(f"  🗑️  Removed stale: {model_name} (id={delete_id})")
         return True
     except requests.RequestException as e:
-        log.error(f"  ❌ Failed to remove {model_name}: {e}")
+        log.error(f"  ❌ Failed to remove {model_name} (id={delete_id}): {e}")
         return False
-
 
 # ── Free tier group aliases ───────────────────────────────────────────────────
 FREE_TIER_GROUPS = {
@@ -405,7 +405,7 @@ def sync(dry_run: bool = False, verbose: bool = False):
     # 4. Apply removals first
     removed = 0
     for name in to_remove:
-        if deregister_model(name, dry_run=dry_run):
+        if deregister_model(name, model_id=current.get(name, ""), dry_run=dry_run):
             removed += 1
 
     # 5. Apply additions

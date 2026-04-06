@@ -58,7 +58,8 @@
       "icon": "⚡",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "n8n"
     },
     {
       "id": "pipeline",
@@ -68,7 +69,8 @@
       "icon": "🎯",
       "category": "automation",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "pipeline_server"
     },
     {
       "id": "litellm",
@@ -78,7 +80,8 @@
       "icon": "🤖",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "litellm"
     },
     {
       "id": "jupyter",
@@ -88,7 +91,8 @@
       "icon": "📓",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "jupyter"
     },
     {
       "id": "claude",
@@ -146,7 +150,8 @@
       "icon": "🔐",
       "category": "security",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "vaultwarden"
     },
     {
       "id": "keycloak-admin",
@@ -221,7 +226,8 @@
       "icon": "🤖",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "agent_zero"
     },
     {
       "id": "ollama-webui",
@@ -231,7 +237,75 @@
       "icon": "📦",
       "category": "ai",
       "favorite": false,
-      "ssoTier": 1
+      "ssoTier": 1,
+      "terminal": "open_webui"
+    },
+    {
+      "id": "grafana",
+      "name": "Grafana",
+      "url": "https://grafana.private.sovereignadvisory.ai",
+      "description": "Metrics dashboards & observability",
+      "icon": "📊",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "grafana"
+    },
+    {
+      "id": "prometheus",
+      "name": "Prometheus",
+      "url": "https://prometheus.private.sovereignadvisory.ai",
+      "description": "Metrics collection & alerting",
+      "icon": "🔥",
+      "category": "infra",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "prometheus"
+    },
+    {
+      "id": "qdrant",
+      "name": "Qdrant",
+      "url": "https://qdrant.private.sovereignadvisory.ai",
+      "description": "Vector database & search engine",
+      "icon": "🧲",
+      "category": "ai",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "qdrant"
+    },
+    {
+      "id": "maltego",
+      "name": "Maltego",
+      "url": "https://maltego.private.sovereignadvisory.ai",
+      "description": "OSINT link analysis · CE desktop + transform API",
+      "icon": "🔍",
+      "category": "security",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "maltego_transforms"
+    },
+    {
+      "id": "hashicorp-vault",
+      "name": "HashiCorp Vault",
+      "url": "https://secrets.private.sovereignadvisory.ai",
+      "description": "Secrets management & encryption",
+      "icon": "🗄️",
+      "category": "security",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "vault",
+      "credentialHint": "https://vault.private.sovereignadvisory.ai/#search/vault"
+    },
+    {
+      "id": "mirofish",
+      "name": "MiroFish",
+      "url": "https://mirofish.private.sovereignadvisory.ai",
+      "description": "LLM-powered application",
+      "icon": "🐟",
+      "category": "ai",
+      "favorite": false,
+      "ssoTier": 1,
+      "terminal": "mirofish"
     }
   ]
 }

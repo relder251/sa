@@ -142,6 +142,20 @@
     .item-list { padding-left:1.2rem; color:var(--text-2); font-size:0.83rem; }
     .item-list li { margin-bottom:0.5rem; }
 
+    /* Research fact table */
+    .r-table { width:100%; border-collapse:collapse; margin-bottom:1.25rem; }
+    .r-table tr { border-bottom:1px solid var(--border); }
+    .r-table tr:last-child { border-bottom:none; }
+    .r-table td { padding:0.45rem 0.5rem; font-size:0.84rem; vertical-align:top; }
+    .r-table .r-label { color:var(--text-3); font-size:0.7rem; text-transform:uppercase;
+                        letter-spacing:0.06em; width:38%; white-space:nowrap; padding-right:1rem; }
+    .r-table .r-val   { color:var(--text-1); }
+    .conf-high   { color:#6ab07a; font-weight:600; }
+    .conf-medium { color:#c8aa55; font-weight:600; }
+    .conf-low    { color:#d07070; font-weight:600; }
+    .r-lists { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; }
+    @media(max-width:600px){ .r-lists { grid-template-columns:1fr; } }
+
     /* Email draft */
     .email-subject { font-size:0.82rem; color:var(--text-3); margin-bottom:0.75rem; }
     .email-subject span { color:var(--text-1); }
@@ -655,12 +669,57 @@
     c.innerHTML += card('Original Message', `<div class="message-box">${esc(lead.message || '(none)')}</div>`);
 
     const research = lead.company_research || lead.person_research || {};
-    const resText  = research.summary || (typeof research === 'string' ? research : '');
-    if (resText) c.innerHTML += card('Research', `<p class="research-text">${esc(resText)}</p>`);
 
+    // Company Intelligence — structured fact table + supplementary lists
+    if (research && typeof research === 'object') {
+      const confClass = { high:'conf-high', medium:'conf-medium', low:'conf-low' }[research.data_confidence] || '';
+      const confLabel = research.data_confidence
+        ? `<span class="${confClass}">${esc(research.data_confidence.charAt(0).toUpperCase() + research.data_confidence.slice(1))}</span>`
+        : '—';
+
+      const rows = [
+        ['Industry',         research.industry],
+        ['Sub-Industry',     research.sub_industry],
+        ['Business Model',   research.business_model],
+        ['Employees',        research.employee_count],
+        ['Revenue',          research.annual_revenue],
+        ['Funding',          research.funding_stage],
+        ['Founded',          research.founded_year ? `${research.founded_year}${research.years_in_business ? ` (${research.years_in_business} yrs)` : ''}` : null],
+        ['Footprint',        research.geographic_footprint],
+        ['Market Position',  research.competitive_position],
+        ['Data Confidence',  research.data_confidence ? confLabel : null],
+      ].filter(([, v]) => v);
+
+      const tableHtml = rows.length
+        ? `<table class="r-table">${rows.map(([k, v]) =>
+            `<tr><td class="r-label">${k}</td><td class="r-val">${k === 'Data Confidence' ? v : esc(String(v))}</td></tr>`
+          ).join('')}</table>`
+        : '';
+
+      const listSections = [
+        ['Products & Services',    research.key_products_services],
+        ['Key Clients / Partners', research.key_clients_partners],
+        ['Technology Stack',       research.technology_stack],
+        ['Growth Signals',         research.growth_signals],
+        ['Pain Points',            research.pain_points],
+        ['Recent News',            research.recent_news],
+      ].filter(([, arr]) => Array.isArray(arr) && arr.length);
+
+      const listsHtml = listSections.length
+        ? `<div class="r-lists">${listSections.map(([title, items]) =>
+            `<div><p class="col-head">${title}</p>${ol(items)}</div>`
+          ).join('')}</div>`
+        : '';
+
+      if (tableHtml || listsHtml) {
+        c.innerHTML += card('Company Intelligence', tableHtml + listsHtml);
+      }
+    }
+
+    // Strategic Assessment — bridges the lead's inquiry to company context
     if (lead.summary || lead.approach) {
-      c.innerHTML += card('Strategic Analysis', `
-        ${lead.summary  ? `<p class="col-head">Summary</p><p class="research-text" style="margin-bottom:1rem">${esc(lead.summary)}</p>` : ''}
+      c.innerHTML += card('Strategic Assessment', `
+        ${lead.summary  ? `<p class="col-head">Why They&rsquo;re Here</p><p class="research-text" style="margin-bottom:1rem;white-space:pre-line">${esc(lead.summary)}</p>` : ''}
         ${lead.approach ? `<p class="col-head">Recommended Approach</p><p class="research-text">${esc(lead.approach)}</p>` : ''}
       `);
     }
@@ -831,6 +890,7 @@
         if (load) load.style.display = 'none';
         setActionButtonsDisabled(false);
         showToast('Draft updated.');
+        const notesEl = document.getElementById('regenNotes'); if (notesEl) notesEl.value = '';
       }
     }, 3000);
   }

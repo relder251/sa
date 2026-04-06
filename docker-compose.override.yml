@@ -1,2 +1,85 @@
-# Auto-merged by Docker Compose. Provisioned oauth2-proxy containers are appended here.
-services: {}
+# =============================================================================
+# docker-compose.override.yml — LOCAL DEV
+# Auto-loaded by `docker compose up` (no -f flag needed).
+# Adds host port mappings so services are reachable on localhost.
+# Overrides Keycloak to start-dev mode (H2, no SSL).
+# Sets COOKIE_SECURE=false for HTTP-only local dev.
+# =============================================================================
+
+services:
+
+  # Local dev: expose ports directly on host
+  n8n:
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_SECURE_COOKIE=false
+
+  ollama:
+    ports:
+      - "11434:11434"
+
+  litellm:
+    ports:
+      - "4000:4000"
+
+  oauth2-proxy-litellm:
+    ports:
+      - "4001:4001"
+
+  oauth2-proxy-n8n:
+    ports:
+      - "5679:5679"
+
+  oauth2-proxy-jupyter:
+    ports:
+      - "8889:8889"
+
+  oauth2-proxy-webui:
+    ports:
+      - "3001:3001"
+
+  oauth2-proxy-portal:
+    ports:
+      - "4185:4185"
+
+  oauth2-proxy-agent-zero:
+    ports:
+      - "50081:50081"
+
+  jupyter:
+    ports:
+      - "8888:8888"
+
+  keycloak:
+    ports:
+      - "8080:8080"
+    command: start-dev
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+      - KC_HOSTNAME=localhost
+      - KC_HTTP_ENABLED=true
+      - KC_HEALTH_ENABLED=true
+
+  pipeline-server:
+    ports:
+      - "5002:5002"
+
+  webui:
+    ports:
+      - "3000:3000"
+
+  lead-review:
+    ports:
+      - "5003:5003"
+
+  nginx-private:
+    ports:
+      - "127.0.0.1:443:443"
+
+  agent-zero:
+    ports:
+      - 80:80
+
+  # Local dev: expose GPU to Ollama if available

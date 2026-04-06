@@ -507,6 +507,53 @@ body {
 .modal-step { display: none; }
 .modal-step.active { display: block; }
 
+/* ── SSH button on card ─────────────────────────── */
+.card-ssh {
+  position: absolute; bottom: 10px; left: 56px;
+  font-size: 11px; color: transparent;
+  padding: 2px 4px; border-radius: 2px;
+  transition: all 0.15s; z-index: 2;
+  font-family: var(--font-b); letter-spacing: 0.04em;
+  text-decoration: none; display: inline-block;
+}
+.card:hover .card-ssh { color: var(--text-3); }
+.card-ssh:hover { color: #7dd3fc !important; background: rgba(56,189,248,0.08); }
+
+/* ── Containers section ─────────────────────────── */
+.containers-section {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border-subtle);
+}
+.containers-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 14px;
+}
+.containers-title {
+  font-family: var(--font-d);
+  font-size: 15px; font-weight: 400;
+  color: var(--text-3); letter-spacing: 0.06em;
+}
+.containers-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.container-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 2px;
+  padding: 6px 12px;
+  font-family: var(--font-b); font-size: 11px; font-weight: 400;
+  color: var(--text-3); letter-spacing: 0.04em;
+  transition: border-color 0.2s;
+}
+.container-chip:hover { border-color: rgba(56,189,248,0.3); }
+.container-chip .c-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
+.container-chip .c-ssh {
+  font-size: 10px; color: rgba(125,211,252,0.4);
+  text-decoration: none; padding: 0 3px;
+  transition: color 0.15s;
+}
+.container-chip:hover .c-ssh { color: #7dd3fc; }
+
 /* ── API Provider badges ─────────────────────────── */
 .api-badge {
   position: absolute;
@@ -589,6 +636,15 @@ body {
     <div class="empty hidden" id="empty-state" style="display:none">
       <div class="empty-icon">★</div>
       <p>No favorites yet — click ☆ on any service card to pin it here.</p>
+    </div>
+
+    <!-- ── Running Containers ────────────────────── -->
+    <div class="containers-section" id="containers-section" style="display:none">
+      <div class="containers-header">
+        <span class="containers-title">Running Containers</span>
+        <span class="service-count" id="containers-count"></span>
+      </div>
+      <div class="containers-grid" id="containers-grid"></div>
     </div>
 
   </div>
@@ -774,6 +830,7 @@ async function loadPortal() {
     buildWizardCategoryTiles(data.categories || []);
     renderCards(data.services || []);
     loadApiStatus();
+    loadContainers();
   } catch (err) {
     console.error('Failed to load services.json:', err);
   }
@@ -845,12 +902,49 @@ function renderCards(services) {
         <span class="card-status"><span class="live-dot"></span> live</span>
       </div>
       <button class="card-edit" onclick="openEdit(event,this.closest('.card'))">✎ edit</button>
+      ${svc.terminal ? `<a class="card-ssh" href="https://terminal.private.sovereignadvisory.ai/?arg=${btoa(svc.terminal)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">⌨ ssh</a>` : ''}
       <span class="card-arrow">↗</span>
     `;
     grid.appendChild(card);
   });
   applyFilter(currentFilter);
   updateCounts();
+}
+
+// ── Containers section ────────────────────────────────
+async function loadContainers() {
+  try {
+    const res = await fetch('/api/docker/containers');
+    if (!res.ok) return;
+    const all = await res.json();
+    const running = all
+      .filter(c => c.State === 'running')
+      .map(c => ({ name: c.Names[0].replace(/^\//, '') }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    const grid = document.getElementById('containers-grid');
+    const section = document.getElementById('containers-section');
+    if (!running.length || !grid) return;
+    grid.innerHTML = '';
+    running.forEach(c => {
+      const chip = document.createElement('div');
+      chip.className = 'container-chip';
+      const dot = document.createElement('span');
+      dot.className = 'c-dot';
+      const label = document.createElement('span');
+      label.textContent = c.name;
+      const link = document.createElement('a');
+      link.className = 'c-ssh';
+      link.href = 'https://terminal.private.sovereignadvisory.ai/?arg=' + btoa(c.name);
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.title = 'Open terminal';
+      link.textContent = '\u2328';
+      chip.append(dot, label, link);
+      grid.appendChild(chip);
+    });
+    document.getElementById('containers-count').textContent = running.length + ' running';
+    section.style.display = '';
+  } catch (_) { /* Docker endpoint unavailable — skip */ }
 }
 
 // ── API Status badges ─────────────────────────────────

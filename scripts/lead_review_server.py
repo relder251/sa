@@ -17,6 +17,7 @@ Environment variables (all required unless noted):
 """
 
 import asyncio
+import traceback
 import hashlib
 import hmac
 import json
@@ -33,7 +34,7 @@ from typing import Optional
 from urllib.parse import parse_qs, urlencode
 
 import asyncpg
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 import httpx
 from jose import jwt, JWTError
@@ -82,9 +83,75 @@ SESSION_TTL = 4 * 3600  # 4 hours
 _oidc_nonces: dict[str, dict] = {}
 OIDC_NONCE_TTL = 60  # seconds
 
+# SQL to ensure SA schema tables exist — safe to run on every startup (all IF NOT EXISTS)
+_SCHEMA_SQL = """
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE SCHEMA IF NOT EXISTS sa;
+GRANT USAGE ON SCHEMA sa TO litellm;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA sa TO litellm;
+ALTER DEFAULT PRIVILEGES IN SCHEMA sa GRANT ALL ON TABLES TO litellm;
+ALTER ROLE litellm SET search_path TO sa, public;
+CREATE TABLE IF NOT EXISTS sa.sa_leads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    first_name VARCHAR(100), last_name VARCHAR(100),
+    email VARCHAR(255) NOT NULL,
+    domain VARCHAR(255), is_personal_email BOOLEAN DEFAULT FALSE,
+    service_area VARCHAR(100), message TEXT,
+    company_research JSONB, person_research JSONB,
+    summary TEXT, approach TEXT,
+    conversation_starters JSONB, questions JSONB, scenarios JSONB,
+    status VARCHAR(50) DEFAULT 'pending_research',
+    do_not_follow_up BOOLEAN DEFAULT FALSE, archived BOOLEAN DEFAULT FALSE,
+    notion_page_id VARCHAR(255), pdf_path TEXT,
+    research_completed_at TIMESTAMPTZ, draft_generated_at TIMESTAMPTZ,
+    first_notified_at TIMESTAMPTZ,
+    first_reminder_sent BOOLEAN DEFAULT FALSE, first_reminder_at TIMESTAMPTZ,
+    second_reminder_sent BOOLEAN DEFAULT FALSE, second_reminder_at TIMESTAMPTZ,
+    reviewed_at TIMESTAMPTZ, sent_at TIMESTAMPTZ
+);
+CREATE TABLE IF NOT EXISTS sa.sa_lead_drafts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID NOT NULL REFERENCES sa.sa_leads(id) ON DELETE CASCADE,
+    version INT DEFAULT 1, subject TEXT, body_html TEXT, body_text TEXT,
+    is_current BOOLEAN DEFAULT TRUE, rejection_notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS sa.sa_review_tokens (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID NOT NULL REFERENCES sa.sa_leads(id) ON DELETE CASCADE,
+    token VARCHAR(255) UNIQUE NOT NULL DEFAULT encode(gen_random_bytes(32), 'hex'),
+    n8n_resume_url TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW(),
+    used_at TIMESTAMPTZ, is_active BOOLEAN DEFAULT TRUE
+);
+CREATE TABLE IF NOT EXISTS sa.sa_email_threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lead_id UUID NOT NULL REFERENCES sa.sa_leads(id) ON DELETE CASCADE,
+    message_id VARCHAR(500), in_reply_to VARCHAR(500),
+    direction VARCHAR(10) CHECK (direction IN ('sent', 'received')),
+    subject TEXT, body_html TEXT, body_text TEXT,
+    sent_at TIMESTAMPTZ, received_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_sa_leads_status  ON sa.sa_leads(status);
+CREATE INDEX IF NOT EXISTS idx_sa_leads_email   ON sa.sa_leads(email);
+CREATE INDEX IF NOT EXISTS idx_sa_leads_created ON sa.sa_leads(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sa_leads_dnfu    ON sa.sa_leads(do_not_follow_up) WHERE do_not_follow_up = TRUE;
+CREATE INDEX IF NOT EXISTS idx_sa_review_token  ON sa.sa_review_tokens(token) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_sa_review_lead   ON sa.sa_review_tokens(lead_id);
+CREATE INDEX IF NOT EXISTS idx_sa_drafts_lead   ON sa.sa_lead_drafts(lead_id);
+CREATE INDEX IF NOT EXISTS idx_sa_threads_lead  ON sa.sa_email_threads(lead_id);
+"""
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Pool is created lazily on first request — no startup DB dependency
+    # Ensure SA schema tables exist on every startup — all statements are IF NOT EXISTS
+    try:
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.execute(_SCHEMA_SQL)
+        print("[startup] SA schema verified/created", flush=True)
+    except Exception as exc:
+        print(f"[startup] Schema check failed: {exc}", flush=True)
     yield
     if _pool:
         await _pool.close()
@@ -336,7 +403,8 @@ async def _regenerate_draft_via_llm(lead_id: str, notes: str) -> None:
             "You are writing on behalf of Robert Elder, CEO of Sovereign Advisory. "
             "Return ONLY a valid JSON object — no preamble, no explanation, no markdown. "
             "Your entire response must be pure JSON starting with { and ending with }. "
-            'Fields: subject (string), body_text (plain text email, no HTML).'
+            'Fields: subject (string), body_text (plain text email body only, no HTML, '
+            "no closing line, no sign-off, no signature — those are appended automatically)."
         )
 
         parts = [
@@ -357,12 +425,12 @@ async def _regenerate_draft_via_llm(lead_id: str, notes: str) -> None:
         user_msg = "\n".join(parts)
 
         # Call LiteLLM
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=180.0) as client:
             resp = await client.post(
                 f"{LITELLM_BASE_URL}/v1/chat/completions",
-                headers={"Authorization": f"Bearer {LITELLM_API_KEY}"},
+                headers={"Authorization": f"Bearer {LITELLM_API_KEY}", "Cache-Control": "no-cache, no-store"},
                 json={
-                    "model": "cloud/smart",
+                    "model": "cloud/fast",
                     "messages": [
                         {"role": "system", "content": system_msg},
                         {"role": "user",   "content": user_msg},
@@ -384,6 +452,9 @@ async def _regenerate_draft_via_llm(lead_id: str, notes: str) -> None:
 
         new_subject = draft_json.get("subject") or prev_subject
         new_body    = draft_json.get("body_text") or ""
+        _REGEN_SIG = '\n\nBest regards,\n\nRobert Elder\nFounder & CEO, Sovereign Advisory\nrelder@sovereignadvisory.ai\nsovereignadvisory.ai'
+        if new_body and not new_body.rstrip().endswith("sovereignadvisory.ai"):
+            new_body = new_body.rstrip() + _REGEN_SIG
         next_version = (current_draft.get("version", 1) if current_draft else 1) + 1
 
         # Save new draft and reset status
@@ -407,7 +478,7 @@ async def _regenerate_draft_via_llm(lead_id: str, notes: str) -> None:
         print(f"[regen] lead {lead_id} → new draft v{next_version} saved", flush=True)
 
     except Exception as exc:
-        print(f"[error] _regenerate_draft_via_llm failed for lead {lead_id}: {exc}", flush=True)
+        print(f"[error] _regenerate_draft_via_llm failed for lead {lead_id}: {exc}\n{traceback.format_exc()}", flush=True)
         # Reset status so reviewer isn't stuck on 'regenerating'
         try:
             pool = await get_pool()
@@ -705,7 +776,7 @@ async def get_review_data(token: str, x_session_key: str = Header(None)):
 
 
 @app.post("/api/review/{token}/action")
-async def take_action(token: str, request: Request, x_session_key: str = Header(None)):
+async def take_action(token: str, request: Request, background_tasks: BackgroundTasks, x_session_key: str = Header(None)):
     """
     Handle reviewer decisions.
 
@@ -846,7 +917,7 @@ async def take_action(token: str, request: Request, x_session_key: str = Header(
     # regeneration caused 409 Conflict on all attempts after the first, silently
     # discarding reviewer notes. The server now handles regeneration in-process.
     if action == "regenerate":
-        asyncio.create_task(_regenerate_draft_via_llm(lead_id, notes))
+        background_tasks.add_task(_regenerate_draft_via_llm, lead_id, notes)
         return JSONResponse({"status": "ok", "action": action})
 
     # ── DNFU: resume n8n workflow ─────────────────────────────────────────────

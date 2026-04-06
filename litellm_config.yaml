@@ -1149,12 +1149,12 @@ litellm_settings:
   json_logs: true
   cache: true
   cache_params:
-    type: qdrant-semantic
-    qdrant_semantic_cache_embedding_model: _local-embedding
-    qdrant_collection_name: litellm_semantic_cache
-    qdrant_quantization_config: binary
-    qdrant_semantic_cache_vector_size: 768
-    similarity_threshold: 0.999
+    type: local
+    # qdrant_semantic_cache_embedding_model: _local-embedding
+    # qdrant_collection_name: litellm_semantic_cache
+    # qdrant_quantization_config: binary
+    # qdrant_semantic_cache_vector_size: 768
+    # similarity_threshold: 0.999
     ttl: 3600
     supported_call_types:
     - acompletion

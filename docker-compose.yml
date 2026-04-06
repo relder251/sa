@@ -23,6 +23,8 @@ volumes:
   qdrant_data:
   prometheus_data:
   grafana_data:
+  maltego_data:
+  mirofish_uploads:
 
 services:
 
@@ -30,7 +32,7 @@ services:
   # PostgreSQL — shared DB for LiteLLM, n8n, lead-review
   # ---------------------------------------------------------------------------
   postgres:
-    image: postgres:15
+    image: pgvector/pgvector:pg15
     container_name: litellm_db
     environment:
       - POSTGRES_USER=${LITELLM_USER:-litellm}
@@ -247,11 +249,6 @@ services:
       - TWILIO_SMS_FROM=${TWILIO_SMS_FROM}
       - NOTIFY_SMS_TO=${NOTIFY_SMS_TO}
       - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      - N8N_SSO_OIDC_ENABLED=true
-      - N8N_SSO_OIDC_ISSUER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - N8N_SSO_OIDC_CLIENT_ID=n8n
-      - N8N_SSO_OIDC_CLIENT_SECRET=${N8N_OIDC_CLIENT_SECRET}
-      - N8N_SSO_OIDC_REDIRECT_URL=${N8N_BASE_URL}/rest/sso/oidc/callback
     depends_on:
       postgres:
         condition: service_healthy
@@ -554,12 +551,35 @@ services:
   # ---------------------------------------------------------------------------
   # Portal — internal home page
   # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # ttyd — browser-based container terminal (docker exec over WebSocket)
+  # ---------------------------------------------------------------------------
+  ttyd:
+    build:
+      context: .
+      dockerfile: Dockerfile.ttyd
+    image: sa_ttyd:latest
+    container_name: ttyd
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
   portal:
     image: nginx:alpine
     container_name: portal
+    command: sh -c 'addgroup -g 989 docker 2>/dev/null; addgroup nginx docker 2>/dev/null; nginx -g "daemon off;"'
     volumes:
       - ./portal:/usr/share/nginx/html:ro
       - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/default.conf:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - vibe_net
     restart: unless-stopped
@@ -668,6 +688,7 @@ services:
       - N8N_BASE_URL=http://n8n:5678
       - PDF_OUTPUT_DIR=/data/output/lead_pdfs
       - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
       - OIDC_ENABLED=${OIDC_ENABLED:-false}
       - KEYCLOAK_ISSUER=http://keycloak:8080/realms/agentic-sdlc
       - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL}
@@ -834,6 +855,7 @@ services:
       - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY}
       # Keycloak OIDC SSO
       - ENABLE_OAUTH_SIGNUP=true
+      - DEFAULT_USER_ROLE=user
       - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
       - OAUTH_PROVIDER_NAME=Keycloak
       - OPENID_PROVIDER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/.well-known/openid-configuration
@@ -1011,6 +1033,13 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-sovereign2026!}
       - GF_USERS_ALLOW_SIGN_UP=false
       - GF_SERVER_HTTP_PORT=3000
+      # Auth proxy — trust X-Forwarded-Email from oauth2_proxy
+      - GF_AUTH_PROXY_ENABLED=true
+      - GF_AUTH_PROXY_HEADER_NAME=X-Forwarded-Email
+      - GF_AUTH_PROXY_HEADER_PROPERTY=email
+      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+      - GF_AUTH_PROXY_WHITELIST=172.20.0.0/16
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
@@ -1111,7 +1140,10 @@ services:
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - RESEARCH_STRUCTURING_MODEL=${RESEARCH_STRUCTURING_MODEL:-_gemini-flash}
+      - RESEARCH_STRUCTURING_MODEL=${RESEARCH_STRUCTURING_MODEL:-_groq-llama3-70b}
+      - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
+      - N8N_PUBLIC_BASE=${N8N_PUBLIC_BASE:-https://sovereignadvisory.ai/n8n}
+      - N8N_INTERNAL_BASE=http://n8n:5678
     networks:
       - vibe_net
     depends_on:
@@ -1131,3 +1163,443 @@ services:
       start_period: 20s
     labels:
       com.sovereignadvisory.service: "company-research"
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Grafana (port 3002)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-grafana:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_grafana
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=grafana
+      - --client-secret=${GRAFANA_OIDC_CLIENT_SECRET}
+      - --redirect-url=${GRAFANA_REDIRECT_URL}
+      - --upstream=http://grafana:3000
+      - --http-address=0.0.0.0:3002
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+      - --proxy-websockets=true
+      - --pass-user-headers=true
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "3002"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      grafana:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Prometheus (port 9091)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-prometheus:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_prometheus
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=prometheus
+      - --client-secret=${PROMETHEUS_OIDC_CLIENT_SECRET}
+      - --redirect-url=${PROMETHEUS_REDIRECT_URL}
+      - --upstream=http://prometheus:9090
+      - --http-address=0.0.0.0:9091
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "9091"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      prometheus:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Qdrant (port 6335)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-qdrant:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_qdrant
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=qdrant
+      - --client-secret=${QDRANT_OIDC_CLIENT_SECRET}
+      - --redirect-url=${QDRANT_REDIRECT_URL}
+      - --upstream=http://qdrant:6333
+      - --http-address=0.0.0.0:6335
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "6335"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Secrets / HashiCorp Vault UI (port 8202)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-secrets:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_secrets
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=secrets
+      - --client-secret=${SECRETS_OIDC_CLIENT_SECRET}
+      - --redirect-url=${SECRETS_REDIRECT_URL}
+      - --upstream=http://vault:8200
+      - --http-address=0.0.0.0:8202
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "8202"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # cAdvisor — per-container CPU / memory / network / disk metrics
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    labels:
+      com.sovereignadvisory.service: "cadvisor"
+
+  # ---------------------------------------------------------------------------
+  # node-exporter — host CPU / memory / disk / network metrics
+  # ---------------------------------------------------------------------------
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    network_mode: host
+    pid: host
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    labels:
+      com.sovereignadvisory.service: "node-exporter"
+
+  # ---------------------------------------------------------------------------
+  # Maltego Transform Server — OSINT/network/person transforms API + CLI
+  # Agent-zero: POST http://maltego_transforms:8080/api/<transform> {"value":"..."}
+  # CLI:        docker exec maltego_transforms python run_transform.py <name> <value>
+  # ---------------------------------------------------------------------------
+  maltego-transforms:
+    build:
+      context: .
+      dockerfile: Dockerfile.maltego_transforms
+    image: sa_maltego_transforms:latest
+    container_name: maltego_transforms
+    environment:
+      - LITELLM_BASE_URL=http://litellm:4000
+      - LITELLM_API_KEY=${LITELLM_API_KEY}
+      - RESEARCH_URL=http://sa_company_research:5004
+      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+      - HIBP_API_KEY=${HIBP_API_KEY:-}
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      com.sovereignadvisory.service: "maltego-transforms"
+
+  # ---------------------------------------------------------------------------
+  # Maltego Desktop — KasmWeb GUI client for visual link analysis (portal access)
+  # First launch: enter CE account credentials at maltego.com (free registration)
+  # ---------------------------------------------------------------------------
+  maltego-desktop:
+    image: kasmweb/maltego:1.18.0-rolling-daily
+    container_name: maltego_desktop
+    environment:
+      - VNC_PW=${MALTEGO_VNC_PW:-Maltego2026!}
+      - KASM_PORT=6901
+    volumes:
+      - maltego_data:/home/kasm-user
+    shm_size: "512m"
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.sovereignadvisory.service: "maltego-desktop"
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Maltego Desktop GUI (port 4183)
+  # Uses nginx auth_request mode: proxy validates session, nginx proxies to KasmWeb
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-maltego:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_maltego
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=maltego
+      - --client-secret=${MALTEGO_OIDC_CLIENT_SECRET}
+      - --redirect-url=${MALTEGO_REDIRECT_URL}
+      - --upstream=http://maltego_desktop_relay:4184
+      - --http-address=0.0.0.0:4183
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+      - --proxy-websockets=true
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "4183"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # Maltego Desktop Relay — nginx HTTP relay that terminates KasmWeb HTTPS
+  # oauth2-proxy → this relay (HTTP:4184) → maltego-desktop (HTTPS:6901)
+  # ---------------------------------------------------------------------------
+  maltego-desktop-relay:
+    image: nginx:alpine
+    container_name: maltego_desktop_relay
+    volumes:
+      - ./nginx/conf.d/maltego-relay.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    depends_on:
+      - maltego-desktop
+  # MiroFish — LLM-powered app (port 3000 internal)
+  # ---------------------------------------------------------------------------
+  mirofish:
+    image: ghcr.io/666ghj/mirofish:latest
+    container_name: mirofish
+    command: >
+      sh -c "
+      sed -i '/server: {/a\\    allowedHosts: true,' /app/frontend/vite.config.js &&
+      VITE_API_BASE_URL=/ npm run dev"
+    environment:
+      - LLM_API_KEY=${LITELLM_API_KEY}
+      - LLM_BASE_URL=http://litellm:4000
+      - LLM_MODEL_NAME=${MIROFISH_MODEL:-gpt-4o-mini}
+      - ZEP_API_KEY=${ZEP_API_KEY:-local}
+      - ZEP_BASE_URL=${ZEP_BASE_URL:-http://zep:8000}
+      - SECRET_KEY=${MIROFISH_SECRET_KEY}
+      - FLASK_DEBUG=False
+    volumes:
+      - mirofish_uploads:/app/backend/uploads
+      - /opt/agentic-sdlc/mirofish-zep-patch/config.py:/app/backend/app/config.py:ro
+      - /opt/agentic-sdlc/mirofish-zep-patch/zep_tools.py:/app/backend/app/services/zep_tools.py:ro
+      - /opt/agentic-sdlc/mirofish-zep-patch/zep_entity_reader.py:/app/backend/app/services/zep_entity_reader.py:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      zep:
+        condition: service_healthy
+    labels:
+      com.sovereignadvisory.service: "mirofish"
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — MiroFish (port 4186)
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-mirofish:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_mirofish
+    command:
+      - --provider=oidc
+      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+      - --client-id=mirofish
+      - --client-secret=${MIROFISH_OIDC_CLIENT_SECRET}
+      - --redirect-url=${MIROFISH_REDIRECT_URL}
+      - --upstream=http://mirofish:3000
+      - --http-address=0.0.0.0:4186
+      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+      - --email-domain=*
+      - --skip-provider-button=true
+      - --code-challenge-method=S256
+      - --allowed-role=agentic-sdlc:admin
+    networks:
+      - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "4186"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      mirofish:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Zep CE — self-hosted memory graph (port 8000 internal)
+  # MiroFish connects via http://zep:8000; auth disabled (Twingate-only access)
+  # ---------------------------------------------------------------------------
+  zep:
+    image: ghcr.io/getzep/zep:latest
+    container_name: zep
+    environment:
+      - ZEP_OPENAI_API_KEY=${LITELLM_API_KEY}
+      - ZEP_OPENAI_API_URL=http://litellm:4000
+    volumes:
+      - /opt/agentic-sdlc/zep-config.yaml:/app/config.yaml:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "grep -qi :1F40 /proc/net/tcp6"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.sovereignadvisory.service: "zep"
