@@ -1089,6 +1089,55 @@ function openEdit(e, card) {
     btn.onclick = () => { grid.querySelectorAll('.cat-tile').forEach(t=>t.classList.remove('selected')); btn.classList.add('selected'); };
     grid.appendChild(btn);
   });
+  // ＋ New category inline form
+  const newBtn = document.createElement('button');
+  newBtn.className = 'cat-tile';
+  newBtn.style.cssText = 'border-style:dashed;opacity:0.7;';
+  newBtn.textContent = '\uFF0B New';
+  newBtn.onclick = () => {
+    newBtn.style.display = 'none';
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:6px;margin-top:8px;align-items:center;';
+    const iconIn = document.createElement('input');
+    iconIn.className = 'form-input';
+    iconIn.placeholder = '🏷️';
+    iconIn.style.cssText = 'width:54px;';
+    iconIn.maxLength = 2;
+    const nameIn = document.createElement('input');
+    nameIn.className = 'form-input';
+    nameIn.placeholder = 'Category name';
+    nameIn.style.flex = '1';
+    const addBtn = document.createElement('button');
+    addBtn.className = 'btn btn-primary';
+    addBtn.style.cssText = 'padding:4px 10px;font-size:11px;';
+    addBtn.textContent = 'Add';
+    addBtn.onclick = () => {
+      const name = nameIn.value.trim();
+      if (!name) return;
+      const icon = iconIn.value.trim() || '\uD83C\uDFF7\uFE0F';
+      const key = name.toLowerCase().replace(/\s+/g, '-');
+      const hues = [200,160,280,40,340,20];
+      const hue = hues[Object.keys(categories).length % hues.length];
+      categories[key] = { key, label: name, icon,
+        color: `hsla(${hue},60%,70%,0.08)`, text: `hsla(${hue},80%,80%,1)`, border: `hsla(${hue},60%,70%,0.2)` };
+      labels[key] = name;
+      persistCategories().catch(() => {});
+      refreshSidebarCategories();
+      // Add tile and select it
+      const tile = document.createElement('button');
+      tile.className = 'cat-tile selected';
+      tile.textContent = icon + ' ' + name;
+      tile.onclick = () => { grid.querySelectorAll('.cat-tile').forEach(t=>t.classList.remove('selected')); tile.classList.add('selected'); };
+      grid.querySelectorAll('.cat-tile').forEach(t=>t.classList.remove('selected'));
+      grid.insertBefore(tile, row);
+      row.remove();
+      newBtn.style.display = '';
+    };
+    row.append(iconIn, nameIn, addBtn);
+    grid.appendChild(row);
+    nameIn.focus();
+  };
+  grid.appendChild(newBtn);
   document.getElementById('edit-overlay').classList.add('open');
 }
 
