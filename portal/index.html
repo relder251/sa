@@ -534,25 +534,32 @@ body {
   font-size: 15px; font-weight: 400;
   color: var(--text-3); letter-spacing: 0.06em;
 }
-.containers-grid { display: flex; flex-wrap: wrap; gap: 8px; }
-.container-chip {
-  display: inline-flex; align-items: center; gap: 7px;
-  background: var(--bg-card);
+.containers-launch {
+  display: flex; align-items: center; gap: 8px;
+}
+.containers-select {
+  flex: 1; max-width: 360px;
+  background: var(--bg-card); color: var(--text-2);
   border: 1px solid var(--border-subtle);
   border-radius: 2px;
-  padding: 6px 12px;
+  padding: 6px 10px;
   font-family: var(--font-b); font-size: 11px; font-weight: 400;
-  color: var(--text-3); letter-spacing: 0.04em;
+  letter-spacing: 0.04em;
+  appearance: none; cursor: pointer;
   transition: border-color 0.2s;
 }
-.container-chip:hover { border-color: rgba(56,189,248,0.3); }
-.container-chip .c-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; flex-shrink: 0; }
-.container-chip .c-ssh {
-  font-size: 10px; color: rgba(125,211,252,0.4);
-  text-decoration: none; padding: 0 3px;
-  transition: color 0.15s;
+.containers-select:focus { outline: none; border-color: rgba(56,189,248,0.4); }
+.containers-go {
+  padding: 6px 16px;
+  background: transparent; color: #7dd3fc;
+  border: 1px solid rgba(56,189,248,0.35);
+  border-radius: 2px;
+  font-family: var(--font-b); font-size: 11px; font-weight: 400;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  cursor: pointer; transition: background 0.15s, border-color 0.15s;
 }
-.container-chip:hover .c-ssh { color: #7dd3fc; }
+.containers-go:hover { background: rgba(56,189,248,0.08); border-color: rgba(56,189,248,0.6); }
+.containers-go:disabled { opacity: 0.35; cursor: not-allowed; }
 
 /* ── API Provider badges ─────────────────────────── */
 .api-badge {
@@ -644,7 +651,12 @@ body {
         <span class="containers-title">Running Containers</span>
         <span class="service-count" id="containers-count"></span>
       </div>
-      <div class="containers-grid" id="containers-grid"></div>
+      <div class="containers-launch">
+        <select class="containers-select" id="containers-select">
+          <option value="">— select container —</option>
+        </select>
+        <button class="containers-go" id="containers-go" onclick="launchContainerShell()" disabled>Go</button>
+      </div>
     </div>
 
   </div>
@@ -921,30 +933,29 @@ async function loadContainers() {
       .filter(c => c.State === 'running')
       .map(c => ({ name: c.Names[0].replace(/^\//, '') }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    const grid = document.getElementById('containers-grid');
+    const sel = document.getElementById('containers-select');
+    const btn = document.getElementById('containers-go');
     const section = document.getElementById('containers-section');
-    if (!running.length || !grid) return;
-    grid.innerHTML = '';
+    if (!running.length || !sel) return;
+    // Keep placeholder, add one option per container
+    sel.innerHTML = '<option value="">\u2014 select container \u2014</option>';
     running.forEach(c => {
-      const chip = document.createElement('div');
-      chip.className = 'container-chip';
-      const dot = document.createElement('span');
-      dot.className = 'c-dot';
-      const label = document.createElement('span');
-      label.textContent = c.name;
-      const link = document.createElement('a');
-      link.className = 'c-ssh';
-      link.href = 'https://terminal.private.sovereignadvisory.ai/?arg=' + btoa(c.name);
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.title = 'Open terminal';
-      link.textContent = '\u2328';
-      chip.append(dot, label, link);
-      grid.appendChild(chip);
+      const opt = document.createElement('option');
+      opt.value = btoa(c.name);
+      opt.textContent = c.name;
+      sel.appendChild(opt);
     });
+    sel.addEventListener('change', () => { btn.disabled = !sel.value; });
     document.getElementById('containers-count').textContent = running.length + ' running';
     section.style.display = '';
   } catch (_) { /* Docker endpoint unavailable — skip */ }
+}
+
+// ── Container shell launcher ─────────────────────────
+function launchContainerShell() {
+  const sel = document.getElementById('containers-select');
+  if (!sel || !sel.value) return;
+  window.open('https://terminal.private.sovereignadvisory.ai/?arg=' + sel.value, '_blank', 'noopener,noreferrer');
 }
 
 // ── API Status badges ─────────────────────────────────
