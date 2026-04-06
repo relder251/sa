@@ -812,7 +812,7 @@ function refreshRecentList() {
   const list = document.getElementById('recent-list');
   if (!list) return;
   list.innerHTML = '';
-  const visible = _recentEntries.slice(0,5).filter(e => currentServices.find(s=>s.id===e.id));
+  const visible = _recentEntries.slice(0,4).filter(e => currentServices.find(s=>s.id===e.id));
   if (!visible.length) {
     list.innerHTML = '<span style="font-size:10px;color:var(--text-3);padding:4px 10px;">No recent services</span>';
     return;
@@ -1061,7 +1061,7 @@ function handleCardClick(id) {
   if (idx > -1) { recentOrder.splice(idx,1); _recentEntries.splice(idx,1); }
   recentOrder.unshift(id);
   _recentEntries.unshift({id,ts:Date.now()});
-  if (recentOrder.length > 5) { recentOrder.pop(); _recentEntries.pop(); }
+  if (recentOrder.length > 4) { recentOrder.pop(); _recentEntries.pop(); }
   _saveRecent(_recentEntries);
   refreshRecentList();
   if (currentFilter === 'recent') applyFilter();
