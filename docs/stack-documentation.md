@@ -391,3 +391,35 @@ Items from `TODO2.md` not yet completed as of snapshot date:
 - Portal webhook routing F1 fix — portal-update/delete/categories endpoints may 502
 - Dispatch loop prompt/output field separation (F9a) — `Agent status` is both input and output
 - FRAMEWORK.md Phase 0 infrastructure not yet started: mirror-staging branch, docker-compose.mirror.yml, CQS schema, PCIRT orchestrator workflow
+
+
+---
+
+## 14. Incident -- Docker Bind Mount Stale Inode (2026-04-07)
+
+### What happened
+sovereignadvisory.ai went down with HTTP 403. Root cause: the /opt/agentic-sdlc/www
+directory (bind-mounted into sa_nginx at /usr/share/nginx/html) had its inode replaced --
+a deploy script had done rm -rf www && mkdir www && cp ... -- so the running container
+bind mount was pinned to the old, now-empty inode. nginx had no index.html and returned
+403 for every request.
+
+The same pattern occurred with prometheus.yml during task #7 (cAdvisor limits): Python
+open(file, w) replaced the file inode; the running Prometheus container still read the
+old inode until force-recreated.
+
+### Fix
+Force-recreate the container:
+  docker stop <container> && docker rm <container>
+  cd /opt/agentic-sdlc && make up ENV=prod SVC=<service>
+
+A simple docker restart or make up SVC=... does NOT fix a stale bind mount inode.
+
+### Prevention
+- Deploy scripts must never replace a bind-mount directory with rm -rf + mkdir.
+  Use rsync or copy individual files in-place to preserve the inode.
+- Alternatively add a post-deploy step: docker rm sa_nginx && make up ENV=prod SVC=nginx
+
+### Detection gap
+No uptime monitoring exists for sovereignadvisory.ai. Outage was discovered manually.
+Task #28 (website availability monitoring) addresses this.
