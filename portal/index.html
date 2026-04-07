@@ -1730,80 +1730,15 @@ setInterval(loadPortal, 5 * 60 * 1000);
 
 <script>
 // Stack Advisor
-const STACK_SYS = `You are the Stack Advisor for Sovereign Advisory AI — an expert assistant with deep knowledge of the entire self-hosted infrastructure stack.
+const STACK_IDENTITY = `You are the Stack Advisor for Sovereign Advisory AI.
 
-## Infrastructure
-- VPS: root@187.77.208.197, all services run via Docker Compose at /opt/agentic-sdlc/
-- Git repo: relder251/sa (private, GitHub)
-- CRITICAL: always use \`make up ENV=prod\` — NEVER bare \`docker compose up\` (starts Keycloak in H2/start-dev mode, wiping apparent realm data)
+You are given RETRIEVED CONTEXT from the live stack documentation in each message — use it as your primary source of truth. Answer only what the context and your training support. For commands, use code blocks. For service issues, check logs first. For docker-compose changes, always show a diff.
 
-## 32 Services on agentic-sdlc_vibe_net
-- nginx (sa_nginx): public proxy, sovereignadvisory.ai, 80/443
-- nginx-private (sa_nginx_private): *.private.sovereignadvisory.ai, TLS via Twingate→127.0.0.1:443
-- keycloak (:8080): SSO/IdP, realm=agentic-sdlc, kc.private.sovereignadvisory.ai
-- postgres (litellm_db:5432): shared DB for LiteLLM + n8n + Keycloak
-- n8n (:5678): workflow automation, n8n.private.sovereignadvisory.ai
-- litellm (:4000): unified LLM proxy, internal key sk-vibe-coding-key-123, litellm.private.sovereignadvisory.ai
-- ollama (:11434): local inference on RTX 3070 8GB — qwen2.5-coder:7b, deepseek-r1:7b, mistral:7b, llama3.2:3b, llama3.1:8b
-- jupyter (:8888): JupyterLab, jupyter.private.sovereignadvisory.ai
-- webui (:3000): custom chat UI, webui.private.sovereignadvisory.ai
-- portal (:80): this portal SPA, home.private.sovereignadvisory.ai
-- vaultwarden: password manager, vault.private.sovereignadvisory.ai
-- shell-gateway (:7681): web terminal at /terminal/
-- qdrant (:6333): vector DB, collection stack-knowledge (768d nomic-embed-text), qdrant.private.sovereignadvisory.ai
-- mirofish (:5001): attack simulation + graph-based security analysis, mirofish.private.sovereignadvisory.ai
-- agent-zero (:80): autonomous AI agent, agent-zero.private.sovereignadvisory.ai
-  - Hacker profile with Kali tools: metasploit, sqlmap, gobuster, hydra, masscan, nikto, smbclient, enum4linux, dnsrecon, impacket, whatweb, dirb, fierce, theharvester, ffuf
-  - Custom tools: mirofish_simulation.py (full pipeline), maltego_osint.py (10 OSINT transforms)
-- glitchtip: Sentry-compatible error tracking, sentry.private.sovereignadvisory.ai
-- free-model-sync: discovers free LLM models (OpenRouter/Groq/Gemini) every 6h via ofelia cron
-- watchtower: auto-updates labelled containers at 03:00
-- vault-sync (:8777): syncs Vaultwarden secrets into container env vars
-- twingate (host network): zero-trust access, routes *.private.* → 127.0.0.1:443
-- oauth2-proxy-* (one per service): SSO gate, validates Keycloak session cookies
-- certbot / certbot-dns: TLS cert renewal
-
-## LiteLLM Model Tiers
-- local/* — Ollama only (qwen2.5-coder, deepseek-r1, mistral, llama3)
-- hybrid/chat|code|reason|fast — Ollama + cloud fallback
-- cloud/smart — cloud-only (Claude, GPT-4o, Gemini Pro)
-- free/* — free-tier (Gemini Flash, Groq, OpenRouter free)
-- _claude-haiku, _claude-sonnet, _claude-opus — direct Claude
-- _local-embedding — nomic-embed-text via Ollama, 768d
-
-## n8n Workflows (14 total, 11 active)
-- Notion→Claude Dispatch (oasCNCvMnbeU4nMD): polls Notion for In-Progress tasks, runs Claude Code CLI on VPS
-- Portal Provision (DXjMzKwRB6c54GCY), Portal Services GET (VHUS5Dx1q9HBZPln)
-- Portal Update/Delete/Categories, Portal Track Recent (GOpCkjqJyPjy5dgG)
-- SA Contact Lead Pipeline (Wyc4UIvCYgByrAwP), SA Lead Reminder
-
-## MiroFish Pipeline (attack simulation)
-1. POST /api/graph/ontology/generate (multipart: scenario file + objective)
-2. POST /api/graph/build → poll until completed
-3. POST /api/simulation/create
-4. POST /api/simulation/prepare → poll
-5. POST /api/simulation/start (platform=reddit, max_rounds=20)
-6. Poll run-status until completed/waiting_command
-7. GET /api/simulation/<id>/profiles → find attacker agent_id
-8. POST /api/simulation/interview → get attack path recommendations
-
-## Protected Items (confirm before touching)
-- Keycloak relder user — roles, credentials, group memberships (was accidentally wiped before)
-- Keycloak realm config — clients, identity providers, realm settings
-- docker-compose.yml — show diff before writing; keep .yml backup visible
-- Open WebUI relder@sovereignadvisory.ai admin account
-- n8n workflows — export JSON before patching DB
-- Vault secrets — never delete/overwrite without confirmation
-
-## Key Commands
-- Start stack: cd /opt/agentic-sdlc && make up ENV=prod
-- Restart service: make up ENV=prod SVC=<service-name>
-- Stop all: make down ENV=prod
-- Logs: docker logs <container> --tail 50 -f
-- After any file change: git add <files> && git commit -m 'what and why'
-
-## Style
-Give direct technical answers. Use code blocks for commands. For service issues, check logs first. For docker-compose changes, show a diff before applying.`;
+Key facts always true regardless of retrieved context:
+- Stack lives at /opt/agentic-sdlc/ on VPS root@187.77.208.197
+- ALWAYS use \`make up ENV=prod\` — NEVER bare docker compose up (starts KC in H2 dev mode)
+- Service name in compose: hyphenated (agent-zero); container name: underscored (agent_zero)
+- After any working change: git add + git commit with descriptive message`;
 let chatHistory = [];
 let chatOpen = false;
 let chatBusy = false;
@@ -1844,14 +1779,39 @@ function chatAppend(role, text) {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
-function chatShowTyping() {
+function chatShowTyping(label) {
   const msgs = document.getElementById('chat-messages');
   const d = document.createElement('div');
   d.className='chat-msg assistant'; d.id='chat-typing';
-  d.innerHTML='<div class="chat-msg-avatar">\u2B21</div><div class="chat-msg-body"><div class="chat-typing"><span></span><span></span><span></span></div></div>';
+  const lbl = label ? `<span style='font-size:10px;color:var(--text-3);margin-left:4px'>${label}</span>` : '';
+  d.innerHTML=`<div class="chat-msg-avatar">\u2B21</div><div class="chat-msg-body"><div class="chat-typing"><span></span><span></span><span></span>${lbl}</div></div>`;
   msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
 }
 function chatHideTyping() { const t=document.getElementById('chat-typing'); if(t)t.remove(); }
+
+// Embed a query string via LiteLLM (nomic-embed-text, 768d)
+async function stackEmbed(text) {
+  const r = await fetch('/api/stack-embed', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({model: '_local-embedding', input: text})
+  });
+  if (!r.ok) throw new Error('embed failed: ' + r.status);
+  const d = await r.json();
+  return d.data[0].embedding;
+}
+
+// Retrieve top-k relevant chunks from Qdrant
+async function stackSearch(vector, limit=5) {
+  const r = await fetch('/api/stack-search', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({vector, limit, with_payload: true, score_threshold: 0.45})
+  });
+  if (!r.ok) throw new Error('search failed: ' + r.status);
+  const d = await r.json();
+  return d.result || [];
+}
 
 async function chatSend() {
   if (chatBusy) return;
@@ -1862,8 +1822,31 @@ async function chatSend() {
   chatBusy=true; document.getElementById('chat-send').disabled=true;
   chatAppend('user', txt);
   chatHistory.push({role:'user', content:txt});
-  chatShowTyping();
-  const messages = [{role:'system',content:STACK_SYS}, ...chatHistory.slice(-12)];
+  const t0 = Date.now();
+
+  let contextSources = [];
+  let systemPrompt = STACK_IDENTITY;
+
+  // Step 1: RAG — embed query and retrieve relevant chunks
+  chatShowTyping('retrieving context…');
+  try {
+    const vector = await stackEmbed(txt);
+    const hits = await stackSearch(vector, 5);
+    if (hits.length > 0) {
+      const chunks = hits.map(h => h.payload.text).join('\n\n---\n\n');
+      contextSources = hits.map(h => h.payload.source || 'unknown');
+      systemPrompt = STACK_IDENTITY + '\n\n## Retrieved Context\n\n' + chunks;
+    }
+  } catch(e) {
+    // RAG failure is non-fatal — fall back to identity-only prompt
+    console.warn('RAG failed, proceeding without context:', e);
+  }
+
+  // Step 2: Call LiteLLM with assembled prompt + history
+  chatHideTyping();
+  chatShowTyping('thinking…');
+  const messages = [{role:'system',content:systemPrompt}, ...chatHistory.slice(-10)];
+  let reply = '(empty)';
   try {
     const r = await fetch('/api/stack-chat',{
       method:'POST',
@@ -1872,10 +1855,18 @@ async function chatSend() {
     });
     if (!r.ok) throw new Error(r.status+': '+(await r.text()).slice(0,200));
     const d = await r.json();
-    const reply = d.choices?.[0]?.message?.content || '(empty)';
+    reply = d.choices?.[0]?.message?.content || '(empty)';
     chatHideTyping();
     chatAppend('assistant', reply);
     chatHistory.push({role:'assistant',content:reply});
+
+    // Step 3: Fire-and-forget audit log
+    const dur = Date.now() - t0;
+    fetch('/api/stack-advisor-audit', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({user_msg:txt, assistant_msg:reply, context_sources:contextSources, model:'hybrid/chat', duration_ms:dur})
+    }).catch(()=>{});
+
   } catch(e) {
     chatHideTyping();
     chatAppend('assistant','Error: '+e.message);
