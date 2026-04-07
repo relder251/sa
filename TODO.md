@@ -3,8 +3,8 @@
 ## In Progress
 
 ## Pending
+- [ ] **#1a** Store Vault root token + unseal keys in Vaultwarden; remove `/root/.vault-keys` from VPS | LOE: Low | ROI: Critical | Impact: Critical
 
-- [ ] **#1** Disable `PasswordAuthentication` + `PermitRootLogin` on SSH | LOE: Low | ROI: Critical | Impact: Critical
 - [ ] **#2** Add Vault data + Vaultwarden data volumes to backup | LOE: Low | ROI: Critical | Impact: Critical
 - [ ] **#3** Add swap space | LOE: Low | ROI: Critical | Impact: High
 - [ ] **#4** Set memory limits on all containers | LOE: Medium | ROI: Critical | Impact: Critical
@@ -32,3 +32,4 @@
 - [ ] **#26** Archive stale compose files to _archive/ | LOE: Low | ROI: Low | Impact: Low
 
 ## Done
+- [x] **#1** Disable `PasswordAuthentication` + `PermitRootLogin` on SSH | commit 2b7f3f3 | 2026-04-07
