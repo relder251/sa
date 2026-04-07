@@ -74,6 +74,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
+          memory: 64m
   certbot:
     image: certbot/certbot:latest
     container_name: sa_certbot
@@ -102,6 +103,7 @@ services:
       resources:
         limits:
           cpus: '0.10'
+          memory: 64m
   twingate:
     image: twingate/connector:1
     container_name: twingate-friendly-jaguar
@@ -128,6 +130,7 @@ services:
       resources:
         limits:
           cpus: '0.25'
+          memory: 64m
   twingate-spider:
     image: twingate/connector:1
     container_name: twingate-hasty-spider
@@ -154,6 +157,7 @@ services:
       resources:
         limits:
           cpus: '0.25'
+          memory: 64m
   vault:
     image: hashicorp/vault:1.18
     container_name: vault
@@ -194,6 +198,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
+          memory: 1g
   vaultwarden:
     image: vaultwarden/server:latest
     container_name: vaultwarden
@@ -231,3 +236,4 @@ services:
       resources:
         limits:
           cpus: '0.25'
+          memory: 128m
