@@ -1825,7 +1825,7 @@ You CAN render diagrams -- always use Mermaid syntax. Wrap in a ```mermaid block
 - Always close every subgraph with end
 
 **Example (stack architecture):**
-```mermaid
+\```mermaid
 graph LR
   nginx["Nginx Portal"]
   litellm["LiteLLM"]
@@ -1834,7 +1834,7 @@ graph LR
   nginx --> litellm
   litellm --> ollama
   litellm --> openai
-```
+\```
 
 Never describe a diagram in words when you can draw it with Mermaid.`;
 let chatHistory = [];
