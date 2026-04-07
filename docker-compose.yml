@@ -608,6 +608,7 @@ services:
       - LITELLM_API_KEY=${LITELLM_API_KEY}
     volumes:
       - agent_zero_usr:/a0/usr
+    pids_limit: 2048
     cap_add:
       - NET_RAW
       - NET_ADMIN
