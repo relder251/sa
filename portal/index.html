@@ -1991,7 +1991,19 @@ async function chatSend() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({model:'hybrid/chat',messages,max_tokens:1024,temperature:0.3})
     });
-    if (!r.ok) throw new Error(r.status+': '+(await r.text()).slice(0,200));
+    if (!r.ok) {
+      const status = r.status;
+      const friendly = status === 502 || status === 503
+        ? 'The AI backend is temporarily unavailable ('+status+'). Please try again in a moment, or simplify your question.'
+        : status === 504
+        ? 'The request timed out (504). Try breaking your question into smaller parts.'
+        : status === 429
+        ? 'Too many requests (429) — please wait a moment before trying again.'
+        : status === 400
+        ? 'The request was too large or malformed (400). Try a shorter or simpler question.'
+        : 'The AI backend returned an error ('+status+'). Please try again.';
+      throw new Error(friendly);
+    }
     const d = await r.json();
     reply = d.choices?.[0]?.message?.content || '(empty)';
     chatHideTyping();
@@ -2007,7 +2019,8 @@ async function chatSend() {
 
   } catch(e) {
     chatHideTyping();
-    chatAppend('assistant','Error: '+e.message);
+    const msg = e.message || 'An unexpected error occurred. Please try again.';
+    chatAppend('assistant', msg);
   } finally {
     chatBusy=false;
     document.getElementById('chat-send').disabled=false;
