@@ -58,7 +58,7 @@ body {
   align-items: center;
   gap: 10px;
 }
-.logo-hex { font-size: 20px; opacity: 0.9; }
+.logo-img { height: 36px; width: auto; opacity: 0.92; object-fit: contain; }
 .logo-sub {
   font-family: var(--font-b);
   font-size: 9px;
@@ -586,6 +586,7 @@ body {
 }
 #chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(212,146,74,0.6); }
 #chat-fab.open { background: linear-gradient(135deg, #1a2140 0%, #111829 100%); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+.fab-logo { width: 26px; height: 26px; filter: brightness(0) invert(1); pointer-events: none; }
 
 #chat-panel {
   position: fixed;
@@ -821,7 +822,7 @@ let _mermaidId = 0;
 
 <div class="topbar">
   <div class="logo">
-    <span class="logo-hex">⬡</span>
+    <img src="/sa-logo.png" class="logo-img" alt="Sovereign Advisory">
     SOVEREIGN ADVISORY
     <span class="logo-sub">Internal Portal</span>
   </div>
@@ -1731,7 +1732,7 @@ setInterval(loadPortal, 5 * 60 * 1000);
 </script>
 
 <!-- Stack Advisor Chat -->
-<button id="chat-fab" title="Stack Advisor" onclick="chatToggle()">&#x2B21;</button>
+<button id="chat-fab" title="Stack Advisor" onclick="chatToggle()"><img src="/sa-icon-32.png" class="fab-logo" alt="SA"></button>
 
 <div id="chat-panel">
   <div class="chat-header">
@@ -1781,14 +1782,14 @@ function chatOpenPanel() {
   chatOpen = true;
   document.getElementById('chat-panel').classList.add('open');
   document.getElementById('chat-fab').classList.add('open');
-  document.getElementById('chat-fab').textContent = '\u2715';
+  document.getElementById('chat-fab').innerHTML = '<span style="font-size:20px;line-height:1">&#x2715;</span>';
   setTimeout(() => document.getElementById('chat-input').focus(), 200);
 }
 function chatClose() {
   chatOpen = false;
   document.getElementById('chat-panel').classList.remove('open');
   document.getElementById('chat-fab').classList.remove('open');
-  document.getElementById('chat-fab').textContent = '\u2B21';
+  document.getElementById('chat-fab').innerHTML = '<img src="/sa-icon-32.png" class="fab-logo" alt="SA">';
 }
 function chatClear() {
   chatHistory = [];
