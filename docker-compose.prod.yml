@@ -13,17 +13,17 @@ services:
   keycloak:
     command: start
     environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
-      - KC_DB_USERNAME=${LITELLM_USER:-litellm}
-      - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      - KC_HOSTNAME=${KC_HOSTNAME:-kc.sovereignadvisory.ai}
-      - KC_HOSTNAME_STRICT=false
-      - KC_PROXY_HEADERS=xforwarded
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
+    - KEYCLOAK_ADMIN=admin
+    - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    - KC_DB=postgres
+    - KC_DB_URL=jdbc:postgresql://postgres:5432/keycloak
+    - KC_DB_USERNAME=${LITELLM_USER:-litellm}
+    - KC_DB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    - KC_HOSTNAME=${KC_HOSTNAME:-kc.sovereignadvisory.ai}
+    - KC_HOSTNAME_STRICT=false
+    - KC_PROXY_HEADERS=xforwarded
+    - KC_HTTP_ENABLED=true
+    - KC_HEALTH_ENABLED=true
     depends_on:
       postgres:
         condition: service_healthy
@@ -34,7 +34,7 @@ services:
   # nginx-private: expose on loopback only (Twingate accesses via host network)
   nginx-private:
     ports:
-      - "127.0.0.1:443:443"
+    - "127.0.0.1:443:443"
 
   # Public-facing nginx — TLS termination and reverse proxy
   nginx:
@@ -47,19 +47,19 @@ services:
         max-size: "10m"
         max-file: "3"
     ports:
-      - "187.77.208.197:80:80"
-      - "187.77.208.197:443:443"
+    - "187.77.208.197:80:80"
+    - "187.77.208.197:443:443"
     volumes:
-      - /opt/agentic-sdlc/nginx-public/nginx.conf:/etc/nginx/nginx.conf:ro
-      - /opt/agentic-sdlc/nginx-public/conf.d:/etc/nginx/conf.d:ro
-      - /opt/agentic-sdlc/www:/usr/share/nginx/html:ro
-      - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
-      - /opt/agentic-sdlc/ssl/dhparam:/etc/nginx/dhparam:ro
-      - /opt/agentic-sdlc/certbot/www:/var/www/certbot:ro
-      - /opt/agentic-sdlc/logs:/var/log/nginx
+    - /opt/agentic-sdlc/nginx-public/nginx.conf:/etc/nginx/nginx.conf:ro
+    - /opt/agentic-sdlc/nginx-public/conf.d:/etc/nginx/conf.d:ro
+    - /opt/agentic-sdlc/www:/usr/share/nginx/html:ro
+    - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
+    - /opt/agentic-sdlc/ssl/dhparam:/etc/nginx/dhparam:ro
+    - /opt/agentic-sdlc/certbot/www:/var/www/certbot:ro
+    - /opt/agentic-sdlc/logs:/var/log/nginx
     networks:
-      - sa_web
-      - vibe_net
+    - sa_web
+    - vibe_net
     healthcheck:
       test: ["CMD", "sh", "-c", "nginx -t 2>/dev/null || exit 1"]
       interval: 30s
@@ -70,6 +70,10 @@ services:
       com.sovereignadvisory.service: "nginx"
 
   # Certbot HTTP-01 — renews public-facing TLS certs via webroot
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   certbot:
     image: certbot/certbot:latest
     container_name: sa_certbot
@@ -80,8 +84,8 @@ services:
         max-size: "10m"
         max-file: "3"
     volumes:
-      - /opt/agentic-sdlc/ssl:/etc/letsencrypt
-      - /opt/agentic-sdlc/certbot/www:/var/www/certbot
+    - /opt/agentic-sdlc/ssl:/etc/letsencrypt
+    - /opt/agentic-sdlc/certbot/www:/var/www/certbot
     entrypoint: >
       /bin/sh -c "trap exit TERM;
         while :; do
@@ -89,11 +93,15 @@ services:
           sleep 12h & wait $${!};
         done"
     networks:
-      - sa_web
+    - sa_web
     labels:
       com.sovereignadvisory.service: "certbot"
 
   # Twingate — zero-trust network connector
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   twingate:
     image: twingate/connector:1
     container_name: twingate-friendly-jaguar
@@ -105,17 +113,21 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      TWINGATE_NETWORK:           ${TWINGATE_NETWORK}
-      TWINGATE_ACCESS_TOKEN:      ${TWINGATE_ACCESS_TOKEN}
-      TWINGATE_REFRESH_TOKEN:     ${TWINGATE_REFRESH_TOKEN}
-      TWINGATE_LABEL_HOSTNAME:    ${TWINGATE_LABEL_HOSTNAME:-}
-      TWINGATE_LOG_LEVEL:         ${TWINGATE_LOG_LEVEL:-3}
+      TWINGATE_NETWORK: ${TWINGATE_NETWORK}
+      TWINGATE_ACCESS_TOKEN: ${TWINGATE_ACCESS_TOKEN}
+      TWINGATE_REFRESH_TOKEN: ${TWINGATE_REFRESH_TOKEN}
+      TWINGATE_LABEL_HOSTNAME: ${TWINGATE_LABEL_HOSTNAME:-}
+      TWINGATE_LOG_LEVEL: ${TWINGATE_LOG_LEVEL:-3}
       TWINGATE_LABEL_DEPLOYED_BY: docker
     network_mode: host
     labels:
       com.sovereignadvisory.service: "twingate"
 
   # Twingate — hasty-spider connector (redundant)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   twingate-spider:
     image: twingate/connector:1
     container_name: twingate-hasty-spider
@@ -127,37 +139,41 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      TWINGATE_NETWORK:           ${TWINGATE_NETWORK}
-      TWINGATE_ACCESS_TOKEN:      ${TWINGATE_ACCESS_TOKEN_SPIDER}
-      TWINGATE_REFRESH_TOKEN:     ${TWINGATE_REFRESH_TOKEN_SPIDER}
-      TWINGATE_LABEL_HOSTNAME:    ${TWINGATE_LABEL_HOSTNAME:-}
-      TWINGATE_LOG_LEVEL:         ${TWINGATE_LOG_LEVEL:-3}
+      TWINGATE_NETWORK: ${TWINGATE_NETWORK}
+      TWINGATE_ACCESS_TOKEN: ${TWINGATE_ACCESS_TOKEN_SPIDER}
+      TWINGATE_REFRESH_TOKEN: ${TWINGATE_REFRESH_TOKEN_SPIDER}
+      TWINGATE_LABEL_HOSTNAME: ${TWINGATE_LABEL_HOSTNAME:-}
+      TWINGATE_LOG_LEVEL: ${TWINGATE_LOG_LEVEL:-3}
       TWINGATE_LABEL_DEPLOYED_BY: docker
     network_mode: host
     labels:
       com.sovereignadvisory.service: "twingate"
 
   # HashiCorp Vault — secrets management enclave
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   vault:
     image: hashicorp/vault:1.18
     container_name: vault
     restart: unless-stopped
     cap_add:
-      - IPC_LOCK
+    - IPC_LOCK
     environment:
-      - VAULT_ADDR=http://0.0.0.0:8200
-      - VAULT_API_ADDR=https://secrets.private.sovereignadvisory.ai
+    - VAULT_ADDR=http://0.0.0.0:8200
+    - VAULT_API_ADDR=https://secrets.private.sovereignadvisory.ai
     volumes:
-      - ./vault/data:/vault/data
-      - ./vault/logs:/vault/logs
-      - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
-      - ./scripts:/vault/scripts:ro
-      - ./vault/logs:/vault/logs
+    - ./vault/data:/vault/data
+    - ./vault/logs:/vault/logs
+    - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
+    - ./scripts:/vault/scripts:ro
+    - ./vault/logs:/vault/logs
     command: vault server -config=/vault/config/vault.hcl
     ports:
-      - "127.0.0.1:8200:8200"
+    - "127.0.0.1:8200:8200"
     networks:
-      - vibe_net
+    - vibe_net
     logging:
       driver: json-file
       options:
@@ -174,6 +190,10 @@ services:
       com.centurylinklabs.watchtower.enable: "false"
 
   # Vaultwarden — self-hosted Bitwarden-compatible password vault
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   vaultwarden:
     image: vaultwarden/server:latest
     container_name: vaultwarden
@@ -184,26 +204,30 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      - DOMAIN=https://vault.private.sovereignadvisory.ai
-      - SIGNUPS_ALLOWED=false
-      - INVITATIONS_ALLOWED=true
-      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
-      - SSO_ENABLED=true
-      - SSO_ONLY=false
-      - SSO_AUTHORITY=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - SSO_CLIENT_ID=vaultwarden
-      - SSO_CLIENT_SECRET=${VAULTWARDEN_OIDC_CLIENT_SECRET}
-      - SMTP_HOST=${NEO_SMTP_HOST}
-      - SMTP_PORT=${NEO_SMTP_PORT}
-      - SMTP_SECURITY=force_tls
-      - SMTP_USERNAME=${NEO_SMTP_USER}
-      - SMTP_PASSWORD=${NEO_SMTP_PASS}
-      - SMTP_FROM=${NOTIFY_EMAIL}
-      - SMTP_FROM_NAME=Sovereign Advisory Vault
+    - DOMAIN=https://vault.private.sovereignadvisory.ai
+    - SIGNUPS_ALLOWED=false
+    - INVITATIONS_ALLOWED=true
+    - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+    - SSO_ENABLED=true
+    - SSO_ONLY=false
+    - SSO_AUTHORITY=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - SSO_CLIENT_ID=vaultwarden
+    - SSO_CLIENT_SECRET=${VAULTWARDEN_OIDC_CLIENT_SECRET}
+    - SMTP_HOST=${NEO_SMTP_HOST}
+    - SMTP_PORT=${NEO_SMTP_PORT}
+    - SMTP_SECURITY=force_tls
+    - SMTP_USERNAME=${NEO_SMTP_USER}
+    - SMTP_PASSWORD=${NEO_SMTP_PASS}
+    - SMTP_FROM=${NOTIFY_EMAIL}
+    - SMTP_FROM_NAME=Sovereign Advisory Vault
     volumes:
-      - vaultwarden_data:/data
+    - vaultwarden_data:/data
     networks:
-      - vibe_net
+    - vibe_net
     labels:
       com.sovereignadvisory.service: "vaultwarden"
 
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'

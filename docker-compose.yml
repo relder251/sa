@@ -36,14 +36,14 @@ services:
     image: pgvector/pgvector:pg15
     container_name: litellm_db
     environment:
-      - POSTGRES_USER=${LITELLM_USER:-litellm}
-      - POSTGRES_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      - POSTGRES_DB=${LITELLM_DB:-litellm}
+    - POSTGRES_USER=${LITELLM_USER:-litellm}
+    - POSTGRES_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    - POSTGRES_DB=${LITELLM_DB:-litellm}
     volumes:
-      - pg_data:/var/lib/postgresql/data
-      - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    - pg_data:/var/lib/postgresql/data
+    - ./postgres-init:/docker-entrypoint-initdb.d:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -57,19 +57,23 @@ services:
       retries: 5
       start_period: 10s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Redis — LiteLLM caching
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
   redis:
     image: redis:7-alpine
     container_name: redis
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
-      - redis_data:/data
+    - redis_data:/data
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -85,13 +89,17 @@ services:
   # ---------------------------------------------------------------------------
   # Qdrant — vector database
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
     volumes:
-      - qdrant_data:/qdrant/storage
+    - qdrant_data:/qdrant/storage
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -105,18 +113,22 @@ services:
       retries: 3
       start_period: 10s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Ollama — local model host (GPU enabled)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     volumes:
-      - ollama_data:/root/.ollama
+    - ollama_data:/root/.ollama
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -124,8 +136,8 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      - OLLAMA_KEEP_ALIVE=10m
-      - OLLAMA_MAX_LOADED_MODELS=1
+    - OLLAMA_KEEP_ALIVE=10m
+    - OLLAMA_MAX_LOADED_MODELS=1
     healthcheck:
       test: ["CMD-SHELL", "ollama list > /dev/null 2>&1 || exit 1"]
       interval: 30s
@@ -133,7 +145,7 @@ services:
       retries: 3
       start_period: 20s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # LiteLLM — AI traffic proxy
@@ -146,47 +158,47 @@ services:
         soft: 65536
         hard: 65536
     environment:
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-      - STORE_MODEL_IN_DB=True
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
-      - VENICE_API_KEY=${VENICE_API_KEY}
-      - VENICE_ADMIN_API_KEY=${VENICE_ADMIN_API_KEY}
-      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
-      - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://ollama:11434}
-      - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
-      - QDRANT_API_BASE=http://qdrant:6333
-      - QDRANT_API_KEY=
+    - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+    - STORE_MODEL_IN_DB=True
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    - OPENAI_API_KEY=${OPENAI_API_KEY}
+    - GEMINI_API_KEY=${GEMINI_API_KEY}
+    - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    - GROQ_API_KEY=${GROQ_API_KEY}
+    - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+    - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    - SAMBANOVA_API_KEY=${SAMBANOVA_API_KEY}
+    - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    - VENICE_API_KEY=${VENICE_API_KEY}
+    - VENICE_ADMIN_API_KEY=${VENICE_ADMIN_API_KEY}
+    - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+    - OLLAMA_CLOUD_API_BASE=${OLLAMA_CLOUD_API_BASE:-http://ollama:11434}
+    - OLLAMA_CLOUD_API_KEY=${OLLAMA_CLOUD_API_KEY:-ollama}
+    - QDRANT_API_BASE=http://qdrant:6333
+    - QDRANT_API_KEY=
       # Keycloak SSO for LiteLLM UI (parameterized per env)
-      - GENERIC_CLIENT_ID=litellm
-      - GENERIC_CLIENT_SECRET=${LITELLM_OIDC_CLIENT_SECRET}
-      - GENERIC_AUTHORIZATION_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/auth
-      - GENERIC_TOKEN_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/token
-      - GENERIC_USERINFO_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/userinfo
-      - GENERIC_REDIRECT_URI=${LITELLM_REDIRECT_URL}
-      - GENERIC_CLIENT_NAME=Keycloak SSO
-      - AUTO_REDIRECT_UI_LOGIN_TO_SSO=True
+    - GENERIC_CLIENT_ID=litellm
+    - GENERIC_CLIENT_SECRET=${LITELLM_OIDC_CLIENT_SECRET}
+    - GENERIC_AUTHORIZATION_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/auth
+    - GENERIC_TOKEN_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/token
+    - GENERIC_USERINFO_ENDPOINT=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/protocol/openid-connect/userinfo
+    - GENERIC_REDIRECT_URI=${LITELLM_REDIRECT_URL}
+    - GENERIC_CLIENT_NAME=Keycloak SSO
+    - AUTO_REDIRECT_UI_LOGIN_TO_SSO=True
     volumes:
-      - ./litellm_config.yaml:/app/config.yaml
-      - ./factual_verifier.py:/app/factual_verifier.py
-      - ./consensus_checker.py:/app/consensus_checker.py
-      - ./ab_testing.py:/app/ab_testing.py
-      - ./ab_dashboard.py:/app/ab_dashboard.py
-      - ./ab_manage.py:/app/ab_manage.py
-      - ./rag_manager.py:/app/rag_manager.py
-      - ./rag_retrieval.py:/app/rag_retrieval.py
+    - ./litellm_config.yaml:/app/config.yaml
+    - ./factual_verifier.py:/app/factual_verifier.py
+    - ./consensus_checker.py:/app/consensus_checker.py
+    - ./ab_testing.py:/app/ab_testing.py
+    - ./ab_dashboard.py:/app/ab_dashboard.py
+    - ./ab_manage.py:/app/ab_manage.py
+    - ./rag_manager.py:/app/rag_manager.py
+    - ./rag_retrieval.py:/app/rag_retrieval.py
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -209,7 +221,7 @@ services:
       retries: 3
       start_period: 60s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # n8n — workflow engine
@@ -218,52 +230,52 @@ services:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
     environment:
-      - N8N_PORT=5678
-      - NODE_ENV=production
-      - WEBHOOK_URL=${N8N_BASE_URL:-http://localhost:5678}
-      - N8N_HOST=${N8N_HOSTNAME:-localhost}
-      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-      - N8N_EDITOR_BASE_URL=${N8N_BASE_URL:-http://localhost:5678}
-      - NODES_EXCLUDE=[]
-      - DB_TYPE=postgresdb
-      - DB_POSTGRESDB_HOST=postgres
-      - DB_POSTGRESDB_PORT=5432
-      - DB_POSTGRESDB_DATABASE=n8n
-      - DB_POSTGRESDB_USER=${LITELLM_USER:-litellm}
-      - DB_POSTGRESDB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-      - N8N_RUNNERS_ENABLED=false
-      - N8N_TRUST_PROXY=true
-      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
-      - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
-      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
-      - LEAD_REVIEW_BASE_URL=${LEAD_REVIEW_BASE_URL}
-      - NOTION_LEADS_DB_ID=${NOTION_LEADS_DB_ID}
-      - NOTIFY_EMAIL=${NOTIFY_EMAIL}
-      - NOTIFY_SMS_EMAIL=${NOTIFY_SMS_EMAIL}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
-      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
-      - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
-      - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
-      - TWILIO_SMS_FROM=${TWILIO_SMS_FROM}
-      - NOTIFY_SMS_TO=${NOTIFY_SMS_TO}
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    - N8N_PORT=5678
+    - NODE_ENV=production
+    - WEBHOOK_URL=${N8N_BASE_URL:-http://localhost:5678}
+    - N8N_HOST=${N8N_HOSTNAME:-localhost}
+    - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+    - N8N_EDITOR_BASE_URL=${N8N_BASE_URL:-http://localhost:5678}
+    - NODES_EXCLUDE=[]
+    - DB_TYPE=postgresdb
+    - DB_POSTGRESDB_HOST=postgres
+    - DB_POSTGRESDB_PORT=5432
+    - DB_POSTGRESDB_DATABASE=n8n
+    - DB_POSTGRESDB_USER=${LITELLM_USER:-litellm}
+    - DB_POSTGRESDB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+    - N8N_RUNNERS_ENABLED=false
+    - N8N_TRUST_PROXY=true
+    - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+    - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
+    - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
+    - LEAD_REVIEW_BASE_URL=${LEAD_REVIEW_BASE_URL}
+    - NOTION_LEADS_DB_ID=${NOTION_LEADS_DB_ID}
+    - NOTIFY_EMAIL=${NOTIFY_EMAIL}
+    - NOTIFY_SMS_EMAIL=${NOTIFY_SMS_EMAIL}
+    - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+    - TWILIO_WHATSAPP_FROM=${TWILIO_WHATSAPP_FROM}
+    - WHATSAPP_NOTIFY_TO=${WHATSAPP_NOTIFY_TO}
+    - TWILIO_SMS_FROM=${TWILIO_SMS_FROM}
+    - NOTIFY_SMS_TO=${NOTIFY_SMS_TO}
+    - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
-      - n8n_data:/home/node/.n8n
-      - ./workflows:/data/workflows
-      - ./output:/data/output
-      - ./opportunities:/data/opportunities
-      - ./scripts:/data/scripts:ro
-      - ./portal:/data/portal
-      - /var/run/docker.sock:/var/run/docker.sock
+    - n8n_data:/home/node/.n8n
+    - ./workflows:/data/workflows
+    - ./output:/data/output
+    - ./opportunities:/data/opportunities
+    - ./scripts:/data/scripts:ro
+    - ./portal:/data/portal
+    - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -277,25 +289,29 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Keycloak — SSO / Identity Provider
   # Base: start-dev mode (H2 in-memory, no postgres dep).
   # Prod delta overrides command to 'start' with postgres backend.
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
     container_name: keycloak
     command: ${KC_START_CMD:-start-dev}
     environment:
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
-      - KC_HOSTNAME=${KC_HOSTNAME:-localhost}
-      - KC_HTTP_ENABLED=true
-      - KC_HEALTH_ENABLED=true
+    - KEYCLOAK_ADMIN=admin
+    - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+    - KC_HOSTNAME=${KC_HOSTNAME:-localhost}
+    - KC_HTTP_ENABLED=true
+    - KC_HEALTH_ENABLED=true
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -312,28 +328,32 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — LiteLLM UI (port 4001)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
   oauth2-proxy-litellm:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_litellm
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=litellm
-      - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
-      - --redirect-url=${LITELLM_REDIRECT_URL}
-      - --upstream=http://litellm:4000
-      - --http-address=0.0.0.0:4001
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
-      - --skip-jwt-bearer-tokens=true
-      - --skip-auth-regex=^/v1/.*
-      - --skip-auth-regex=^/health
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=litellm
+    - --client-secret=${LITELLM_OIDC_CLIENT_SECRET}
+    - --redirect-url=${LITELLM_REDIRECT_URL}
+    - --upstream=http://litellm:4000
+    - --http-address=0.0.0.0:4001
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --skip-jwt-bearer-tokens=true
+    - --skip-auth-regex=^/v1/.*
+    - --skip-auth-regex=^/health
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "4001"]
       interval: 30s
@@ -355,28 +375,32 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — n8n UI (port 5679)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-n8n:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_n8n
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=n8n
-      - --client-secret=${N8N_OIDC_CLIENT_SECRET}
-      - --redirect-url=${N8N_REDIRECT_URL}
-      - --upstream=http://n8n:5678
-      - --http-address=0.0.0.0:5679
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --allowed-role=agentic-sdlc:admin
-      - --code-challenge-method=S256
-      - --skip-auth-route=^/webhook/
-      - --skip-auth-route=^/webhook-test/
-      - --skip-auth-route=^/healthz
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=n8n
+    - --client-secret=${N8N_OIDC_CLIENT_SECRET}
+    - --redirect-url=${N8N_REDIRECT_URL}
+    - --upstream=http://n8n:5678
+    - --http-address=0.0.0.0:5679
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --allowed-role=agentic-sdlc:admin
+    - --code-challenge-method=S256
+    - --skip-auth-route=^/webhook/
+    - --skip-auth-route=^/webhook-test/
+    - --skip-auth-route=^/healthz
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "5679"]
       interval: 30s
@@ -393,25 +417,29 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — JupyterLab (port 8889)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-jupyter:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_jupyter
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=jupyter
-      - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
-      - --redirect-url=${JUPYTER_REDIRECT_URL}
-      - --upstream=http://jupyter:8888
-      - --http-address=0.0.0.0:8889
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=jupyter
+    - --client-secret=${JUPYTER_OIDC_CLIENT_SECRET}
+    - --redirect-url=${JUPYTER_REDIRECT_URL}
+    - --upstream=http://jupyter:8888
+    - --http-address=0.0.0.0:8889
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "8889"]
       interval: 30s
@@ -433,26 +461,30 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Pipeline WebUI (port 3001)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-webui:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_webui
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=webui
-      - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
-      - --redirect-url=${WEBUI_REDIRECT_URL}
-      - --upstream=http://webui:3000
-      - --http-address=0.0.0.0:3001
-      - --email-domain=*
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
-      - --allowed-role=agentic-sdlc:user
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=webui
+    - --client-secret=${WEBUI_OIDC_CLIENT_SECRET}
+    - --redirect-url=${WEBUI_REDIRECT_URL}
+    - --upstream=http://webui:3000
+    - --http-address=0.0.0.0:3001
+    - --email-domain=*
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_WEBUI}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --allowed-role=agentic-sdlc:user
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "3001"]
       interval: 30s
@@ -472,26 +504,30 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Internal Access Portal (port 4185)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-portal:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_portal
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=portal
-      - --client-secret=${PORTAL_OIDC_CLIENT_SECRET}
-      - --redirect-url=${PORTAL_REDIRECT_URL}
-      - --upstream=http://portal:80
-      - --http-address=0.0.0.0:4185
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --insecure-oidc-allow-unverified-email=true
-      - --code-challenge-method=S256
-      - --upstream-timeout=120s
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=portal
+    - --client-secret=${PORTAL_OIDC_CLIENT_SECRET}
+    - --redirect-url=${PORTAL_REDIRECT_URL}
+    - --upstream=http://portal:80
+    - --http-address=0.0.0.0:4185
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --insecure-oidc-allow-unverified-email=true
+    - --code-challenge-method=S256
+    - --upstream-timeout=120s
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "4185"]
       interval: 30s
@@ -513,26 +549,30 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Agent Zero (port 50081)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-agent-zero:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_agent_zero
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=agent-zero
-      - --client-secret=${AGENT_ZERO_OIDC_CLIENT_SECRET}
-      - --redirect-url=${A0_REDIRECT_URL}
-      - --upstream=http://agent_zero:80
-      - --http-address=0.0.0.0:50081
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_A0}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
-      - --proxy-websockets=true
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=agent-zero
+    - --client-secret=${AGENT_ZERO_OIDC_CLIENT_SECRET}
+    - --redirect-url=${A0_REDIRECT_URL}
+    - --upstream=http://agent_zero:80
+    - --http-address=0.0.0.0:50081
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_A0}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --proxy-websockets=true
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "50081"]
       interval: 30s
@@ -558,6 +598,10 @@ services:
   # ---------------------------------------------------------------------------
   # ttyd — browser-based container terminal (docker exec over WebSocket)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   ttyd:
     build:
       context: .
@@ -565,9 +609,9 @@ services:
     image: sa_ttyd:latest
     container_name: ttyd
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/run/docker.sock
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -575,16 +619,20 @@ services:
         max-size: "5m"
         max-file: "2"
 
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   portal:
     image: nginx:alpine
     container_name: portal
     command: sh -c 'addgroup -g 989 docker 2>/dev/null; addgroup nginx docker 2>/dev/null; nginx -g "daemon off;"'
     volumes:
-      - ./portal:/usr/share/nginx/html:ro
-      - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/default.conf:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    - ./portal:/usr/share/nginx/html:ro
+    - ./nginx/conf.d/portal.conf:/etc/nginx/conf.d/default.conf:ro
+    - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -592,11 +640,15 @@ services:
         max-size: "10m"
         max-file: "3"
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Agent Zero — autonomous AI agent framework
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   agent-zero:
     build:
       context: /root/cc_work/agent-zero
@@ -604,15 +656,15 @@ services:
     image: agent-zero-local:latest
     container_name: agent_zero
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
     volumes:
-      - agent_zero_usr:/a0/usr
+    - agent_zero_usr:/a0/usr
     pids_limit: 2048
     cap_add:
-      - NET_RAW
-      - NET_ADMIN
-      - SYS_PTRACE
+    - NET_RAW
+    - NET_ADMIN
+    - SYS_PTRACE
     sysctls:
       net.ipv4.ping_group_range: "0 2147483647"
       net.ipv4.ip_unprivileged_port_start: "0"
@@ -620,7 +672,7 @@ services:
       net.ipv4.conf.default.accept_source_route: "0"
       net.ipv4.conf.default.promote_secondaries: "1"
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -643,34 +695,34 @@ services:
     image: quay.io/jupyter/scipy-notebook:latest
     container_name: jupyter
     environment:
-      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-}
-      - JUPYTER_ENABLE_LAB=yes
-      - LITELLM_BASE_URL=http://litellm:4000
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - N8N_BASE_URL=http://n8n:5678
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - MISTRAL_API_KEY=${MISTRAL_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
-      - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
+    - JUPYTER_TOKEN=${JUPYTER_TOKEN:-}
+    - JUPYTER_ENABLE_LAB=yes
+    - LITELLM_BASE_URL=http://litellm:4000
+    - OLLAMA_BASE_URL=http://ollama:11434
+    - N8N_BASE_URL=http://n8n:5678
+    - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    - OPENAI_API_KEY=${OPENAI_API_KEY}
+    - GEMINI_API_KEY=${GEMINI_API_KEY}
+    - GROQ_API_KEY=${GROQ_API_KEY}
+    - MISTRAL_API_KEY=${MISTRAL_API_KEY}
+    - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+    - PERPLEXITY_API_KEY=${PERPLEXITY_API_KEY}
     volumes:
-      - ./notebooks:/home/jovyan/notebooks
-      - ./output:/home/jovyan/output
-      - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
-      - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
+    - ./notebooks:/home/jovyan/notebooks
+    - ./output:/home/jovyan/output
+    - ./free_model_sync.py:/home/jovyan/scripts/free_model_sync.py
+    - ./litellm_config.yaml:/home/jovyan/config/litellm_config.yaml:ro
     command:
-      - bash
-      - -c
-      - |
-        pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
-        start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
+    - bash
+    - -c
+    - |
+      pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
+      start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -687,11 +739,15 @@ services:
       retries: 3
       start_period: 60s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Lead Review Portal — HITM review UI
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
   lead-review:
     build:
       context: ./scripts
@@ -699,28 +755,28 @@ services:
     image: sa_lead_review:latest
     container_name: sa_lead_review
     environment:
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
-      - LEAD_REVIEW_PASSWORD=${LEAD_REVIEW_PASSWORD}
-      - N8N_BASE_URL=http://n8n:5678
-      - PDF_OUTPUT_DIR=/data/output/lead_pdfs
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - OIDC_ENABLED=${OIDC_ENABLED:-false}
-      - KEYCLOAK_ISSUER=http://keycloak:8080/realms/agentic-sdlc
-      - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL}
-      - KEYCLOAK_CLIENT_ID=lead-review
-      - KEYCLOAK_CLIENT_SECRET=${LEAD_REVIEW_OIDC_CLIENT_SECRET}
-      - LEAD_REVIEW_PUBLIC_URL=${LEAD_REVIEW_PUBLIC_URL}
-      - NEO_SMTP_HOST=${NEO_SMTP_HOST:-smtp.resend.com}
-      - NEO_SMTP_PORT=${NEO_SMTP_PORT:-465}
-      - NEO_SMTP_USER=${NEO_SMTP_USER:-resend}
-      - NEO_SMTP_PASS=${NEO_SMTP_PASS}
-      - NOTIFY_EMAIL=${NOTIFY_EMAIL}
+    - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
+    - LEAD_REVIEW_PASSWORD=${LEAD_REVIEW_PASSWORD}
+    - N8N_BASE_URL=http://n8n:5678
+    - PDF_OUTPUT_DIR=/data/output/lead_pdfs
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - OIDC_ENABLED=${OIDC_ENABLED:-false}
+    - KEYCLOAK_ISSUER=http://keycloak:8080/realms/agentic-sdlc
+    - KEYCLOAK_EXTERNAL_URL=${KEYCLOAK_EXTERNAL_URL}
+    - KEYCLOAK_CLIENT_ID=lead-review
+    - KEYCLOAK_CLIENT_SECRET=${LEAD_REVIEW_OIDC_CLIENT_SECRET}
+    - LEAD_REVIEW_PUBLIC_URL=${LEAD_REVIEW_PUBLIC_URL}
+    - NEO_SMTP_HOST=${NEO_SMTP_HOST:-smtp.resend.com}
+    - NEO_SMTP_PORT=${NEO_SMTP_PORT:-465}
+    - NEO_SMTP_USER=${NEO_SMTP_USER:-resend}
+    - NEO_SMTP_PASS=${NEO_SMTP_PASS}
+    - NOTIFY_EMAIL=${NOTIFY_EMAIL}
     volumes:
-      - ./output:/data/output
+    - ./output:/data/output
     networks:
-      - vibe_net
-      - sa_web
+    - vibe_net
+    - sa_web
     depends_on:
       postgres:
         condition: service_healthy
@@ -742,32 +798,36 @@ services:
   # ---------------------------------------------------------------------------
   # Pipeline Server — phases 1-10 orchestrator
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   pipeline-server:
     build:
       context: .
       dockerfile: Dockerfile.pipeline
     container_name: pipeline_server
     volumes:
-      - ./output:/data/output
-      - ./scripts:/data/scripts:ro
-      - ./phases:/data/phases:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+    - ./output:/data/output
+    - ./scripts:/data/scripts:ro
+    - ./phases:/data/phases:ro
+    - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - PHASE3_MAX_ATTEMPTS=3
-      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
-      - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
-      - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
-      - DEPLOY_TARGET=${DEPLOY_TARGET:-skip}
-      - DEPLOY_SSH_HOST=${DEPLOY_SSH_HOST:-}
-      - DEPLOY_SSH_USER=${DEPLOY_SSH_USER:-}
-      - DEPLOY_SSH_KEY_PATH=${DEPLOY_SSH_KEY_PATH:-}
-      - ENABLE_APPROVAL_GATE=${ENABLE_APPROVAL_GATE:-false}
-      - APPROVAL_TIMEOUT_HOURS=${APPROVAL_TIMEOUT_HOURS:-24}
-      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - PHASE3_MAX_ATTEMPTS=3
+    - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
+    - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
+    - GIT_REMOTE_URL=${GIT_REMOTE_URL:-}
+    - DEPLOY_TARGET=${DEPLOY_TARGET:-skip}
+    - DEPLOY_SSH_HOST=${DEPLOY_SSH_HOST:-}
+    - DEPLOY_SSH_USER=${DEPLOY_SSH_USER:-}
+    - DEPLOY_SSH_KEY_PATH=${DEPLOY_SSH_KEY_PATH:-}
+    - ENABLE_APPROVAL_GATE=${ENABLE_APPROVAL_GATE:-false}
+    - APPROVAL_TIMEOUT_HOURS=${APPROVAL_TIMEOUT_HOURS:-24}
+    - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -784,11 +844,15 @@ services:
       retries: 3
       start_period: 60s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Test Runner — phase 3 Python test executor
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   test-runner:
     build:
       context: .
@@ -796,15 +860,15 @@ services:
     image: sa_test_runner:latest
     container_name: test_runner
     volumes:
-      - ./output:/data/output
-      - ./scripts:/data/scripts:ro
+    - ./output:/data/output
+    - ./scripts:/data/scripts:ro
     working_dir: /app
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - PHASE3_MAX_ATTEMPTS=3
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - PHASE3_MAX_ATTEMPTS=3
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -824,23 +888,27 @@ services:
   # ---------------------------------------------------------------------------
   # WebUI — single pane of glass
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   webui:
     build:
       context: ./webui
     container_name: webui
     volumes:
-      - ./output:/data/output:ro
-      - ./output/opportunities:/data/output/opportunities
+    - ./output:/data/output:ro
+    - ./output/opportunities:/data/output/opportunities
     environment:
-      - OUTPUT_BASE=/data/output
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - N8N_BASE_URL=http://n8n:5678
-      - PIPELINE_SERVER_URL=http://pipeline-server:5002
-      - TEST_RUNNER_URL=http://test-runner:5001
-      - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
+    - OUTPUT_BASE=/data/output
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - N8N_BASE_URL=http://n8n:5678
+    - PIPELINE_SERVER_URL=http://pipeline-server:5002
+    - TEST_RUNNER_URL=http://test-runner:5001
+    - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -848,7 +916,7 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - pipeline-server
+    - pipeline-server
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:3000/health')\" "]
       interval: 30s
@@ -856,32 +924,36 @@ services:
       retries: 3
       start_period: 30s
     labels:
-      - "com.centurylinklabs.watchtower.enable=true"
+    - "com.centurylinklabs.watchtower.enable=true"
 
   # ---------------------------------------------------------------------------
   # Open WebUI — Ollama model management & chat UI
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open_webui
     volumes:
-      - open_webui_data:/app/backend/data
+    - open_webui_data:/app/backend/data
     environment:
-      - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/open_webui
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY}
+    - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/open_webui
+    - OLLAMA_BASE_URL=http://ollama:11434
+    - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY}
       # Keycloak OIDC SSO
-      - ENABLE_OAUTH_SIGNUP=true
-      - DEFAULT_USER_ROLE=user
-      - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
-      - OAUTH_PROVIDER_NAME=Keycloak
-      - OPENID_PROVIDER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/.well-known/openid-configuration
-      - OAUTH_CLIENT_ID=open-webui
-      - OAUTH_CLIENT_SECRET=${OPEN_WEBUI_OIDC_CLIENT_SECRET}
-      - OAUTH_SCOPES=openid email profile
-      - WEBUI_URL=https://ollama-ui.private.sovereignadvisory.ai
+    - ENABLE_OAUTH_SIGNUP=true
+    - DEFAULT_USER_ROLE=user
+    - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
+    - OAUTH_PROVIDER_NAME=Keycloak
+    - OPENID_PROVIDER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/.well-known/openid-configuration
+    - OAUTH_CLIENT_ID=open-webui
+    - OAUTH_CLIENT_SECRET=${OPEN_WEBUI_OIDC_CLIENT_SECRET}
+    - OAUTH_SCOPES=openid email profile
+    - WEBUI_URL=https://ollama-ui.private.sovereignadvisory.ai
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -901,6 +973,10 @@ services:
   # ---------------------------------------------------------------------------
   # Free Model Sync — discovers/registers free models into LiteLLM every 6h
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   free-model-sync:
     build:
       context: .
@@ -908,16 +984,16 @@ services:
     image: sa_free_model_sync:latest
     container_name: free_model_sync
     volumes:
-      - ./free_model_sync.py:/app/free_model_sync.py:ro
+    - ./free_model_sync.py:/app/free_model_sync.py:ro
     working_dir: /app
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    - GROQ_API_KEY=${GROQ_API_KEY}
+    - GEMINI_API_KEY=${GEMINI_API_KEY}
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -931,14 +1007,18 @@ services:
   # ---------------------------------------------------------------------------
   # Ofelia — lightweight Docker cron scheduler
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./ofelia.ini:/etc/ofelia/config.ini:ro
+    - /var/run/docker.sock:/var/run/docker.sock
+    - ./ofelia.ini:/etc/ofelia/config.ini:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -946,30 +1026,34 @@ services:
         max-size: "10m"
         max-file: "3"
     depends_on:
-      - free-model-sync
+    - free-model-sync
 
   # ---------------------------------------------------------------------------
   # Backup — daily pg_dumpall + output/opportunities/ssl tarballs
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   backup:
     image: postgres:15
     container_name: backup
     volumes:
-      - ./backup:/backup
-      - ./output:/data/output:ro
-      - ./opportunities:/data/opportunities:ro
-      - /opt/agentic-sdlc/ssl:/ssl:ro
-      - open_webui_data:/data/open_webui:ro
-      - ./vault/data:/data/vault:ro
-      - vaultwarden_data:/data/vaultwarden:ro
-      - ./scripts/backup.sh:/backup.sh:ro
+    - ./backup:/backup
+    - ./output:/data/output:ro
+    - ./opportunities:/data/opportunities:ro
+    - /opt/agentic-sdlc/ssl:/ssl:ro
+    - open_webui_data:/data/open_webui:ro
+    - ./vault/data:/data/vault:ro
+    - vaultwarden_data:/data/vaultwarden:ro
+    - ./scripts/backup.sh:/backup.sh:ro
     environment:
-      - PGHOST=postgres
-      - PGUSER=${LITELLM_USER:-litellm}
-      - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
+    - PGHOST=postgres
+    - PGUSER=${LITELLM_USER:-litellm}
+    - PGPASSWORD=${LITELLM_PASSWORD:-litellm_password}
     command: ["sleep", "infinity"]
     networks:
-      - vibe_net
+    - vibe_net
     depends_on:
       postgres:
         condition: service_healthy
@@ -985,20 +1069,24 @@ services:
   # ---------------------------------------------------------------------------
   # Watchtower — automatic image updater
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   watchtower:
     image: containrrr/watchtower:latest
     container_name: watchtower
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+    - /var/run/docker.sock:/var/run/docker.sock
     environment:
-      - WATCHTOWER_LABEL_ENABLE=true
-      - WATCHTOWER_SCHEDULE=0 0 3 * * *
-      - WATCHTOWER_STOP_TIMEOUT=30s
-      - WATCHTOWER_CLEANUP=true
-      - WATCHTOWER_ROLLING_RESTART=true
-      - DOCKER_API_VERSION=1.41
+    - WATCHTOWER_LABEL_ENABLE=true
+    - WATCHTOWER_SCHEDULE=0 0 3 * * *
+    - WATCHTOWER_STOP_TIMEOUT=30s
+    - WATCHTOWER_CLEANUP=true
+    - WATCHTOWER_ROLLING_RESTART=true
+    - DOCKER_API_VERSION=1.41
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1009,22 +1097,26 @@ services:
   # ---------------------------------------------------------------------------
   # Prometheus — metrics collection
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - prometheus_data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.retention.time=30d'
-      - '--storage.tsdb.retention.size=10GB'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--web.enable-lifecycle'
+    - '--config.file=/etc/prometheus/prometheus.yml'
+    - '--storage.tsdb.path=/prometheus'
+    - '--storage.tsdb.retention.time=30d'
+    - '--storage.tsdb.retention.size=10GB'
+    - '--web.console.libraries=/etc/prometheus/console_libraries'
+    - '--web.console.templates=/etc/prometheus/consoles'
+    - '--web.enable-lifecycle'
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1046,29 +1138,33 @@ services:
   # ---------------------------------------------------------------------------
   # Grafana — observability dashboards
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-sovereign2026!}
-      - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_SERVER_HTTP_PORT=3000
+    - GF_SECURITY_ADMIN_USER=admin
+    - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-sovereign2026!}
+    - GF_USERS_ALLOW_SIGN_UP=false
+    - GF_SERVER_HTTP_PORT=3000
       # Auth proxy — trust X-Forwarded-Email from oauth2_proxy
-      - GF_AUTH_PROXY_ENABLED=true
-      - GF_AUTH_PROXY_HEADER_NAME=X-Forwarded-Email
-      - GF_AUTH_PROXY_HEADER_PROPERTY=email
-      - GF_AUTH_PROXY_AUTO_SIGN_UP=true
-      - GF_AUTH_PROXY_WHITELIST=172.20.0.0/16
-      - GF_AUTH_DISABLE_LOGIN_FORM=false
-      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
-      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
+    - GF_AUTH_PROXY_ENABLED=true
+    - GF_AUTH_PROXY_HEADER_NAME=X-Forwarded-Email
+    - GF_AUTH_PROXY_HEADER_PROPERTY=email
+    - GF_AUTH_PROXY_AUTO_SIGN_UP=true
+    - GF_AUTH_PROXY_WHITELIST=172.20.0.0/16
+    - GF_AUTH_DISABLE_LOGIN_FORM=false
+    - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+    - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    - grafana_data:/var/lib/grafana
+    - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1090,13 +1186,17 @@ services:
   # ---------------------------------------------------------------------------
   # Blackbox Exporter — HTTP uptime probing for sovereignadvisory.ai
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   blackbox_exporter:
     image: prom/blackbox-exporter:v0.25.0
     container_name: blackbox_exporter
     volumes:
-      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1110,6 +1210,10 @@ services:
   # ---------------------------------------------------------------------------
   # nginx-private — TLS termination for private subdomains (via Twingate)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   nginx-private:
     image: nginx:1.27-alpine
     container_name: sa_nginx_private
@@ -1120,10 +1224,10 @@ services:
         max-size: "10m"
         max-file: "3"
     volumes:
-      - ./nginx-private/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx-private/conf.d:/etc/nginx/conf.d:ro
-      - ./logs/nginx-private:/var/log/nginx
-      - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
+    - ./nginx-private/nginx.conf:/etc/nginx/nginx.conf:ro
+    - ./nginx-private/conf.d:/etc/nginx/conf.d:ro
+    - ./logs/nginx-private:/var/log/nginx
+    - /opt/agentic-sdlc/ssl:/etc/letsencrypt:ro
     depends_on:
       n8n:
         condition: service_started
@@ -1142,13 +1246,17 @@ services:
       open-webui:
         condition: service_started
     networks:
-      - vibe_net
+    - vibe_net
     labels:
       com.sovereignadvisory.service: "nginx-private"
 
   # ---------------------------------------------------------------------------
   # Certbot DNS (Cloudflare) — wildcard cert for *.private.sovereignadvisory.ai
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   certbot-dns:
     image: certbot/dns-cloudflare:latest
     container_name: sa_certbot_dns
@@ -1159,21 +1267,25 @@ services:
         max-size: "10m"
         max-file: "3"
     environment:
-      - CF_API_TOKEN=${CF_API_TOKEN}
+    - CF_API_TOKEN=${CF_API_TOKEN}
     volumes:
-      - /opt/agentic-sdlc/ssl:/etc/letsencrypt
-      - ./certbot/nginx-reload.py:/nginx-reload.py:ro
-      - ./certbot/entrypoint.sh:/entrypoint.sh:ro
-      - /var/run/docker.sock:/var/run/docker.sock
+    - /opt/agentic-sdlc/ssl:/etc/letsencrypt
+    - ./certbot/nginx-reload.py:/nginx-reload.py:ro
+    - ./certbot/entrypoint.sh:/entrypoint.sh:ro
+    - /var/run/docker.sock:/var/run/docker.sock
     entrypoint: ["/bin/sh", "/entrypoint.sh"]
     networks:
-      - vibe_net
+    - vibe_net
     labels:
       com.sovereignadvisory.service: "certbot-dns"
 
   # ---------------------------------------------------------------------------
   # Company Research Service — web-based company enrichment for lead pipeline
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   company-research:
     build:
       context: ./scripts
@@ -1181,14 +1293,14 @@ services:
     image: sa_company_research:latest
     container_name: sa_company_research
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - RESEARCH_STRUCTURING_MODEL=${RESEARCH_STRUCTURING_MODEL:-_groq-llama3-70b}
-      - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
-      - N8N_PUBLIC_BASE=${N8N_PUBLIC_BASE:-https://sovereignadvisory.ai/n8n}
-      - N8N_INTERNAL_BASE=http://n8n:5678
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - RESEARCH_STRUCTURING_MODEL=${RESEARCH_STRUCTURING_MODEL:-_groq-llama3-70b}
+    - LEAD_PIPELINE_MODEL=${LEAD_PIPELINE_MODEL:-_groq-llama3-70b}
+    - N8N_PUBLIC_BASE=${N8N_PUBLIC_BASE:-https://sovereignadvisory.ai/n8n}
+    - N8N_INTERNAL_BASE=http://n8n:5678
     networks:
-      - vibe_net
+    - vibe_net
     depends_on:
       litellm:
         condition: service_healthy
@@ -1210,27 +1322,31 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Grafana (port 3002)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-grafana:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_grafana
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=grafana
-      - --client-secret=${GRAFANA_OIDC_CLIENT_SECRET}
-      - --redirect-url=${GRAFANA_REDIRECT_URL}
-      - --upstream=http://grafana:3000
-      - --http-address=0.0.0.0:3002
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
-      - --proxy-websockets=true
-      - --pass-user-headers=true
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=grafana
+    - --client-secret=${GRAFANA_OIDC_CLIENT_SECRET}
+    - --redirect-url=${GRAFANA_REDIRECT_URL}
+    - --upstream=http://grafana:3000
+    - --http-address=0.0.0.0:3002
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --proxy-websockets=true
+    - --pass-user-headers=true
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "3002"]
       interval: 30s
@@ -1252,25 +1368,29 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Prometheus (port 9091)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-prometheus:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_prometheus
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=prometheus
-      - --client-secret=${PROMETHEUS_OIDC_CLIENT_SECRET}
-      - --redirect-url=${PROMETHEUS_REDIRECT_URL}
-      - --upstream=http://prometheus:9090
-      - --http-address=0.0.0.0:9091
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=prometheus
+    - --client-secret=${PROMETHEUS_OIDC_CLIENT_SECRET}
+    - --redirect-url=${PROMETHEUS_REDIRECT_URL}
+    - --upstream=http://prometheus:9090
+    - --http-address=0.0.0.0:9091
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "9091"]
       interval: 30s
@@ -1292,25 +1412,29 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Qdrant (port 6335)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-qdrant:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_qdrant
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=qdrant
-      - --client-secret=${QDRANT_OIDC_CLIENT_SECRET}
-      - --redirect-url=${QDRANT_REDIRECT_URL}
-      - --upstream=http://qdrant:6333
-      - --http-address=0.0.0.0:6335
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=qdrant
+    - --client-secret=${QDRANT_OIDC_CLIENT_SECRET}
+    - --redirect-url=${QDRANT_REDIRECT_URL}
+    - --upstream=http://qdrant:6333
+    - --http-address=0.0.0.0:6335
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "6335"]
       interval: 30s
@@ -1332,25 +1456,29 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — Secrets / HashiCorp Vault UI (port 8202)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-secrets:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_secrets
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=secrets
-      - --client-secret=${SECRETS_OIDC_CLIENT_SECRET}
-      - --redirect-url=${SECRETS_REDIRECT_URL}
-      - --upstream=http://vault:8200
-      - --http-address=0.0.0.0:8202
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=secrets
+    - --client-secret=${SECRETS_OIDC_CLIENT_SECRET}
+    - --redirect-url=${SECRETS_REDIRECT_URL}
+    - --upstream=http://vault:8200
+    - --http-address=0.0.0.0:8202
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "8202"]
       interval: 30s
@@ -1370,23 +1498,27 @@ services:
   # ---------------------------------------------------------------------------
   # cAdvisor — per-container CPU / memory / network / disk metrics
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     privileged: true
     command:
-      - --housekeeping_interval=10s
-      - --disable_metrics=disk,diskIO
+    - --housekeeping_interval=10s
+    - --disable_metrics=disk,diskIO
     devices:
-      - /dev/kmsg
+    - /dev/kmsg
     volumes:
-      - /:/rootfs:ro
-      - /var/run:/var/run:ro
-      - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
-      - /dev/disk/:/dev/disk:ro
+    - /:/rootfs:ro
+    - /var/run:/var/run:ro
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /dev/disk/:/dev/disk:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1408,14 +1540,14 @@ services:
     image: prom/node-exporter:latest
     container_name: node_exporter
     command:
-      - '--path.procfs=/host/proc'
-      - '--path.rootfs=/rootfs'
-      - '--path.sysfs=/host/sys'
-      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    - '--path.procfs=/host/proc'
+    - '--path.rootfs=/rootfs'
+    - '--path.sysfs=/host/sys'
+    - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
     volumes:
-      - /proc:/host/proc:ro
-      - /sys:/host/sys:ro
-      - /:/rootfs:ro
+    - /proc:/host/proc:ro
+    - /sys:/host/sys:ro
+    - /:/rootfs:ro
     network_mode: host
     pid: host
     restart: unless-stopped
@@ -1432,6 +1564,10 @@ services:
   # Agent-zero: POST http://maltego_transforms:8080/api/<transform> {"value":"..."}
   # CLI:        docker exec maltego_transforms python run_transform.py <name> <value>
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
   maltego-transforms:
     build:
       context: .
@@ -1439,13 +1575,13 @@ services:
     image: sa_maltego_transforms:latest
     container_name: maltego_transforms
     environment:
-      - LITELLM_BASE_URL=http://litellm:4000
-      - LITELLM_API_KEY=${LITELLM_API_KEY}
-      - RESEARCH_URL=http://sa_company_research:5004
-      - SHODAN_API_KEY=${SHODAN_API_KEY:-}
-      - HIBP_API_KEY=${HIBP_API_KEY:-}
+    - LITELLM_BASE_URL=http://litellm:4000
+    - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - RESEARCH_URL=http://sa_company_research:5004
+    - SHODAN_API_KEY=${SHODAN_API_KEY:-}
+    - HIBP_API_KEY=${HIBP_API_KEY:-}
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1468,17 +1604,21 @@ services:
   # Maltego Desktop — KasmWeb GUI client for visual link analysis (portal access)
   # First launch: enter CE account credentials at maltego.com (free registration)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   maltego-desktop:
     image: kasmweb/maltego:1.18.0-rolling-daily
     container_name: maltego_desktop
     environment:
-      - VNC_PW=${MALTEGO_VNC_PW:-Maltego2026!}
-      - KASM_PORT=6901
+    - VNC_PW=${MALTEGO_VNC_PW:-Maltego2026!}
+    - KASM_PORT=6901
     volumes:
-      - maltego_data:/home/kasm-user
+    - maltego_data:/home/kasm-user
     shm_size: "512m"
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1492,26 +1632,30 @@ services:
   # oauth2-proxy — Maltego Desktop GUI (port 4183)
   # Uses nginx auth_request mode: proxy validates session, nginx proxies to KasmWeb
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
   oauth2-proxy-maltego:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_maltego
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=maltego
-      - --client-secret=${MALTEGO_OIDC_CLIENT_SECRET}
-      - --redirect-url=${MALTEGO_REDIRECT_URL}
-      - --upstream=http://maltego_desktop_relay:4184
-      - --http-address=0.0.0.0:4183
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
-      - --proxy-websockets=true
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=maltego
+    - --client-secret=${MALTEGO_OIDC_CLIENT_SECRET}
+    - --redirect-url=${MALTEGO_REDIRECT_URL}
+    - --upstream=http://maltego_desktop_relay:4184
+    - --http-address=0.0.0.0:4183
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --proxy-websockets=true
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "4183"]
       interval: 30s
@@ -1532,13 +1676,17 @@ services:
   # Maltego Desktop Relay — nginx HTTP relay that terminates KasmWeb HTTPS
   # oauth2-proxy → this relay (HTTP:4184) → maltego-desktop (HTTPS:6901)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   maltego-desktop-relay:
     image: nginx:alpine
     container_name: maltego_desktop_relay
     volumes:
-      - ./nginx/conf.d/maltego-relay.conf:/etc/nginx/conf.d/default.conf:ro
+    - ./nginx/conf.d/maltego-relay.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1546,9 +1694,13 @@ services:
         max-size: "5m"
         max-file: "2"
     depends_on:
-      - maltego-desktop
+    - maltego-desktop
   # MiroFish — LLM-powered app (port 3000 internal)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
   mirofish:
     image: ghcr.io/666ghj/mirofish:latest
     container_name: mirofish
@@ -1557,20 +1709,20 @@ services:
       sed -i '/server: {/a\\    allowedHosts: true,' /app/frontend/vite.config.js &&
       VITE_API_BASE_URL=/ npm run dev"
     environment:
-      - LLM_API_KEY=${LITELLM_API_KEY}
-      - LLM_BASE_URL=http://litellm:4000
-      - LLM_MODEL_NAME=${MIROFISH_MODEL:-gpt-4o-mini}
-      - ZEP_API_KEY=${ZEP_API_KEY:-local}
-      - ZEP_BASE_URL=${ZEP_BASE_URL:-http://zep:8000}
-      - SECRET_KEY=${MIROFISH_SECRET_KEY}
-      - FLASK_DEBUG=False
+    - LLM_API_KEY=${LITELLM_API_KEY}
+    - LLM_BASE_URL=http://litellm:4000
+    - LLM_MODEL_NAME=${MIROFISH_MODEL:-gpt-4o-mini}
+    - ZEP_API_KEY=${ZEP_API_KEY:-local}
+    - ZEP_BASE_URL=${ZEP_BASE_URL:-http://zep:8000}
+    - SECRET_KEY=${MIROFISH_SECRET_KEY}
+    - FLASK_DEBUG=False
     volumes:
-      - mirofish_uploads:/app/backend/uploads
-      - /opt/agentic-sdlc/mirofish-zep-patch/config.py:/app/backend/app/config.py:ro
-      - /opt/agentic-sdlc/mirofish-zep-patch/zep_tools.py:/app/backend/app/services/zep_tools.py:ro
-      - /opt/agentic-sdlc/mirofish-zep-patch/zep_entity_reader.py:/app/backend/app/services/zep_entity_reader.py:ro
+    - mirofish_uploads:/app/backend/uploads
+    - /opt/agentic-sdlc/mirofish-zep-patch/config.py:/app/backend/app/config.py:ro
+    - /opt/agentic-sdlc/mirofish-zep-patch/zep_tools.py:/app/backend/app/services/zep_tools.py:ro
+    - /opt/agentic-sdlc/mirofish-zep-patch/zep_entity_reader.py:/app/backend/app/services/zep_entity_reader.py:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1586,25 +1738,29 @@ services:
   # ---------------------------------------------------------------------------
   # oauth2-proxy — MiroFish (port 4186)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   oauth2-proxy-mirofish:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_mirofish
     command:
-      - --provider=oidc
-      - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
-      - --client-id=mirofish
-      - --client-secret=${MIROFISH_OIDC_CLIENT_SECRET}
-      - --redirect-url=${MIROFISH_REDIRECT_URL}
-      - --upstream=http://mirofish:3000
-      - --http-address=0.0.0.0:4186
-      - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
-      - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
-      - --email-domain=*
-      - --skip-provider-button=true
-      - --code-challenge-method=S256
-      - --allowed-role=agentic-sdlc:admin
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=mirofish
+    - --client-secret=${MIROFISH_OIDC_CLIENT_SECRET}
+    - --redirect-url=${MIROFISH_REDIRECT_URL}
+    - --upstream=http://mirofish:3000
+    - --http-address=0.0.0.0:4186
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
     networks:
-      - vibe_net
+    - vibe_net
     healthcheck:
       test: ["CMD", "/nc", "-z", "localhost", "4186"]
       interval: 30s
@@ -1627,16 +1783,20 @@ services:
   # Zep CE — self-hosted memory graph (port 8000 internal)
   # MiroFish connects via http://zep:8000; auth disabled (Twingate-only access)
   # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
   zep:
     image: ghcr.io/getzep/zep:latest
     container_name: zep
     environment:
-      - ZEP_OPENAI_API_KEY=${LITELLM_API_KEY}
-      - ZEP_OPENAI_API_URL=http://litellm:4000
+    - ZEP_OPENAI_API_KEY=${LITELLM_API_KEY}
+    - ZEP_OPENAI_API_URL=http://litellm:4000
     volumes:
-      - /opt/agentic-sdlc/zep-config.yaml:/app/config.yaml:ro
+    - /opt/agentic-sdlc/zep-config.yaml:/app/config.yaml:ro
     networks:
-      - vibe_net
+    - vibe_net
     restart: unless-stopped
     depends_on:
       postgres:
@@ -1654,3 +1814,7 @@ services:
         max-file: "3"
     labels:
       com.sovereignadvisory.service: "zep"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
