@@ -1350,6 +1350,9 @@ services:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
     privileged: true
+    command:
+      - --housekeeping_interval=10s
+      - --disable_metrics=disk,diskIO
     devices:
       - /dev/kmsg
     volumes:
@@ -1368,6 +1371,11 @@ services:
         max-file: "2"
     labels:
       com.sovereignadvisory.service: "cadvisor"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256m
 
   # ---------------------------------------------------------------------------
   # node-exporter — host CPU / memory / disk / network metrics
