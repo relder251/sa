@@ -1916,12 +1916,11 @@ function _chatRenderText(t) {
     .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:2px;font-size:11px;font-family:monospace">$1</code>');
 }
 
-function chatShowTyping(label) {
+function chatShowTyping() {
   const msgs = document.getElementById('chat-messages');
   const d = document.createElement('div');
   d.className='chat-msg assistant'; d.id='chat-typing';
-  const lbl = label ? `<span style='font-size:10px;color:var(--text-3);margin-left:4px'>${label}</span>` : '';
-  d.innerHTML=`<div class="chat-msg-avatar"></div><div class="chat-msg-body"><div class="chat-typing"><span></span><span></span><span></span>${lbl}</div></div>`;
+  d.innerHTML=`<div class="chat-msg-avatar"></div><div class="chat-msg-body"><div class="chat-typing"><span></span><span></span><span></span></div></div>`;
   msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
 }
 function chatHideTyping() { const t=document.getElementById('chat-typing'); if(t)t.remove(); }
@@ -1965,7 +1964,7 @@ async function chatSend() {
   let systemPrompt = STACK_IDENTITY;
 
   // Step 1: RAG — embed query and retrieve relevant chunks
-  chatShowTyping('retrieving context…');
+  chatShowTyping();
   try {
     const vector = await stackEmbed(txt);
     const hits = await stackSearch(vector, 5);
@@ -1981,7 +1980,7 @@ async function chatSend() {
 
   // Step 2: Call LiteLLM with assembled prompt + history
   chatHideTyping();
-  chatShowTyping('thinking…');
+  chatShowTyping();
   const messages = [{role:'system',content:systemPrompt}, ...chatHistory.slice(-10)];
   let reply = '(empty)';
   try {
