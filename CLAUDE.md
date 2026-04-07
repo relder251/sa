@@ -136,3 +136,17 @@ Ollama is configured for an RTX 3070 (8GB VRAM):
 - `OLLAMA_KEEP_ALIVE=10m` — unload model after 10 min idle
 
 If running without a GPU, remove the `deploy.resources.reservations` block from the `ollama` service in `docker-compose.yml`.
+
+## Change workflow — MANDATORY for every backlog item
+
+Every change to the stack must follow this sequence without exception:
+
+1. **Backup** — snapshot any file, config, or volume being changed before touching it
+2. **Make the change** — implement the edit
+3. **User approval** — present the change and wait for explicit go-ahead
+4. **Test** — verify via CLI/shell output; test UI where applicable; show results to user
+5. **Confirm success** — user reviews test output
+6. **User approval to commit** — wait for explicit go-ahead before touching git
+7. **Commit to GitHub** — `git add <files> && git commit -m "..."` with a descriptive message
+
+Never skip backup. Never skip approval gates. Never batch multiple backlog items into one commit.
