@@ -8,11 +8,13 @@
 #   BACKUP_DIR                 — defaults to /backup
 #
 # Volumes expected:
-#   /backup             — output directory (host: ./backup)
-#   /data/output        — lead PDFs and pipeline output (read-only)
-#   /data/opportunities — pipeline input data (read-only)
-#   /data/open_webui    — Open WebUI SQLite data dir (read-only)
-#   /ssl                — TLS certs at /opt/sovereignadvisory/ssl (read-only)
+#   /backup                — output directory (host: ./backup)
+#   /data/output           — lead PDFs and pipeline output (read-only)
+#   /data/opportunities    — pipeline input data (read-only)
+#   /data/open_webui       — Open WebUI SQLite data dir (read-only)
+#   /ssl                   — TLS certs at /opt/sovereignadvisory/ssl (read-only)
+#   /data/n8n              — n8n_data volume; contains encryption key (.n8n/config) (read-only)
+#   /data/agent_zero_usr   — agent_zero_usr volume; custom tools (read-only)
 
 set -euo pipefail
 
@@ -81,6 +83,17 @@ run bash -c "
 # --- SSL certificates ---
 echo "--- ssl ---"
 run bash -c "tar -czf \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" -C / ssl && mv \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/ssl_${DATE}.tar.gz\""
+
+# --- n8n encryption key + workflow data ---
+# n8n_data contains .n8n/config which is the encryption key for all n8n credentials
+# stored in postgres. Without this file a postgres restore cannot decrypt credentials.
+echo "--- n8n ---"
+run bash -c "tar -czf \"$BACKUP_DIR/n8n_${DATE}.tar.gz.tmp\" -C /data n8n && mv \"$BACKUP_DIR/n8n_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/n8n_${DATE}.tar.gz\""
+
+# --- Agent Zero /usr volume ---
+# agent_zero_usr holds custom tools (MiroFish, Maltego integrations) not present in the image.
+echo "--- agent_zero_usr ---"
+run bash -c "tar -czf \"$BACKUP_DIR/agent_zero_usr_${DATE}.tar.gz.tmp\" -C /data agent_zero_usr && mv \"$BACKUP_DIR/agent_zero_usr_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/agent_zero_usr_${DATE}.tar.gz\""
 
 if $DRY_RUN; then
   echo "=== Dry-run complete — no files written ==="

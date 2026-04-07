@@ -1072,6 +1072,8 @@ services:
     - open_webui_data:/data/open_webui:ro
     - ./vault/data:/data/vault:ro
     - vaultwarden_data:/data/vaultwarden:ro
+    - n8n_data:/data/n8n:ro
+    - agent_zero_usr:/data/agent_zero_usr:ro
     - ./scripts/backup.sh:/backup.sh:ro
     environment:
     - PGHOST=postgres
