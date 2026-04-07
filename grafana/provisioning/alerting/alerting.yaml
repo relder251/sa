@@ -238,3 +238,58 @@ groups:
         labels:
           severity: warning
         isPaused: false
+
+      - uid: sa-website-down
+        title: 'sovereignadvisory.ai Down'
+        condition: THRESHOLD
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              editorMode: code
+              expr: 'probe_success{job="blackbox-http",instance="https://sovereignadvisory.ai"}'
+              instant: true
+              intervalMs: 1000
+              legendFormat: ''
+              maxDataPoints: 43200
+              range: false
+              refId: QUERY
+          - refId: THRESHOLD
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: '-100'
+            model:
+              conditions:
+                - evaluator:
+                    params: [1]
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: [QUERY]
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: '-100'
+              expression: QUERY
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: THRESHOLD
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 1m
+        annotations:
+          summary: 'sovereignadvisory.ai is DOWN'
+          description: 'HTTP probe has been failing for 1+ minute (2+ consecutive 30s checks at 30s interval).'
+        labels:
+          severity: critical
+        isPaused: false

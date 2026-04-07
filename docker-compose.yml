@@ -1087,6 +1087,26 @@ services:
       com.sovereignadvisory.service: "grafana"
 
   # ---------------------------------------------------------------------------
+  # Blackbox Exporter — HTTP uptime probing for sovereignadvisory.ai
+  # ---------------------------------------------------------------------------
+  blackbox_exporter:
+    image: prom/blackbox-exporter:v0.25.0
+    container_name: blackbox_exporter
+    volumes:
+      - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.sovereignadvisory.service: "blackbox_exporter"
+
+
+  # ---------------------------------------------------------------------------
   # nginx-private — TLS termination for private subdomains (via Twingate)
   # ---------------------------------------------------------------------------
   nginx-private:
