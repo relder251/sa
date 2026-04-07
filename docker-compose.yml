@@ -25,6 +25,7 @@ volumes:
   grafana_data:
   maltego_data:
   mirofish_uploads:
+  agent_zero_data:
 
 services:
 
@@ -604,6 +605,8 @@ services:
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
+    volumes:
+      - agent_zero_data:/a0
     networks:
       - vibe_net
     restart: unless-stopped
