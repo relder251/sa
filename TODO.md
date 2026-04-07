@@ -5,11 +5,12 @@
 ## Pending
 
 
-- [ ] **#4** Set memory limits on all containers | LOE: Medium | ROI: Critical | Impact: Critical
-- [ ] **#5** Set CPU limits on all containers | LOE: Medium | ROI: Critical | Impact: Critical
-- [ ] **#6** Add off-site backup destination | LOE: Medium | ROI: Critical | Impact: Critical
 - [ ] **#7** Cap cAdvisor CPU/RAM + increase scrape interval to 30s | LOE: Low | ROI: High | Impact: High
-- [ ] **#8** Constrain Keycloak JVM heap (-Xmx) | LOE: Low | ROI: High | Impact: High
+- [ ] **#8** Constrain Keycloak JVM heap (`-Xmx`) | LOE: Low | ROI: High | Impact: High
+- [ ] **#17** Configure Grafana alerting -> Telegram | LOE: Medium | ROI: High | Impact: High
+- [ ] **#4** Set memory limits on all containers (stable services only — exclude ollama, agent_zero, maltego_desktop; keycloak handled via #8) | LOE: Medium | ROI: Critical | Impact: Critical
+- [ ] **#5** Set CPU limits on all containers (stable services only — exclude ollama, agent_zero during active scans) | LOE: Medium | ROI: Critical | Impact: Critical
+- [ ] **#6** Add off-site backup destination | LOE: Medium | ROI: Critical | Impact: Critical
 - [ ] **#9** PID limit + CPU cap on Agent Zero | LOE: Low | ROI: High | Impact: High
 - [ ] **#10** Install fail2ban for SSH brute force protection | LOE: Low | ROI: High | Impact: High
 - [ ] **#11** Add n8n encryption key + Agent Zero usr volumes to backup | LOE: Low | ROI: High | Impact: High
@@ -18,7 +19,6 @@
 - [ ] **#14** Add Content-Security-Policy header to nginx | LOE: Low | ROI: High | Impact: Medium
 - [ ] **#15** CORS origin allowlist on public n8n webhook | LOE: Low | ROI: High | Impact: Medium
 - [ ] **#16** Watchtower pre-update hook commits image tags to git | LOE: Medium | ROI: High | Impact: High
-- [ ] **#17** Configure Grafana alerting -> Telegram | LOE: Medium | ROI: High | Impact: High
 - [ ] **#18** Configure Vault auto-unseal | LOE: Medium | ROI: High | Impact: High
 - [ ] **#19** Scope down docker.sock on pipeline/test containers | LOE: Medium | ROI: High | Impact: Medium
 - [ ] **#20** Add Loki log aggregation | LOE: High | ROI: High | Impact: High
