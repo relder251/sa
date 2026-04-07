@@ -1,0 +1,123 @@
+version: "3.9"
+# Mirror environment — isolated Docker replica for PCIRT+ testing
+# Same images as production. Separate DB. No live API keys.
+# LiteLLM routes to local Ollama only — never cloud in mirror.
+# No nginx, no keycloak, no vaultwarden, no oauth2_proxy — minimal by design.
+
+services:
+  n8n-mirror:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: agentic-sdlc-n8n-mirror
+    ports:
+      - "127.0.0.1:${MIRROR_N8N_PORT:-5679}:5678"
+    environment:
+      N8N_PORT: 5678
+      NODE_ENV: production
+      WEBHOOK_URL: http://localhost:${MIRROR_N8N_PORT:-5679}
+      N8N_HOST: localhost
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:${MIRROR_N8N_PORT:-5679}
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres-mirror
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: n8n_mirror
+      DB_POSTGRESDB_USER: mirror_user
+      DB_POSTGRESDB_PASSWORD: mirror_pass
+      N8N_ENCRYPTION_KEY: ${MIRROR_N8N_ENCRYPTION_KEY:-mirror-encryption-key-not-real}
+      N8N_RUNNERS_ENABLED: "false"
+      N8N_TRUST_PROXY: "false"
+      N8N_SECURE_COOKIE: "false"
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+      NODE_FUNCTION_ALLOW_BUILTIN: "fs,path,crypto,os,child_process"
+      LITELLM_BASE_URL: http://litellm-mirror:4000
+      LITELLM_API_KEY: ${MIRROR_LITELLM_KEY:-mirror-test-key-not-real}
+    depends_on:
+      postgres-mirror:
+        condition: service_healthy
+    volumes:
+      - mirror-n8n-data:/home/node/.n8n
+      - ./workflows:/data/workflows:ro
+    networks: [mirror-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  litellm-mirror:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: agentic-sdlc-litellm-mirror
+    ports:
+      - "127.0.0.1:${MIRROR_LITELLM_PORT:-4002}:4000"
+    environment:
+      LITELLM_MASTER_KEY: ${MIRROR_LITELLM_KEY:-mirror-test-key-not-real}
+      DATABASE_URL: postgresql://mirror_user:mirror_pass@postgres-mirror:5432/litellm_mirror
+      STORE_MODEL_IN_DB: "True"
+      OLLAMA_API_BASE: http://host.docker.internal:11434
+      OLLAMA_CLOUD_API_BASE: http://host.docker.internal:11434
+      OLLAMA_CLOUD_API_KEY: ollama
+    command: ["--port", "4000", "--num_workers", "1"]
+    depends_on:
+      postgres-mirror:
+        condition: service_healthy
+    networks: [mirror-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres-mirror:
+    image: postgres:15-alpine
+    container_name: agentic-sdlc-postgres-mirror
+    environment:
+      POSTGRES_USER: mirror_user
+      POSTGRES_PASSWORD: mirror_pass
+      POSTGRES_DB: n8n_mirror
+    ports:
+      - "127.0.0.1:${MIRROR_DB_PORT:-5434}:5432"
+    volumes:
+      - mirror-pg-data:/var/lib/postgresql/data
+      - ./scripts/mirror-pg-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks: [mirror-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mirror_user -d n8n_mirror"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  score-db:
+    image: postgres:15-alpine
+    container_name: agentic-sdlc-score-db
+    environment:
+      POSTGRES_USER: scores_user
+      POSTGRES_PASSWORD: scores_pass
+      POSTGRES_DB: cqs_scores
+    ports:
+      - "127.0.0.1:${SCORE_DB_PORT:-5433}:5432"
+    volumes:
+      - score-db-data:/var/lib/postgresql/data
+      - ./scripts/cqs-schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    networks: [mirror-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scores_user -d cqs_scores"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mirror-n8n-data:
+  mirror-pg-data:
+  score-db-data:
+
+networks:
+  mirror-net:
+    driver: bridge

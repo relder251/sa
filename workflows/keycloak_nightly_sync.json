@@ -1,0 +1,45 @@
+{
+  "name": "Keycloak Nightly Credential Sync",
+  "active": true,
+  "nodes": [
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 2 * * *"}]
+        }
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000002",
+      "name": "Sync All Keycloak",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://vault-sync:8777/sync/keycloak",
+        "options": {"timeout": 60000}
+      }
+    },
+    {
+      "id": "a1b2c3d4-0001-0001-0001-000000000003",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconsole.log('[Keycloak Nightly Sync]', JSON.stringify({synced: r.synced?.length, skipped: r.skipped?.length, errors: r.errors?.length}));\nreturn $input.all();"
+      }
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {"main": [[{"node": "Sync All Keycloak", "type": "main", "index": 0}]]},
+    "Sync All Keycloak": {"main": [[{"node": "Log Result", "type": "main", "index": 0}]]}
+  },
+  "settings": {"executionOrder": "v1"}
+}

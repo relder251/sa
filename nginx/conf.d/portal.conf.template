@@ -1,0 +1,111 @@
+# WebSocket upgrade map — required by the /terminal/ proxy below
+map $http_upgrade $connection_upgrade {
+    default  upgrade;
+    ''       close;
+}
+
+server {
+    listen 80;
+    server_name home.private.sovereignadvisory.ai;
+
+    root /usr/share/nginx/html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # LiteLLM provider health — used by portal for API access badges
+    # Must appear before /api/ to make ordering intent explicit
+    # (nginx longest-match prefix means /api/litellm-health always wins over /api/)
+    location /api/litellm-health {
+        proxy_pass http://litellm:4000/health?model=cloud/smart;
+        proxy_set_header Host $host;
+        # LITELLM_API_KEY is injected by nginx:alpine envsubst at container start.
+        # Set LITELLM_API_KEY in the portal service environment in docker-compose.
+        proxy_set_header Authorization "Bearer ${LITELLM_API_KEY}";
+        proxy_read_timeout 20s;
+    }
+
+    # portal data API — returns live services.json via n8n (GET, no body required)
+    location /api/portal-services {
+        proxy_pass http://n8n:5678/webhook/VHUS5Dx1q9HBZPln/webhook/portal-services;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 10s;
+    }
+
+    # n8n provisioning webhooks
+    # portal-provision (DXjMzKwRB6c54GCY) uses workflowId-prefixed path (n8n 2.12.x legacy format)
+    # portal-update-categories (MdZMVjJ2zUPmDtyu), portal-update (NCvllVAgkG91FXzD),
+    # and portal-delete (q6C6PUPzyYhhT8gG) use plain /webhook/{path} as registered in DB
+
+    location /api/portal-provision {
+        proxy_pass http://n8n:5678/webhook/DXjMzKwRB6c54GCY/webhook/portal-provision;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 120s;
+    }
+
+    location /api/portal-update-categories {
+        # workflowId: MdZMVjJ2zUPmDtyu — plain path registered in webhook_entity
+        proxy_pass http://n8n:5678/webhook/portal-update-categories;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/portal-update {
+        # workflowId: NCvllVAgkG91FXzD — plain path registered in webhook_entity
+        proxy_pass http://n8n:5678/webhook/portal-update;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/portal-delete {
+        # workflowId: q6C6PUPzyYhhT8gG — plain path registered in webhook_entity
+        proxy_pass http://n8n:5678/webhook/portal-delete;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 30s;
+    }
+
+    location /api/portal-track-recent {
+        proxy_pass http://n8n:5678/webhook/GOpCkjqJyPjy5dgG/webhook/portal-track-recent;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 10s;
+    }
+
+    # Credential rotation — atomically updates Vaultwarden + Keycloak
+    location /api/rotate-credential {
+        proxy_pass http://n8n:5678/webhook/rotate-credential;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_read_timeout 60s;
+    }
+
+    # oauth2-proxy — userinfo + auth endpoints for portal SSO
+    location /oauth2/ {
+        proxy_pass http://oauth2_proxy_portal:4185;
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # Web terminal proxy — xterm.js pages + WebSocket pty bridge
+    # Each /terminal/<target> opens a shell session via shell_gateway.
+    location /terminal/ {
+        resolver 127.0.0.11 valid=30s;
+        set $up_shell http://shell_gateway:7681;
+        proxy_pass $up_shell;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_set_header Host       $host;
+        proxy_set_header X-Real-IP  $remote_addr;
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+    }
+}

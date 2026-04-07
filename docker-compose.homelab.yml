@@ -1,0 +1,15 @@
+# Homelab-specific overrides — NOT used on the VPS
+# Adds RTX 3070 GPU reservation to ollama.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.homelab.yml up -d
+# (phase_1_setup.sh handles this automatically)
+
+services:
+  ollama:
+    # RTX 3070 8GB VRAM — GPU enabled (homelab only)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

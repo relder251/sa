@@ -1,0 +1,1108 @@
+{
+    "updatedAt": "2026-03-23T00:05:16.380Z",
+    "createdAt": "2026-03-22T18:05:14.952Z",
+    "id": "oasCNCvMnbeU4nMD",
+    "name": "Notion -> Claude Dispatch",
+    "description": null,
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+        {
+            "id": "schedule-trigger",
+            "name": "Every 5 Minutes",
+            "type": "n8n-nodes-base.scheduleTrigger",
+            "position": [
+                200,
+                300
+            ],
+            "parameters": {
+                "rule": {
+                    "interval": [
+                        {
+                            "field": "minutes",
+                            "minutesInterval": 5
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 1.2
+        },
+        {
+            "id": "query-notion",
+            "name": "Query Notion for Ready Tasks",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                420,
+                300
+            ],
+            "parameters": {
+                "url": "https://api.notion.com/v1/databases/f7f99de0-e9dd-8342-9d79-81a93b571dfc/query",
+                "method": "POST",
+                "options": {},
+                "jsonBody": "{\n  \"filter\": {\n    \"and\": [\n      {\n        \"property\": \"Status\",\n        \"status\": {\n          \"equals\": \"Ready\"\n        }\n      },\n      {\n        \"property\": \"Agent blocked\",\n        \"checkbox\": {\n          \"equals\": false\n        }\n      }\n    ]\n  },\n  \"sorts\": [\n    {\n      \"timestamp\": \"created_time\",\n      \"direction\": \"ascending\"\n    }\n  ]\n}",
+                "sendBody": true,
+                "contentType": "json",
+                "sendHeaders": true,
+                "specifyBody": "json",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Notion-Version",
+                            "value": "2022-06-28"
+                        }
+                    ]
+                }
+            },
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "Fd9gwjnr6Vi7sRUN",
+                    "name": "Notion Tasks API"
+                }
+            },
+            "typeVersion": 4.2
+        },
+        {
+            "id": "has-tasks",
+            "name": "Has Ready Tasks?",
+            "type": "n8n-nodes-base.if",
+            "position": [
+                640,
+                300
+            ],
+            "parameters": {
+                "options": {},
+                "conditions": {
+                    "options": {
+                        "leftValue": "",
+                        "caseSensitive": true,
+                        "typeValidation": "strict"
+                    },
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "has-results",
+                            "operator": {
+                                "type": "number",
+                                "operation": "gt"
+                            },
+                            "leftValue": "={{ $json.results.length }}",
+                            "rightValue": 0
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 2.2
+        },
+        {
+            "id": "split-results",
+            "name": "Split Into Individual Tasks",
+            "type": "n8n-nodes-base.splitOut",
+            "position": [
+                860,
+                200
+            ],
+            "parameters": {
+                "options": {},
+                "fieldToSplitOut": "results"
+            },
+            "typeVersion": 1
+        },
+        {
+            "id": "extract-task-data",
+            "name": "Extract Task Data",
+            "type": "n8n-nodes-base.set",
+            "position": [
+                1080,
+                200
+            ],
+            "parameters": {
+                "options": {},
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "page-id",
+                            "name": "page_id",
+                            "type": "string",
+                            "value": "={{ $json.id }}"
+                        },
+                        {
+                            "id": "task-name",
+                            "name": "task_name",
+                            "type": "string",
+                            "value": "={{ $json.properties['Task name'].title.map(t => t.plain_text).join('') }}"
+                        },
+                        {
+                            "id": "prompt",
+                            "name": "prompt",
+                            "type": "string",
+                            "value": "={{ ($json.properties['Agent prompt']?.rich_text || []).map(t => t.plain_text).join('').trim() || ($json.properties['Agent status']?.rich_text || []).map(t => t.plain_text).join('').trim() || $json.properties['Task name'].title.map(t => t.plain_text).join('') }}"
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 3.4
+        },
+        {
+            "id": "mark-in-progress",
+            "name": "Mark In Progress",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                1300,
+                200
+            ],
+            "parameters": {
+                "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                "method": "PATCH",
+                "options": {},
+                "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"In progress\"\n      }\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": \"Picked up at {{ new Date().toISOString() }}\"\n          }\n        }\n      ]\n    }\n  }\n}",
+                "sendBody": true,
+                "contentType": "json",
+                "sendHeaders": true,
+                "specifyBody": "json",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Notion-Version",
+                            "value": "2022-06-28"
+                        }
+                    ]
+                }
+            },
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "Fd9gwjnr6Vi7sRUN",
+                    "name": "Notion Tasks API"
+                }
+            },
+            "typeVersion": 4.2
+        },
+        {
+            "id": "pass-context",
+            "name": "Pass Context",
+            "type": "n8n-nodes-base.set",
+            "position": [
+                1520,
+                200
+            ],
+            "parameters": {
+                "options": {},
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "pass-page-id",
+                            "name": "page_id",
+                            "type": "string",
+                            "value": "={{ $('Extract Task Data').item.json.page_id }}"
+                        },
+                        {
+                            "id": "pass-prompt",
+                            "name": "prompt",
+                            "type": "string",
+                            "value": "={{ $('Extract Task Data').item.json.prompt }}"
+                        },
+                        {
+                            "id": "pass-task-name",
+                            "name": "task_name",
+                            "type": "string",
+                            "value": "={{ $('Extract Task Data').item.json.task_name }}"
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 3.4
+        },
+        {
+            "id": "run-claude",
+            "name": "Run Claude CLI",
+            "type": "n8n-nodes-base.code",
+            "onError": "continueRegularOutput",
+            "position": [
+                1740,
+                200
+            ],
+            "parameters": {
+                "jsCode": "\nconst { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty prompt'}}];\n}\n\nconst tmpFile = '/tmp/claude_prompt_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\n// Explicitly pass ANTHROPIC_API_KEY from n8n env vars\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 300000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  fs.unlinkSync(tmpFile);\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8') : '',\n    stderr: e.stderr ? e.stderr.toString('utf8') : e.message\n  }}];\n}\n"
+            },
+            "typeVersion": 2
+        },
+        {
+            "id": "check-exit-code",
+            "name": "Claude Succeeded?",
+            "type": "n8n-nodes-base.if",
+            "position": [
+                1960,
+                200
+            ],
+            "parameters": {
+                "options": {},
+                "conditions": {
+                    "options": {
+                        "leftValue": "",
+                        "caseSensitive": true,
+                        "typeValidation": "strict"
+                    },
+                    "combinator": "and",
+                    "conditions": [
+                        {
+                            "id": "success-check",
+                            "operator": {
+                                "type": "number",
+                                "operation": "equals"
+                            },
+                            "leftValue": "={{ $json.exitCode }}",
+                            "rightValue": 0
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 2.2
+        },
+        {
+            "id": "prepare-done",
+            "name": "Prepare Done Output",
+            "type": "n8n-nodes-base.set",
+            "position": [
+                2180,
+                100
+            ],
+            "parameters": {
+                "options": {},
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "output-text",
+                            "name": "agent_output",
+                            "type": "string",
+                            "value": "={{ $json.stdout.length > 2000 ? $json.stdout.substring(0, 2000) + '\\n\\n[Full output truncated]' : $json.stdout }}"
+                        },
+                        {
+                            "id": "page-id-done",
+                            "name": "page_id",
+                            "type": "string",
+                            "value": "={{ $('Pass Context').item.json.page_id }}"
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 3.4
+        },
+        {
+            "id": "mark-done",
+            "name": "Mark Done",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                2400,
+                100
+            ],
+            "parameters": {
+                "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                "method": "PATCH",
+                "options": {},
+                "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"Done\"\n      }\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.agent_output) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+                "sendBody": true,
+                "contentType": "json",
+                "sendHeaders": true,
+                "specifyBody": "json",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Notion-Version",
+                            "value": "2022-06-28"
+                        }
+                    ]
+                }
+            },
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "Fd9gwjnr6Vi7sRUN",
+                    "name": "Notion Tasks API"
+                }
+            },
+            "typeVersion": 4.2
+        },
+        {
+            "id": "prepare-error",
+            "name": "Prepare Error Output",
+            "type": "n8n-nodes-base.set",
+            "position": [
+                2180,
+                320
+            ],
+            "parameters": {
+                "options": {},
+                "assignments": {
+                    "assignments": [
+                        {
+                            "id": "error-text",
+                            "name": "error_message",
+                            "type": "string",
+                            "value": "=FAILED (exit {{ $json.exitCode }}): {{ ($json.stderr || $json.stdout || 'Unknown error').substring(0, 1900) }}"
+                        },
+                        {
+                            "id": "page-id-err",
+                            "name": "page_id",
+                            "type": "string",
+                            "value": "={{ $('Pass Context').item.json.page_id }}"
+                        }
+                    ]
+                }
+            },
+            "typeVersion": 3.4
+        },
+        {
+            "id": "mark-failed",
+            "name": "Mark Failed",
+            "type": "n8n-nodes-base.httpRequest",
+            "position": [
+                2400,
+                320
+            ],
+            "parameters": {
+                "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                "method": "PATCH",
+                "options": {},
+                "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"Planning\"\n      }\n    },\n    \"Agent blocked\": {\n      \"checkbox\": true\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.error_message) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+                "sendBody": true,
+                "contentType": "json",
+                "sendHeaders": true,
+                "specifyBody": "json",
+                "authentication": "genericCredentialType",
+                "genericAuthType": "httpHeaderAuth",
+                "headerParameters": {
+                    "parameters": [
+                        {
+                            "name": "Notion-Version",
+                            "value": "2022-06-28"
+                        }
+                    ]
+                }
+            },
+            "credentials": {
+                "httpHeaderAuth": {
+                    "id": "Fd9gwjnr6Vi7sRUN",
+                    "name": "Notion Tasks API"
+                }
+            },
+            "typeVersion": 4.2
+        }
+    ],
+    "connections": {
+        "Every 5 Minutes": {
+            "main": [
+                [
+                    {
+                        "node": "Query Notion for Ready Tasks",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Query Notion for Ready Tasks": {
+            "main": [
+                [
+                    {
+                        "node": "Has Ready Tasks?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Has Ready Tasks?": {
+            "main": [
+                [
+                    {
+                        "node": "Split Into Individual Tasks",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                []
+            ]
+        },
+        "Split Into Individual Tasks": {
+            "main": [
+                [
+                    {
+                        "node": "Extract Task Data",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Extract Task Data": {
+            "main": [
+                [
+                    {
+                        "node": "Mark In Progress",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Mark In Progress": {
+            "main": [
+                [
+                    {
+                        "node": "Pass Context",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Pass Context": {
+            "main": [
+                [
+                    {
+                        "node": "Run Claude CLI",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Run Claude CLI": {
+            "main": [
+                [
+                    {
+                        "node": "Claude Succeeded?",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Claude Succeeded?": {
+            "main": [
+                [
+                    {
+                        "node": "Prepare Done Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ],
+                [
+                    {
+                        "node": "Prepare Error Output",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Done Output": {
+            "main": [
+                [
+                    {
+                        "node": "Mark Done",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        },
+        "Prepare Error Output": {
+            "main": [
+                [
+                    {
+                        "node": "Mark Failed",
+                        "type": "main",
+                        "index": 0
+                    }
+                ]
+            ]
+        }
+    },
+    "settings": {
+        "executionOrder": "v1",
+        "saveManualExecutions": true,
+        "callerPolicy": "workflowsFromSameOwner",
+        "availableInMCP": false
+    },
+    "staticData": {
+        "node:Every 5 Minutes": {
+            "recurrenceRules": []
+        }
+    },
+    "meta": null,
+    "pinData": null,
+    "versionId": "ee4db062-050e-4c7a-a2ac-7485a67c2503",
+    "activeVersionId": "ee4db062-050e-4c7a-a2ac-7485a67c2503",
+    "versionCounter": 46,
+    "triggerCount": 1,
+    "shared": [
+        {
+            "updatedAt": "2026-03-22T18:05:14.952Z",
+            "createdAt": "2026-03-22T18:05:14.952Z",
+            "role": "workflow:owner",
+            "workflowId": "oasCNCvMnbeU4nMD",
+            "projectId": "9nfbed6kWhG9AlzC",
+            "project": {
+                "updatedAt": "2026-03-14T17:20:00.372Z",
+                "createdAt": "2026-03-12T21:41:24.639Z",
+                "id": "9nfbed6kWhG9AlzC",
+                "name": "Unnamed Project",
+                "type": "personal",
+                "icon": null,
+                "description": null,
+                "creatorId": "22098edd-6722-4a81-acf5-8996c4d72365"
+            }
+        }
+    ],
+    "tags": [],
+    "activeVersion": {
+        "updatedAt": "2026-03-23T00:05:16.385Z",
+        "createdAt": "2026-03-23T00:05:16.385Z",
+        "versionId": "ee4db062-050e-4c7a-a2ac-7485a67c2503",
+        "workflowId": "oasCNCvMnbeU4nMD",
+        "nodes": [
+            {
+                "id": "schedule-trigger",
+                "name": "Every 5 Minutes",
+                "type": "n8n-nodes-base.scheduleTrigger",
+                "position": [
+                    200,
+                    300
+                ],
+                "parameters": {
+                    "rule": {
+                        "interval": [
+                            {
+                                "field": "minutes",
+                                "minutesInterval": 5
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 1.2
+            },
+            {
+                "id": "query-notion",
+                "name": "Query Notion for Ready Tasks",
+                "type": "n8n-nodes-base.httpRequest",
+                "position": [
+                    420,
+                    300
+                ],
+                "parameters": {
+                    "url": "https://api.notion.com/v1/databases/f7f99de0-e9dd-8342-9d79-81a93b571dfc/query",
+                    "method": "POST",
+                    "options": {},
+                    "jsonBody": "{\n  \"filter\": {\n    \"and\": [\n      {\n        \"property\": \"Status\",\n        \"status\": {\n          \"equals\": \"Ready\"\n        }\n      },\n      {\n        \"property\": \"Agent blocked\",\n        \"checkbox\": {\n          \"equals\": false\n        }\n      }\n    ]\n  },\n  \"sorts\": [\n    {\n      \"timestamp\": \"created_time\",\n      \"direction\": \"ascending\"\n    }\n  ]\n}",
+                    "sendBody": true,
+                    "contentType": "json",
+                    "sendHeaders": true,
+                    "specifyBody": "json",
+                    "authentication": "genericCredentialType",
+                    "genericAuthType": "httpHeaderAuth",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "Notion-Version",
+                                "value": "2022-06-28"
+                            }
+                        ]
+                    }
+                },
+                "credentials": {
+                    "httpHeaderAuth": {
+                        "id": "Fd9gwjnr6Vi7sRUN",
+                        "name": "Notion Tasks API"
+                    }
+                },
+                "typeVersion": 4.2
+            },
+            {
+                "id": "has-tasks",
+                "name": "Has Ready Tasks?",
+                "type": "n8n-nodes-base.if",
+                "position": [
+                    640,
+                    300
+                ],
+                "parameters": {
+                    "options": {},
+                    "conditions": {
+                        "options": {
+                            "leftValue": "",
+                            "caseSensitive": true,
+                            "typeValidation": "strict"
+                        },
+                        "combinator": "and",
+                        "conditions": [
+                            {
+                                "id": "has-results",
+                                "operator": {
+                                    "type": "number",
+                                    "operation": "gt"
+                                },
+                                "leftValue": "={{ $json.results.length }}",
+                                "rightValue": 0
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 2.2
+            },
+            {
+                "id": "split-results",
+                "name": "Split Into Individual Tasks",
+                "type": "n8n-nodes-base.splitOut",
+                "position": [
+                    860,
+                    200
+                ],
+                "parameters": {
+                    "options": {},
+                    "fieldToSplitOut": "results"
+                },
+                "typeVersion": 1
+            },
+            {
+                "id": "extract-task-data",
+                "name": "Extract Task Data",
+                "type": "n8n-nodes-base.set",
+                "position": [
+                    1080,
+                    200
+                ],
+                "parameters": {
+                    "options": {},
+                    "assignments": {
+                        "assignments": [
+                            {
+                                "id": "page-id",
+                                "name": "page_id",
+                                "type": "string",
+                                "value": "={{ $json.id }}"
+                            },
+                            {
+                                "id": "task-name",
+                                "name": "task_name",
+                                "type": "string",
+                                "value": "={{ $json.properties['Task name'].title.map(t => t.plain_text).join('') }}"
+                            },
+                            {
+                                "id": "prompt",
+                                "name": "prompt",
+                                "type": "string",
+                                "value": "={{ ($json.properties['Agent prompt']?.rich_text || []).map(t => t.plain_text).join('').trim() || ($json.properties['Agent status']?.rich_text || []).map(t => t.plain_text).join('').trim() || $json.properties['Task name'].title.map(t => t.plain_text).join('') }}"
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 3.4
+            },
+            {
+                "id": "mark-in-progress",
+                "name": "Mark In Progress",
+                "type": "n8n-nodes-base.httpRequest",
+                "position": [
+                    1300,
+                    200
+                ],
+                "parameters": {
+                    "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                    "method": "PATCH",
+                    "options": {},
+                    "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"In progress\"\n      }\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": \"Picked up at {{ new Date().toISOString() }}\"\n          }\n        }\n      ]\n    }\n  }\n}",
+                    "sendBody": true,
+                    "contentType": "json",
+                    "sendHeaders": true,
+                    "specifyBody": "json",
+                    "authentication": "genericCredentialType",
+                    "genericAuthType": "httpHeaderAuth",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "Notion-Version",
+                                "value": "2022-06-28"
+                            }
+                        ]
+                    }
+                },
+                "credentials": {
+                    "httpHeaderAuth": {
+                        "id": "Fd9gwjnr6Vi7sRUN",
+                        "name": "Notion Tasks API"
+                    }
+                },
+                "typeVersion": 4.2
+            },
+            {
+                "id": "pass-context",
+                "name": "Pass Context",
+                "type": "n8n-nodes-base.set",
+                "position": [
+                    1520,
+                    200
+                ],
+                "parameters": {
+                    "options": {},
+                    "assignments": {
+                        "assignments": [
+                            {
+                                "id": "pass-page-id",
+                                "name": "page_id",
+                                "type": "string",
+                                "value": "={{ $('Extract Task Data').item.json.page_id }}"
+                            },
+                            {
+                                "id": "pass-prompt",
+                                "name": "prompt",
+                                "type": "string",
+                                "value": "={{ $('Extract Task Data').item.json.prompt }}"
+                            },
+                            {
+                                "id": "pass-task-name",
+                                "name": "task_name",
+                                "type": "string",
+                                "value": "={{ $('Extract Task Data').item.json.task_name }}"
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 3.4
+            },
+            {
+                "id": "run-claude",
+                "name": "Run Claude CLI",
+                "type": "n8n-nodes-base.code",
+                "onError": "continueRegularOutput",
+                "position": [
+                    1740,
+                    200
+                ],
+                "parameters": {
+                    "jsCode": "\nconst { execFileSync } = require('child_process');\nconst fs = require('fs');\n\nconst prompt = $input.item.json.prompt;\nif (!prompt) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: empty prompt'}}];\n}\n\nconst tmpFile = '/tmp/claude_prompt_' + Date.now() + '.txt';\nfs.writeFileSync(tmpFile, prompt, 'utf8');\n\n// Explicitly pass ANTHROPIC_API_KEY from n8n env vars\nconst apiKey = $env.ANTHROPIC_API_KEY;\nif (!apiKey) {\n  return [{json: {exitCode: 1, stdout: '', stderr: 'ERROR: ANTHROPIC_API_KEY not set in n8n env'}}];\n}\n\ntry {\n  const output = execFileSync(\n    'node',\n    ['/opt/claude-code/cli.js', '-p', '--output-format', 'text', '--add-dir', '/opt/agentic-sdlc'],\n    {\n      input: fs.readFileSync(tmpFile),\n      env: {\n        ANTHROPIC_API_KEY: apiKey,\n        HOME: '/home/node',\n        PATH: '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin'\n      },\n      timeout: 300000,\n      maxBuffer: 10 * 1024 * 1024,\n      cwd: '/opt/agentic-sdlc'\n    }\n  );\n  fs.unlinkSync(tmpFile);\n  return [{json: {exitCode: 0, stdout: output.toString('utf8').trim(), stderr: ''}}];\n} catch (e) {\n  try { fs.unlinkSync(tmpFile); } catch (_) {}\n  return [{json: {\n    exitCode: e.status || 1,\n    stdout: e.stdout ? e.stdout.toString('utf8') : '',\n    stderr: e.stderr ? e.stderr.toString('utf8') : e.message\n  }}];\n}\n"
+                },
+                "typeVersion": 2
+            },
+            {
+                "id": "check-exit-code",
+                "name": "Claude Succeeded?",
+                "type": "n8n-nodes-base.if",
+                "position": [
+                    1960,
+                    200
+                ],
+                "parameters": {
+                    "options": {},
+                    "conditions": {
+                        "options": {
+                            "leftValue": "",
+                            "caseSensitive": true,
+                            "typeValidation": "strict"
+                        },
+                        "combinator": "and",
+                        "conditions": [
+                            {
+                                "id": "success-check",
+                                "operator": {
+                                    "type": "number",
+                                    "operation": "equals"
+                                },
+                                "leftValue": "={{ $json.exitCode }}",
+                                "rightValue": 0
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 2.2
+            },
+            {
+                "id": "prepare-done",
+                "name": "Prepare Done Output",
+                "type": "n8n-nodes-base.set",
+                "position": [
+                    2180,
+                    100
+                ],
+                "parameters": {
+                    "options": {},
+                    "assignments": {
+                        "assignments": [
+                            {
+                                "id": "output-text",
+                                "name": "agent_output",
+                                "type": "string",
+                                "value": "={{ $json.stdout.length > 2000 ? $json.stdout.substring(0, 2000) + '\\n\\n[Full output truncated]' : $json.stdout }}"
+                            },
+                            {
+                                "id": "page-id-done",
+                                "name": "page_id",
+                                "type": "string",
+                                "value": "={{ $('Pass Context').item.json.page_id }}"
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 3.4
+            },
+            {
+                "id": "mark-done",
+                "name": "Mark Done",
+                "type": "n8n-nodes-base.httpRequest",
+                "position": [
+                    2400,
+                    100
+                ],
+                "parameters": {
+                    "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                    "method": "PATCH",
+                    "options": {},
+                    "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"Done\"\n      }\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.agent_output) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+                    "sendBody": true,
+                    "contentType": "json",
+                    "sendHeaders": true,
+                    "specifyBody": "json",
+                    "authentication": "genericCredentialType",
+                    "genericAuthType": "httpHeaderAuth",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "Notion-Version",
+                                "value": "2022-06-28"
+                            }
+                        ]
+                    }
+                },
+                "credentials": {
+                    "httpHeaderAuth": {
+                        "id": "Fd9gwjnr6Vi7sRUN",
+                        "name": "Notion Tasks API"
+                    }
+                },
+                "typeVersion": 4.2
+            },
+            {
+                "id": "prepare-error",
+                "name": "Prepare Error Output",
+                "type": "n8n-nodes-base.set",
+                "position": [
+                    2180,
+                    320
+                ],
+                "parameters": {
+                    "options": {},
+                    "assignments": {
+                        "assignments": [
+                            {
+                                "id": "error-text",
+                                "name": "error_message",
+                                "type": "string",
+                                "value": "=FAILED (exit {{ $json.exitCode }}): {{ ($json.stderr || $json.stdout || 'Unknown error').substring(0, 1900) }}"
+                            },
+                            {
+                                "id": "page-id-err",
+                                "name": "page_id",
+                                "type": "string",
+                                "value": "={{ $('Pass Context').item.json.page_id }}"
+                            }
+                        ]
+                    }
+                },
+                "typeVersion": 3.4
+            },
+            {
+                "id": "mark-failed",
+                "name": "Mark Failed",
+                "type": "n8n-nodes-base.httpRequest",
+                "position": [
+                    2400,
+                    320
+                ],
+                "parameters": {
+                    "url": "=https://api.notion.com/v1/pages/{{ $json.page_id }}",
+                    "method": "PATCH",
+                    "options": {},
+                    "jsonBody": "={\n  \"properties\": {\n    \"Status\": {\n      \"status\": {\n        \"name\": \"Planning\"\n      }\n    },\n    \"Agent blocked\": {\n      \"checkbox\": true\n    },\n    \"Agent status\": {\n      \"rich_text\": [\n        {\n          \"type\": \"text\",\n          \"text\": {\n            \"content\": {{ JSON.stringify($json.error_message) }}\n          }\n        }\n      ]\n    }\n  }\n}",
+                    "sendBody": true,
+                    "contentType": "json",
+                    "sendHeaders": true,
+                    "specifyBody": "json",
+                    "authentication": "genericCredentialType",
+                    "genericAuthType": "httpHeaderAuth",
+                    "headerParameters": {
+                        "parameters": [
+                            {
+                                "name": "Notion-Version",
+                                "value": "2022-06-28"
+                            }
+                        ]
+                    }
+                },
+                "credentials": {
+                    "httpHeaderAuth": {
+                        "id": "Fd9gwjnr6Vi7sRUN",
+                        "name": "Notion Tasks API"
+                    }
+                },
+                "typeVersion": 4.2
+            }
+        ],
+        "connections": {
+            "Every 5 Minutes": {
+                "main": [
+                    [
+                        {
+                            "node": "Query Notion for Ready Tasks",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Query Notion for Ready Tasks": {
+                "main": [
+                    [
+                        {
+                            "node": "Has Ready Tasks?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Has Ready Tasks?": {
+                "main": [
+                    [
+                        {
+                            "node": "Split Into Individual Tasks",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    []
+                ]
+            },
+            "Split Into Individual Tasks": {
+                "main": [
+                    [
+                        {
+                            "node": "Extract Task Data",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Extract Task Data": {
+                "main": [
+                    [
+                        {
+                            "node": "Mark In Progress",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Mark In Progress": {
+                "main": [
+                    [
+                        {
+                            "node": "Pass Context",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Pass Context": {
+                "main": [
+                    [
+                        {
+                            "node": "Run Claude CLI",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Run Claude CLI": {
+                "main": [
+                    [
+                        {
+                            "node": "Claude Succeeded?",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Claude Succeeded?": {
+                "main": [
+                    [
+                        {
+                            "node": "Prepare Done Output",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ],
+                    [
+                        {
+                            "node": "Prepare Error Output",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Done Output": {
+                "main": [
+                    [
+                        {
+                            "node": "Mark Done",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Prepare Error Output": {
+                "main": [
+                    [
+                        {
+                            "node": "Mark Failed",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        },
+        "authors": "null null",
+        "name": null,
+        "description": null,
+        "autosaved": false,
+        "workflowPublishHistory": [
+            {
+                "createdAt": "2026-03-23T00:05:16.468Z",
+                "id": 215,
+                "workflowId": "oasCNCvMnbeU4nMD",
+                "versionId": "ee4db062-050e-4c7a-a2ac-7485a67c2503",
+                "event": "deactivated",
+                "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
+            },
+            {
+                "createdAt": "2026-03-23T00:05:16.495Z",
+                "id": 216,
+                "workflowId": "oasCNCvMnbeU4nMD",
+                "versionId": "ee4db062-050e-4c7a-a2ac-7485a67c2503",
+                "event": "activated",
+                "userId": "22098edd-6722-4a81-acf5-8996c4d72365"
+            }
+        ]
+    }
+}

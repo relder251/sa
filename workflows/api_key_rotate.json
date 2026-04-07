@@ -1,0 +1,174 @@
+{
+  "name": "API Key Rotation",
+  "active": true,
+  "nodes": [
+    {
+      "id": "akr-0001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "parameters": {
+        "path": "rotate-api-key",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "akr-0002",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [420, 300],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst keyName = body.key_name || '';\nconst keyValue = body.key_value || '';\n\nconst ALLOWED = [\n  'ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY',\n  'GROQ_API_KEY', 'DEEPSEEK_API_KEY', 'PERPLEXITY_API_KEY',\n  'XAI_API_KEY', 'GREPTILE_API_KEY', 'CLOUDFLARE_API_TOKEN'\n];\n\nif (!keyName || !keyValue) {\n  return [{ json: { valid: false, error: 'key_name and key_value are required' } }];\n}\nif (!ALLOWED.includes(keyName)) {\n  return [{ json: { valid: false, error: `key_name '${keyName}' not in allowed list` } }];\n}\nreturn [{ json: { valid: true, key_name: keyName, key_value: keyValue } }];"
+      }
+    },
+    {
+      "id": "akr-0003",
+      "name": "Input Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "cond-akr-01",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": true,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "akr-0004",
+      "name": "Update Key via vault-sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [860, 220],
+      "parameters": {
+        "method": "POST",
+        "url": "http://vault-sync:8777/env/update",
+        "sendBody": true,
+        "contentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ key_name: $json.key_name, key_value: $json.key_value }) }}",
+        "options": {"timeout": 30000}
+      }
+    },
+    {
+      "id": "akr-0005",
+      "name": "Update Succeeded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1080, 220],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "cond-akr-02",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "akr-0006",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 160],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconst valid = r.validation || {};\nconst key_name = r.key_name || '';\nconsole.log('[Key Rotation] Updated', key_name, '— validation:', valid.ok);\nreturn [{ json: {\n  status: 'ok',\n  key_name,\n  updated: true,\n  validation_ok: valid.ok,\n  validation_error: valid.error || null,\n  message: valid.ok ? `${key_name} updated and validated successfully` : `${key_name} updated in .env but validation failed: ${valid.error}. Check the key value.`\n} }];"
+      }
+    },
+    {
+      "id": "akr-0007",
+      "name": "Build Error Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1300, 340],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nconsole.error('[Key Rotation] vault-sync update failed:', JSON.stringify(r));\nreturn [{ json: { status: 'error', message: r.message || r.detail || 'vault-sync update failed', details: r } }];"
+      }
+    },
+    {
+      "id": "akr-0008",
+      "name": "Build Invalid Input Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 420],
+      "parameters": {
+        "jsCode": "const r = $input.first().json;\nreturn [{ json: { status: 'error', message: r.error || 'Invalid input' } }];"
+      }
+    },
+    {
+      "id": "akr-0009",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1520, 260],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {"responseCode": 200}
+      }
+    },
+    {
+      "id": "akr-0010",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1080, 420],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {"responseCode": 400}
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Validate Input", "type": "main", "index": 0}]]
+    },
+    "Validate Input": {
+      "main": [[{"node": "Input Valid?", "type": "main", "index": 0}]]
+    },
+    "Input Valid?": {
+      "main": [
+        [{"node": "Update Key via vault-sync", "type": "main", "index": 0}],
+        [{"node": "Build Invalid Input Response", "type": "main", "index": 0}]
+      ]
+    },
+    "Update Key via vault-sync": {
+      "main": [[{"node": "Update Succeeded?", "type": "main", "index": 0}]]
+    },
+    "Update Succeeded?": {
+      "main": [
+        [{"node": "Build Success Response", "type": "main", "index": 0}],
+        [{"node": "Build Error Response", "type": "main", "index": 0}]
+      ]
+    },
+    "Build Success Response": {
+      "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    },
+    "Build Error Response": {
+      "main": [[{"node": "Respond Success", "type": "main", "index": 0}]]
+    },
+    "Build Invalid Input Response": {
+      "main": [[{"node": "Respond Error", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}

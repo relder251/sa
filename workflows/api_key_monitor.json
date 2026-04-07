@@ -1,0 +1,107 @@
+{
+  "name": "API Key Health Monitor",
+  "active": true,
+  "nodes": [
+    {
+      "id": "akm-0001",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "hours", "hoursInterval": 1}]
+        }
+      }
+    },
+    {
+      "id": "akm-0002",
+      "name": "Validate All API Keys",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [420, 300],
+      "parameters": {
+        "method": "POST",
+        "url": "http://vault-sync:8777/env/validate",
+        "options": {"timeout": 60000}
+      }
+    },
+    {
+      "id": "akm-0003",
+      "name": "Any Failures?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [640, 300],
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "cond-akm-01",
+              "leftValue": "={{ $json.all_ok }}",
+              "rightValue": false,
+              "operator": {"type": "boolean", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "akm-0004",
+      "name": "Build Alert Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 220],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconst failures = data.failures || [];\nconst results = data.results || {};\n\nconst PROVIDER_URLS = {\n  GROQ_API_KEY:         'https://console.groq.com/keys',\n  DEEPSEEK_API_KEY:     'https://platform.deepseek.com/api_keys',\n  PERPLEXITY_API_KEY:   'https://www.perplexity.ai/settings/api',\n  XAI_API_KEY:          'https://console.x.ai/',\n  ANTHROPIC_API_KEY:    'https://console.anthropic.com/settings/keys',\n  OPENAI_API_KEY:       'https://platform.openai.com/api-keys',\n  GEMINI_API_KEY:       'https://aistudio.google.com/app/apikey',\n  CLOUDFLARE_API_TOKEN: 'https://dash.cloudflare.com/profile/api-tokens',\n  GREPTILE_API_KEY:     'https://app.greptile.com/settings/api',\n};\n\nlet lines = ['🔴 *API Key Failures Detected*\\n'];\nfor (const k of failures) {\n  const r = results[k] || {};\n  const present = r.present ? '(key present but invalid)' : '(key missing)';\n  const code = r.status_code ? ` [HTTP ${r.status_code}]` : '';\n  const url = PROVIDER_URLS[k] || 'N/A';\n  lines.push(`• *${k}*${code} ${present}`);\n  lines.push(`  Renew at: ${url}`);\n}\n\nlines.push('\\nUse POST /webhook/FbXt05vqQd7sbNEr/webhook/rotate-api-key with {\\\"key_name\\\": \\\"...\\\", \\\"key_value\\\": \\\"...\\\"}  to update');\n\nreturn [{ json: { message: lines.join('\\n'), failures } }];"
+      }
+    },
+    {
+      "id": "akm-0005",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1080, 220],
+      "parameters": {
+        "chatId": "8761521211",
+        "text": "={{ $json.message }}",
+        "additionalFields": {"parse_mode": "Markdown"}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "xenO3FMYF5CSJt9m",
+          "name": "SA Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "akm-0006",
+      "name": "Log Failures",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1080, 380],
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nconsole.log('[API Key Monitor] All keys OK at', new Date().toISOString());\nreturn $input.all();"
+      }
+    }
+  ],
+  "connections": {
+    "Every Hour": {
+      "main": [[{"node": "Validate All API Keys", "type": "main", "index": 0}]]
+    },
+    "Validate All API Keys": {
+      "main": [[{"node": "Any Failures?", "type": "main", "index": 0}]]
+    },
+    "Any Failures?": {
+      "main": [
+        [{"node": "Build Alert Message", "type": "main", "index": 0}],
+        [{"node": "Log Failures", "type": "main", "index": 0}]
+      ]
+    },
+    "Build Alert Message": {
+      "main": [[{"node": "Send Telegram Alert", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {"executionOrder": "v1"}
+}

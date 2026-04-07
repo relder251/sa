@@ -57,3 +57,9 @@ vault/data/
 
 # One-off admin scripts
 reset_n8n_password.sh
+
+# Sensitive archives and runtime data
+_archive/bitwarden_import.csv
+_archive/.~lock.*
+backups/
+db/
