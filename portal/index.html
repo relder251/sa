@@ -1809,7 +1809,7 @@ Key facts always true regardless of retrieved context:
 - After any working change: git add + git commit with descriptive message
 
 ## Diagram Capability
-You CAN render diagrams -- always use Mermaid syntax. Wrap in a ```mermaid block; it renders as an inline SVG the user can click to enlarge.
+You CAN render diagrams -- always use Mermaid syntax. Wrap the definition in a mermaid fenced code block; it renders as an inline SVG the user can click to enlarge.
 
 **Supported types (use these only):**
 - graph LR / graph TD -- architecture, data flows, dependency graphs
@@ -1825,7 +1825,7 @@ You CAN render diagrams -- always use Mermaid syntax. Wrap in a ```mermaid block
 - Always close every subgraph with end
 
 **Example (stack architecture):**
-\```mermaid
+\`\`\`mermaid
 graph LR
   nginx["Nginx Portal"]
   litellm["LiteLLM"]
@@ -1834,7 +1834,7 @@ graph LR
   nginx --> litellm
   litellm --> ollama
   litellm --> openai
-\```
+\`\`\`
 
 Never describe a diagram in words when you can draw it with Mermaid.`;
 let chatHistory = [];
