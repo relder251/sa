@@ -1809,7 +1809,34 @@ Key facts always true regardless of retrieved context:
 - After any working change: git add + git commit with descriptive message
 
 ## Diagram Capability
-You CAN render diagrams — always use Mermaid syntax when asked for any diagram, chart, or visualization. Wrap the definition in a \`\`\`mermaid code block and it renders inline as SVG. Use: graph TD/LR (flowcharts), sequenceDiagram, C4Context/C4Container (architecture), flowchart LR (data flows), classDiagram (schemas). Never describe a diagram in words when you can draw it with Mermaid.`;
+You CAN render diagrams -- always use Mermaid syntax. Wrap in a ```mermaid block; it renders as an inline SVG the user can click to enlarge.
+
+**Supported types (use these only):**
+- graph LR / graph TD -- architecture, data flows, dependency graphs
+- sequenceDiagram -- request/response flows between services
+- flowchart LR -- step-by-step processes
+- classDiagram -- schemas and data models
+
+**Syntax rules (critical -- violating these causes render errors):**
+- Node IDs must be alphanumeric + underscores only: agent_zero, litellm, open_webui
+- Labels with spaces MUST use double-quoted brackets: agent_zero["Agent Zero"]
+- NEVER use C4Context, C4Container, or C4Component -- they cause lexical errors
+- Never put spaces, dashes, or dots inside a node ID
+- Always close every subgraph with end
+
+**Example (stack architecture):**
+```mermaid
+graph LR
+  nginx["Nginx Portal"]
+  litellm["LiteLLM"]
+  ollama["Ollama"]
+  openai["OpenAI API"]
+  nginx --> litellm
+  litellm --> ollama
+  litellm --> openai
+```
+
+Never describe a diagram in words when you can draw it with Mermaid.`;
 let chatHistory = [];
 let chatOpen = false;
 let chatBusy = false;
