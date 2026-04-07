@@ -805,8 +805,31 @@ body {
   padding: 12px;
   overflow-x: auto;
   max-width: 352px;
+  cursor: zoom-in;
 }
-.chat-diagram svg { max-width: 100%; height: auto; display: block; }
+.chat-diagram svg { max-width: 100%; height: auto; display: block; pointer-events: none; }
+/* Diagram lightbox */
+#diagram-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+#diagram-modal.open { display: flex; }
+#diagram-modal-inner {
+  max-width: 94vw;
+  max-height: 90vh;
+  overflow: auto;
+  background: #0b0f1c;
+  border: 1px solid rgba(240,165,53,0.4);
+  border-radius: 6px;
+  padding: 16px;
+}
+#diagram-modal-inner svg { max-width: 100%; height: auto; display: block; }
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
@@ -894,6 +917,11 @@ let _mermaidId = 0;
 
 
   </div>
+</div>
+
+<!-- ── Diagram Lightbox ──────────────────────────── -->
+<div id="diagram-modal" onclick="closeDiagramModal()">
+  <div id="diagram-modal-inner" onclick="event.stopPropagation()"></div>
 </div>
 
 <!-- ── Edit Service Modal ────────────────────────── -->
@@ -1805,6 +1833,17 @@ function chatClear() {
 function chatKeydown(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();chatSend();} }
 function chatInputResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
 
+function openDiagramModal(svgHtml) {
+  const inner = document.getElementById('diagram-modal-inner');
+  inner.innerHTML = svgHtml;
+  document.getElementById('diagram-modal').classList.add('open');
+  const onKey = e => { if (e.key === 'Escape') { closeDiagramModal(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
+}
+function closeDiagramModal() {
+  document.getElementById('diagram-modal').classList.remove('open');
+}
+
 function chatAppend(role, text) {
   const msgs = document.getElementById('chat-messages');
   const empty = document.getElementById('chat-empty');
@@ -1825,7 +1864,10 @@ function chatAppend(role, text) {
     setTimeout(() => {
       mermaid.render(id + '-svg', defn).then(({svg}) => {
         const w = document.getElementById(id + '-wrap');
-        if (w) w.innerHTML = svg;
+        if (w) {
+          w.innerHTML = svg;
+          w.onclick = () => openDiagramModal(w.innerHTML);
+        }
       }).catch(err => {
         const w = document.getElementById(id + '-wrap');
         if (w) w.innerHTML = '<pre style="color:#fca5a5;font-size:10px">' + escHtml(err.message) + '</pre>';
