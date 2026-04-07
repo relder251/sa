@@ -564,6 +564,227 @@ body {
   background: rgba(248,113,113,0.12);
   color: #fca5a5;
 }
+
+/* ── Stack Advisor Chat ──────────────────────────────── */
+#chat-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--copper) 0%, var(--copper-light) 100%);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  z-index: 1000;
+  box-shadow: 0 4px 18px rgba(212,146,74,0.45);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+#chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(212,146,74,0.6); }
+#chat-fab.open { background: linear-gradient(135deg, #1a2140 0%, #111829 100%); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
+
+#chat-panel {
+  position: fixed;
+  bottom: 90px;
+  right: 28px;
+  width: 400px;
+  max-height: 600px;
+  background: var(--bg-card);
+  border: 1px solid var(--copper-border);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  z-index: 999;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+  opacity: 0;
+  transform: translateY(16px) scale(0.97);
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+#chat-panel.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.chat-header {
+  background: var(--bg-sidebar);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 16px;
+  border-radius: 6px 6px 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.chat-header-title {
+  font-family: var(--font-d);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--copper-light);
+  letter-spacing: 0.06em;
+}
+.chat-header-sub {
+  font-family: var(--font-b);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  color: var(--text-3);
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.chat-header-actions { display: flex; gap: 8px; align-items: center; }
+.chat-icon-btn {
+  background: none;
+  border: none;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 2px;
+  transition: color 0.15s;
+}
+.chat-icon-btn:hover { color: var(--text); }
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 200px;
+  max-height: 440px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--copper-border) transparent;
+}
+.chat-msg { display: flex; gap: 10px; animation: chatFadeUp 0.2s ease; }
+@keyframes chatFadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.chat-msg.user { flex-direction: row-reverse; }
+.chat-msg-avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+}
+.chat-msg.user .chat-msg-avatar {
+  background: linear-gradient(135deg, var(--copper) 0%, var(--copper-light) 100%);
+  color: #0b0f1c;
+}
+.chat-msg.assistant .chat-msg-avatar {
+  background: rgba(240,165,53,0.12);
+  border: 1px solid var(--copper-border);
+  color: var(--copper-light);
+  font-size: 14px;
+}
+.chat-msg-body {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-2);
+  max-width: 310px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.chat-msg.user .chat-msg-body {
+  background: rgba(240,165,53,0.08);
+  border-color: var(--copper-border);
+  color: var(--text);
+}
+.chat-typing { display: flex; gap: 5px; align-items: center; padding: 4px 0; }
+.chat-typing span {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: var(--copper);
+  animation: chatBlink 1.2s infinite;
+}
+.chat-typing span:nth-child(2) { animation-delay: 0.2s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes chatBlink {
+  0%,80%,100% { opacity:0.25; transform:scale(0.85); }
+  40%          { opacity:1;    transform:scale(1.1); }
+}
+
+.chat-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 12px;
+  padding: 24px;
+  text-align: center;
+}
+.chat-empty-icon { font-size: 28px; opacity: 0.5; }
+
+.chat-input-row {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+#chat-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font-b);
+  font-size: 12.5px;
+  padding: 7px 10px;
+  resize: none;
+  outline: none;
+  line-height: 1.5;
+  max-height: 100px;
+  transition: border-color 0.15s;
+}
+#chat-input:focus { border-color: var(--copper-border); }
+#chat-input::placeholder { color: var(--text-3); }
+#chat-send {
+  background: linear-gradient(135deg, var(--copper) 0%, var(--copper-light) 100%);
+  border: none;
+  border-radius: 4px;
+  color: #0b0f1c;
+  cursor: pointer;
+  font-size: 14px;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+#chat-send:hover { opacity: 0.85; }
+#chat-send:disabled { opacity: 0.35; cursor: not-allowed; }
+.chat-model-badge {
+  padding: 2px 8px;
+  background: var(--copper-pale);
+  border: 1px solid var(--copper-border);
+  border-radius: 10px;
+  font-size: 9px;
+  color: var(--text-3);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 </style>
 </head>
 <body>
@@ -1477,6 +1698,193 @@ async function finishWizard() {
 document.addEventListener('DOMContentLoaded', loadPortal);
 // Auto-refresh: reload portal data every 5 minutes
 setInterval(loadPortal, 5 * 60 * 1000);
+</script>
+
+<!-- Stack Advisor Chat -->
+<button id="chat-fab" title="Stack Advisor" onclick="chatToggle()">&#x2B21;</button>
+
+<div id="chat-panel">
+  <div class="chat-header">
+    <div>
+      <div class="chat-header-title">&#x2B21; Stack Advisor</div>
+      <div class="chat-header-sub">AI &middot; Sovereign Advisory Stack</div>
+    </div>
+    <div class="chat-header-actions">
+      <span class="chat-model-badge">hybrid/chat</span>
+      <button class="chat-icon-btn" title="Clear" onclick="chatClear()">&#x21BA;</button>
+      <button class="chat-icon-btn" title="Close" onclick="chatClose()">&#x2715;</button>
+    </div>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="chat-empty" id="chat-empty">
+      <div class="chat-empty-icon">&#x2B21;</div>
+      <div style="font-family:var(--font-d);font-size:14px;color:var(--text-2)">Stack Advisor</div>
+      <div>Ask about services, workflows, SSO, model tiers, or the agentic pipeline.</div>
+    </div>
+  </div>
+  <div class="chat-input-row">
+    <textarea id="chat-input" rows="1" placeholder="Ask about the stackâ¦" onkeydown="chatKeydown(event)" oninput="chatInputResize(this)"></textarea>
+    <button id="chat-send" onclick="chatSend()" title="Send">&#x25B6;</button>
+  </div>
+</div>
+
+<script>
+// Stack Advisor
+const STACK_SYS = `You are the Stack Advisor for Sovereign Advisory AI — an expert assistant with deep knowledge of the entire self-hosted infrastructure stack.
+
+## Infrastructure
+- VPS: root@187.77.208.197, all services run via Docker Compose at /opt/agentic-sdlc/
+- Git repo: relder251/sa (private, GitHub)
+- CRITICAL: always use \`make up ENV=prod\` — NEVER bare \`docker compose up\` (starts Keycloak in H2/start-dev mode, wiping apparent realm data)
+
+## 32 Services on agentic-sdlc_vibe_net
+- nginx (sa_nginx): public proxy, sovereignadvisory.ai, 80/443
+- nginx-private (sa_nginx_private): *.private.sovereignadvisory.ai, TLS via Twingate→127.0.0.1:443
+- keycloak (:8080): SSO/IdP, realm=agentic-sdlc, kc.private.sovereignadvisory.ai
+- postgres (litellm_db:5432): shared DB for LiteLLM + n8n + Keycloak
+- n8n (:5678): workflow automation, n8n.private.sovereignadvisory.ai
+- litellm (:4000): unified LLM proxy, internal key sk-vibe-coding-key-123, litellm.private.sovereignadvisory.ai
+- ollama (:11434): local inference on RTX 3070 8GB — qwen2.5-coder:7b, deepseek-r1:7b, mistral:7b, llama3.2:3b, llama3.1:8b
+- jupyter (:8888): JupyterLab, jupyter.private.sovereignadvisory.ai
+- webui (:3000): custom chat UI, webui.private.sovereignadvisory.ai
+- portal (:80): this portal SPA, home.private.sovereignadvisory.ai
+- vaultwarden: password manager, vault.private.sovereignadvisory.ai
+- shell-gateway (:7681): web terminal at /terminal/
+- qdrant (:6333): vector DB, collection stack-knowledge (768d nomic-embed-text), qdrant.private.sovereignadvisory.ai
+- mirofish (:5001): attack simulation + graph-based security analysis, mirofish.private.sovereignadvisory.ai
+- agent-zero (:80): autonomous AI agent, agent-zero.private.sovereignadvisory.ai
+  - Hacker profile with Kali tools: metasploit, sqlmap, gobuster, hydra, masscan, nikto, smbclient, enum4linux, dnsrecon, impacket, whatweb, dirb, fierce, theharvester, ffuf
+  - Custom tools: mirofish_simulation.py (full pipeline), maltego_osint.py (10 OSINT transforms)
+- glitchtip: Sentry-compatible error tracking, sentry.private.sovereignadvisory.ai
+- free-model-sync: discovers free LLM models (OpenRouter/Groq/Gemini) every 6h via ofelia cron
+- watchtower: auto-updates labelled containers at 03:00
+- vault-sync (:8777): syncs Vaultwarden secrets into container env vars
+- twingate (host network): zero-trust access, routes *.private.* → 127.0.0.1:443
+- oauth2-proxy-* (one per service): SSO gate, validates Keycloak session cookies
+- certbot / certbot-dns: TLS cert renewal
+
+## LiteLLM Model Tiers
+- local/* — Ollama only (qwen2.5-coder, deepseek-r1, mistral, llama3)
+- hybrid/chat|code|reason|fast — Ollama + cloud fallback
+- cloud/smart — cloud-only (Claude, GPT-4o, Gemini Pro)
+- free/* — free-tier (Gemini Flash, Groq, OpenRouter free)
+- _claude-haiku, _claude-sonnet, _claude-opus — direct Claude
+- _local-embedding — nomic-embed-text via Ollama, 768d
+
+## n8n Workflows (14 total, 11 active)
+- Notion→Claude Dispatch (oasCNCvMnbeU4nMD): polls Notion for In-Progress tasks, runs Claude Code CLI on VPS
+- Portal Provision (DXjMzKwRB6c54GCY), Portal Services GET (VHUS5Dx1q9HBZPln)
+- Portal Update/Delete/Categories, Portal Track Recent (GOpCkjqJyPjy5dgG)
+- SA Contact Lead Pipeline (Wyc4UIvCYgByrAwP), SA Lead Reminder
+
+## MiroFish Pipeline (attack simulation)
+1. POST /api/graph/ontology/generate (multipart: scenario file + objective)
+2. POST /api/graph/build → poll until completed
+3. POST /api/simulation/create
+4. POST /api/simulation/prepare → poll
+5. POST /api/simulation/start (platform=reddit, max_rounds=20)
+6. Poll run-status until completed/waiting_command
+7. GET /api/simulation/<id>/profiles → find attacker agent_id
+8. POST /api/simulation/interview → get attack path recommendations
+
+## Protected Items (confirm before touching)
+- Keycloak relder user — roles, credentials, group memberships (was accidentally wiped before)
+- Keycloak realm config — clients, identity providers, realm settings
+- docker-compose.yml — show diff before writing; keep .yml backup visible
+- Open WebUI relder@sovereignadvisory.ai admin account
+- n8n workflows — export JSON before patching DB
+- Vault secrets — never delete/overwrite without confirmation
+
+## Key Commands
+- Start stack: cd /opt/agentic-sdlc && make up ENV=prod
+- Restart service: make up ENV=prod SVC=<service-name>
+- Stop all: make down ENV=prod
+- Logs: docker logs <container> --tail 50 -f
+- After any file change: git add <files> && git commit -m 'what and why'
+
+## Style
+Give direct technical answers. Use code blocks for commands. For service issues, check logs first. For docker-compose changes, show a diff before applying.`;
+let chatHistory = [];
+let chatOpen = false;
+let chatBusy = false;
+
+function chatToggle() { chatOpen ? chatClose() : chatOpenPanel(); }
+function chatOpenPanel() {
+  chatOpen = true;
+  document.getElementById('chat-panel').classList.add('open');
+  document.getElementById('chat-fab').classList.add('open');
+  document.getElementById('chat-fab').textContent = '\u2715';
+  setTimeout(() => document.getElementById('chat-input').focus(), 200);
+}
+function chatClose() {
+  chatOpen = false;
+  document.getElementById('chat-panel').classList.remove('open');
+  document.getElementById('chat-fab').classList.remove('open');
+  document.getElementById('chat-fab').textContent = '\u2B21';
+}
+function chatClear() {
+  chatHistory = [];
+  document.getElementById('chat-messages').innerHTML = `<div class="chat-empty" id="chat-empty"><div class="chat-empty-icon">&#x2B21;</div><div style="font-family:var(--font-d);font-size:14px;color:var(--text-2)">Stack Advisor</div><div>Ask about services, workflows, SSO, model tiers, or the agentic pipeline.</div></div>`;
+}
+function chatKeydown(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();chatSend();} }
+function chatInputResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
+
+function chatAppend(role, text) {
+  const msgs = document.getElementById('chat-messages');
+  const empty = document.getElementById('chat-empty');
+  if (empty) empty.remove();
+  const div = document.createElement('div');
+  div.className = 'chat-msg ' + role;
+  const av = role==='user' ? 'RE' : '\u2B21';
+  const safe = escHtml(text)
+    .replace(/```([\s\S]*?)```/g, '<pre style="background:rgba(255,255,255,0.05);padding:8px;border-radius:3px;font-size:11px;overflow-x:auto;margin:4px 0;font-family:monospace">$1</pre>')
+    .replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.07);padding:1px 5px;border-radius:2px;font-size:11px;font-family:monospace">$1</code>');
+  div.innerHTML = `<div class="chat-msg-avatar">${av}</div><div class="chat-msg-body">${safe}</div>`;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+function chatShowTyping() {
+  const msgs = document.getElementById('chat-messages');
+  const d = document.createElement('div');
+  d.className='chat-msg assistant'; d.id='chat-typing';
+  d.innerHTML='<div class="chat-msg-avatar">\u2B21</div><div class="chat-msg-body"><div class="chat-typing"><span></span><span></span><span></span></div></div>';
+  msgs.appendChild(d); msgs.scrollTop=msgs.scrollHeight;
+}
+function chatHideTyping() { const t=document.getElementById('chat-typing'); if(t)t.remove(); }
+
+async function chatSend() {
+  if (chatBusy) return;
+  const inp = document.getElementById('chat-input');
+  const txt = inp.value.trim();
+  if (!txt) return;
+  inp.value=''; inp.style.height='auto';
+  chatBusy=true; document.getElementById('chat-send').disabled=true;
+  chatAppend('user', txt);
+  chatHistory.push({role:'user', content:txt});
+  chatShowTyping();
+  const messages = [{role:'system',content:STACK_SYS}, ...chatHistory.slice(-12)];
+  try {
+    const r = await fetch('/api/stack-chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({model:'hybrid/chat',messages,max_tokens:1024,temperature:0.3})
+    });
+    if (!r.ok) throw new Error(r.status+': '+(await r.text()).slice(0,200));
+    const d = await r.json();
+    const reply = d.choices?.[0]?.message?.content || '(empty)';
+    chatHideTyping();
+    chatAppend('assistant', reply);
+    chatHistory.push({role:'assistant',content:reply});
+  } catch(e) {
+    chatHideTyping();
+    chatAppend('assistant','Error: '+e.message);
+  } finally {
+    chatBusy=false;
+    document.getElementById('chat-send').disabled=false;
+    document.getElementById('chat-input').focus();
+  }
+}
 </script>
 </body>
 </html>
