@@ -151,6 +151,7 @@ services:
       - ./vault/data:/vault/data
       - ./vault/logs:/vault/logs
       - ./vault/config/vault.hcl:/vault/config/vault.hcl:ro
+      - ./scripts:/vault/scripts:ro
       - ./vault/logs:/vault/logs
     command: vault server -config=/vault/config/vault.hcl
     ports:

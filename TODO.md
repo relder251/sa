@@ -31,5 +31,7 @@
 - [ ] **#25** Archive .bak files and one-time fix scripts to _archive/ | LOE: Low | ROI: Medium | Impact: Low
 - [ ] **#26** Archive stale compose files to _archive/ | LOE: Low | ROI: Low | Impact: Low
 
+- [ ] **#27** Fix postgres collation version mismatch (`ALTER DATABASE postgres REFRESH COLLATION VERSION`) — silences pg_dumpall warning; glibc 2.36 in backup container vs 2.41 recorded in DB | LOE: Low | ROI: Low | Impact: Low
+
 ## Done
 - [x] **#1** Disable `PasswordAuthentication` + `PermitRootLogin` on SSH | commit 2b7f3f3 | 2026-04-07

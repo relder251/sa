@@ -57,6 +57,27 @@ run bash -c "tar -czf \"$BACKUP_DIR/output_${DATE}.tar.gz.tmp\" -C /data output 
 echo "--- opportunities ---"
 run bash -c "tar -czf \"$BACKUP_DIR/opportunities_${DATE}.tar.gz.tmp\" -C /data opportunities && mv \"$BACKUP_DIR/opportunities_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/opportunities_${DATE}.tar.gz\""
 
+# --- Vault raft snapshot ---
+# Snapshot written by vault-snapshot Ofelia job at 01:30 into vault/data/
+# Copied here (dated) so retention pruning applies uniformly.
+echo "--- vault ---"
+run bash -c "
+  [ -f /data/vault/latest_snapshot.snap ] || { echo 'ERROR: vault snapshot missing'; exit 1; }
+  cp /data/vault/latest_snapshot.snap \"$BACKUP_DIR/vault_${DATE}.snap.tmp\" &&
+  mv \"$BACKUP_DIR/vault_${DATE}.snap.tmp\" \"$BACKUP_DIR/vault_${DATE}.snap\"
+"
+
+# --- Vaultwarden (SQLite + config + RSA key in single tar) ---
+# WAL/SHM files included when present for a consistent SQLite backup.
+echo "--- vaultwarden ---"
+run bash -c "
+  EXTRAS=''
+  [ -f /data/vaultwarden/db.sqlite3-wal ] && EXTRAS='db.sqlite3-wal db.sqlite3-shm'
+  tar -czf \"$BACKUP_DIR/vaultwarden_${DATE}.tar.gz.tmp\" \
+    -C /data/vaultwarden db.sqlite3 \$EXTRAS config.json rsa_key.pem
+  mv \"$BACKUP_DIR/vaultwarden_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/vaultwarden_${DATE}.tar.gz\"
+"
+
 # --- SSL certificates ---
 echo "--- ssl ---"
 run bash -c "tar -czf \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" -C / ssl && mv \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/ssl_${DATE}.tar.gz\""
@@ -73,7 +94,7 @@ SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done \
   | tr '\n' '|' | sed 's/|$//')
 
 # Pass 1: delete non-Sunday .gz files older than 7 days
-find "$BACKUP_DIR" -name "*.gz" -mtime +7 \
+find "$BACKUP_DIR" \( -name "*.gz" -o -name "*.snap" \) -mtime +7 \
   | grep -vE "($SUNDAYS)" \
   | xargs -r rm -f || true
 
@@ -83,7 +104,7 @@ find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +7 \
   | xargs -r rm -f || true
 
 # Pass 3: hard cutoff — delete everything older than 28 days
-find "$BACKUP_DIR" -name "*.gz" -mtime +28 | xargs -r rm -f
+find "$BACKUP_DIR" \( -name "*.gz" -o -name "*.snap" \) -mtime +28 | xargs -r rm -f
 find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +28 | xargs -r rm -f
 
 echo "=== Backup complete: $DATE ==="
