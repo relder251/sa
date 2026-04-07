@@ -604,9 +604,6 @@ services:
     environment:
       - LITELLM_BASE_URL=http://litellm:4000
       - LITELLM_API_KEY=${LITELLM_API_KEY}
-    cap_add:
-      - NET_RAW
-      - NET_ADMIN
     networks:
       - vibe_net
     restart: unless-stopped
