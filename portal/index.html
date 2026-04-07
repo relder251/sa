@@ -586,7 +586,7 @@ body {
 }
 #chat-fab:hover { transform: scale(1.08); box-shadow: 0 6px 24px rgba(212,146,74,0.6); }
 #chat-fab.open { background: linear-gradient(135deg, #1a2140 0%, #111829 100%); box-shadow: 0 4px 18px rgba(0,0,0,0.4); }
-#chat-fab::before { content: ''; display: block; width: 26px; height: 26px; background: url('/sa-logo.svg') center/contain no-repeat; }
+#chat-fab::before { content: ''; display: block; width: 26px; height: 26px; background: url('/sa-logo.png') center/contain no-repeat; }
 #chat-fab.open::before { display: none; }
 #chat-fab.open::after { content: '\2715'; font-size: 20px; color: var(--copper-light); }
 
@@ -623,7 +623,7 @@ body {
   align-items: center;
   justify-content: space-between;
 }
-.chat-header-title::before { content: ''; display: inline-block; width: 15px; height: 10px; background: url('/sa-logo.svg') center/contain no-repeat; vertical-align: middle; margin-right: 6px; opacity: 0.9; }
+.chat-header-title::before { content: ''; display: inline-block; width: 15px; height: 10px; background: url('/sa-logo.png') center/contain no-repeat; vertical-align: middle; margin-right: 6px; opacity: 0.9; }
 .chat-header-title {
   font-family: var(--font-d);
   font-size: 15px;
@@ -695,7 +695,7 @@ body {
   content: '';
   position: absolute;
   inset: 4px;
-  background: url('/sa-logo.svg') center/contain no-repeat;
+  background: url('/sa-logo.png') center/contain no-repeat;
 }
 .chat-msg-body {
   background: rgba(255,255,255,0.04);
@@ -740,7 +740,8 @@ body {
   padding: 24px;
   text-align: center;
 }
-.chat-empty-icon { width: 36px; height: 36px; background: url('/sa-logo.svg') center/contain no-repeat; opacity: 0.5; margin: 0 auto 8px; }
+.chat-empty-icon { width: 36px; height: 36px; background: url('/sa-logo.png') center/contain no-repeat; opacity: 0.5; margin: 0 auto 8px; }
+.chat-empty-title { font-family: var(--font-d); font-size: 14px; color: var(--text-2); }
 
 .chat-input-row {
   border-top: 1px solid var(--border);
@@ -830,7 +831,7 @@ let _mermaidId = 0;
 
 <div class="topbar">
   <div class="logo">
-    <img src="/sa-logo.svg" class="logo-img" alt="Sovereign Advisory">
+    <img src="/sa-logo.png" class="logo-img" alt="Sovereign Advisory">
     SOVEREIGN ADVISORY
     <span class="logo-sub">Internal Portal</span>
   </div>
@@ -1757,7 +1758,7 @@ setInterval(loadPortal, 5 * 60 * 1000);
   <div class="chat-messages" id="chat-messages">
     <div class="chat-empty" id="chat-empty">
       <div class="chat-empty-icon"></div>
-      <div style="font-family:var(--font-d);font-size:14px;color:var(--text-2)">Stack Advisor</div>
+      <div class="chat-empty-title">Stack Advisor</div>
       <div>Ask about services, workflows, SSO, model tiers, or the agentic pipeline.</div>
     </div>
   </div>
@@ -1799,7 +1800,7 @@ function chatClose() {
 }
 function chatClear() {
   chatHistory = [];
-  document.getElementById('chat-messages').innerHTML = `<div class="chat-empty" id="chat-empty"><div class="chat-empty-icon"></div><div style="font-family:var(--font-d);font-size:14px;color:var(--text-2)">Stack Advisor</div><div>Ask about services, workflows, SSO, model tiers, or the agentic pipeline.</div></div>`;
+  document.getElementById('chat-messages').innerHTML = `<div class="chat-empty" id="chat-empty"><div class="chat-empty-icon"></div><div class="chat-empty-title">Stack Advisor</div><div>Ask about services, workflows, SSO, model tiers, or the agentic pipeline.</div></div>`;
 }
 function chatKeydown(e) { if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();chatSend();} }
 function chatInputResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,100)+'px'; }
