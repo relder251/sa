@@ -3,7 +3,7 @@
 ## In Progress
 
 ## Pending
-- [ ] **#1a** Store Vault root token + unseal keys in Vaultwarden; remove `/root/.vault-keys` from VPS | LOE: Low | ROI: Critical | Impact: Critical
+
 
 - [ ] **#2** Add Vault data + Vaultwarden data volumes to backup | LOE: Low | ROI: Critical | Impact: Critical
 - [ ] **#3** Add swap space | LOE: Low | ROI: Critical | Impact: High
@@ -34,4 +34,5 @@
 - [ ] **#27** Fix postgres collation version mismatch (`ALTER DATABASE postgres REFRESH COLLATION VERSION`) — silences pg_dumpall warning; glibc 2.36 in backup container vs 2.41 recorded in DB | LOE: Low | ROI: Low | Impact: Low
 
 ## Done
+- [x] **#1a** Store Vault root token + unseal keys in Vaultwarden; remove `/root/.vault-keys` from VPS | commit — | 2026-04-07
 - [x] **#1** Disable `PasswordAuthentication` + `PermitRootLogin` on SSH | commit 2b7f3f3 | 2026-04-07
