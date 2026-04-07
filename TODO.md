@@ -6,7 +6,7 @@
 
 ### Group 1 — Observability (see before you tune)
 - [ ] **#28** Add website availability monitoring for sovereignadvisory.ai (HTTP uptime checks + alerting) | LOE: Low | ROI: Critical | Impact: Critical
-- [ ] **#7** Cap cAdvisor CPU/RAM + increase scrape interval to 30s | LOE: Low | ROI: High | Impact: High
+- [x] **#7** Cap cAdvisor CPU/RAM + increase scrape interval to 30s | commit 256e11a | 2026-04-07
 - [ ] **#22** Prometheus scrape interval -> uniform 30s | LOE: Low | ROI: Medium | Impact: Medium
 - [ ] **#12** Prometheus storage retention limits | LOE: Low | ROI: High | Impact: Medium
 - [ ] **#17** Configure Grafana alerting -> Telegram | LOE: Medium | ROI: High | Impact: High
