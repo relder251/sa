@@ -1,0 +1,240 @@
+apiVersion: 1
+
+# Contact points and notification policy are managed via the Grafana API
+# (see setup-alerting-api.sh) to avoid storing secrets in provisioning files.
+
+groups:
+  - orgId: 1
+    name: Infrastructure
+    folder: Alerts
+    folderUID: sa-alerts
+    interval: 1m
+    rules:
+
+      - uid: sa-disk-usage-high
+        title: 'Disk Usage > 80%'
+        condition: THRESHOLD
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              editorMode: code
+              expr: '(node_filesystem_size_bytes{fstype="ext4",mountpoint="/"} - node_filesystem_avail_bytes{fstype="ext4",mountpoint="/"}) / node_filesystem_size_bytes{fstype="ext4",mountpoint="/"} * 100'
+              instant: true
+              intervalMs: 1000
+              legendFormat: ''
+              maxDataPoints: 43200
+              range: false
+              refId: QUERY
+          - refId: THRESHOLD
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: '-100'
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 80
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - QUERY
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: '-100'
+              expression: QUERY
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: THRESHOLD
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: 'Disk / usage exceeds 80%'
+          description: 'Current usage: {{ $values.QUERY.Value | printf "%.1f" }}%'
+        labels:
+          severity: warning
+        isPaused: false
+
+      - uid: sa-memory-usage-high
+        title: 'Memory Usage > 85%'
+        condition: THRESHOLD
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              editorMode: code
+              expr: '(1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100'
+              instant: true
+              intervalMs: 1000
+              legendFormat: ''
+              maxDataPoints: 43200
+              range: false
+              refId: QUERY
+          - refId: THRESHOLD
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: '-100'
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 85
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - QUERY
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: '-100'
+              expression: QUERY
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: THRESHOLD
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 5m
+        annotations:
+          summary: 'Host memory usage exceeds 85%'
+          description: 'Current usage: {{ $values.QUERY.Value | printf "%.1f" }}%'
+        labels:
+          severity: critical
+        isPaused: false
+
+      - uid: sa-key-service-down
+        title: 'Key Service Down'
+        condition: THRESHOLD
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              editorMode: code
+              expr: 'time() - max by (name) (container_last_seen{name=~"keycloak|n8n|vault|sa_nginx|sa_nginx_private|litellm"})'
+              instant: true
+              intervalMs: 1000
+              legendFormat: ''
+              maxDataPoints: 43200
+              range: false
+              refId: QUERY
+          - refId: THRESHOLD
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: '-100'
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 120
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - QUERY
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: '-100'
+              expression: QUERY
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: THRESHOLD
+              type: threshold
+        noDataState: Alerting
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: 'Key service {{ $labels.name }} is down'
+          description: 'Container {{ $labels.name }} has not reported in over 2 minutes'
+        labels:
+          severity: critical
+        isPaused: false
+
+      - uid: sa-container-restarted
+        title: 'Container Restarted'
+        condition: THRESHOLD
+        data:
+          - refId: QUERY
+            relativeTimeRange:
+              from: 900
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              editorMode: code
+              expr: 'sum by (name) (changes(container_start_time_seconds{container_label_com_docker_compose_project="agentic-sdlc",name!=""}[15m])) > 0'
+              instant: true
+              intervalMs: 1000
+              legendFormat: ''
+              maxDataPoints: 43200
+              range: false
+              refId: QUERY
+          - refId: THRESHOLD
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: '-100'
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - QUERY
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: '-100'
+              expression: QUERY
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: THRESHOLD
+              type: threshold
+        noDataState: OK
+        execErrState: Error
+        for: 1m
+        annotations:
+          summary: 'Container {{ $labels.name }} restarted'
+          description: 'Container {{ $labels.name }} restarted at least once in the last 15 minutes'
+        labels:
+          severity: warning
+        isPaused: false
