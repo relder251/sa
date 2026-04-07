@@ -318,6 +318,7 @@ services:
     - KC_HOSTNAME=${KC_HOSTNAME:-localhost}
     - KC_HTTP_ENABLED=true
     - KC_HEALTH_ENABLED=true
+    - JAVA_OPTS_APPEND=-Xms256m -Xmx1024m
     networks:
     - vibe_net
     restart: unless-stopped
@@ -340,6 +341,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
+          memory: 1536m
   oauth2-proxy-litellm:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_litellm
