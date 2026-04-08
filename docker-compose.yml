@@ -35,6 +35,8 @@ services:
   postgres:
     image: pgvector/pgvector:pg15
     container_name: litellm_db
+    security_opt:
+      - no-new-privileges:true
     environment:
     - POSTGRES_USER=${LITELLM_USER:-litellm}
     - POSTGRES_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
@@ -70,6 +72,8 @@ services:
   redis:
     image: redis:7-alpine
     container_name: redis
+    security_opt:
+      - no-new-privileges:true
     command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
     volumes:
     - redis_data:/data
@@ -98,6 +102,8 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     container_name: qdrant
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - qdrant_data:/qdrant/storage
     networks:
@@ -128,6 +134,8 @@ services:
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ollama_data:/root/.ollama
     networks:
@@ -156,6 +164,8 @@ services:
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
     container_name: litellm
+    security_opt:
+      - no-new-privileges:true
     ulimits:
       nofile:
         soft: 65536
@@ -236,6 +246,8 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     container_name: n8n
+    security_opt:
+      - no-new-privileges:true
     environment:
     - N8N_PORT=5678
     - NODE_ENV=production
@@ -311,6 +323,8 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:24.0.5
     container_name: keycloak
+    security_opt:
+      - no-new-privileges:true
     command: ${KC_START_CMD:-start-dev}
     environment:
     - KEYCLOAK_ADMIN=admin
@@ -345,6 +359,8 @@ services:
   oauth2-proxy-litellm:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_litellm
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -393,6 +409,8 @@ services:
   oauth2-proxy-n8n:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_n8n
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -436,6 +454,8 @@ services:
   oauth2-proxy-jupyter:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_jupyter
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -481,6 +501,8 @@ services:
   oauth2-proxy-webui:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_webui
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -525,6 +547,8 @@ services:
   oauth2-proxy-portal:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_portal
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -571,6 +595,8 @@ services:
   oauth2-proxy-agent-zero:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_agent_zero
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -624,6 +650,8 @@ services:
       dockerfile: Dockerfile.ttyd
     image: sa_ttyd:latest
     container_name: ttyd
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     networks:
@@ -643,6 +671,8 @@ services:
   portal:
     image: nginx:alpine
     container_name: portal
+    security_opt:
+      - no-new-privileges:true
     command: sh -c 'addgroup -g 989 docker 2>/dev/null; addgroup nginx docker 2>/dev/null; nginx -g "daemon off;"'
     volumes:
     - ./portal:/usr/share/nginx/html:ro
@@ -712,6 +742,8 @@ services:
   jupyter:
     image: quay.io/jupyter/scipy-notebook:latest
     container_name: jupyter
+    security_opt:
+      - no-new-privileges:true
     environment:
     - JUPYTER_TOKEN=${JUPYTER_TOKEN:-}
     - JUPYTER_ENABLE_LAB=yes
@@ -773,6 +805,8 @@ services:
       dockerfile: Dockerfile.lead_review
     image: sa_lead_review:latest
     container_name: sa_lead_review
+    security_opt:
+      - no-new-privileges:true
     environment:
     - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/${LITELLM_DB:-litellm}
     - LEAD_REVIEW_PASSWORD=${LEAD_REVIEW_PASSWORD}
@@ -827,6 +861,8 @@ services:
       context: .
       dockerfile: Dockerfile.pipeline
     container_name: pipeline_server
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./output:/data/output
     - ./scripts:/data/scripts:ro
@@ -880,6 +916,8 @@ services:
       dockerfile: Dockerfile.test_runner
     image: sa_test_runner:latest
     container_name: test_runner
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./output:/data/output
     - ./scripts:/data/scripts:ro
@@ -918,6 +956,8 @@ services:
     build:
       context: ./webui
     container_name: webui
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./output:/data/output:ro
     - ./output/opportunities:/data/output/opportunities
@@ -959,6 +999,8 @@ services:
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: open_webui
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - open_webui_data:/app/backend/data
     environment:
@@ -1007,6 +1049,8 @@ services:
       dockerfile: Dockerfile.free_model_sync
     image: sa_free_model_sync:latest
     container_name: free_model_sync
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./free_model_sync.py:/app/free_model_sync.py:ro
     working_dir: /app
@@ -1039,6 +1083,8 @@ services:
   ofelia:
     image: mcuadros/ofelia:latest
     container_name: ofelia
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     - ./ofelia.ini:/etc/ofelia/config.ini:ro
@@ -1064,6 +1110,8 @@ services:
   backup:
     image: postgres:15
     container_name: backup
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./backup:/backup
     - ./output:/data/output:ro
@@ -1105,6 +1153,8 @@ services:
   watchtower:
     image: containrrr/watchtower:latest
     container_name: watchtower
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - /var/run/docker.sock:/var/run/docker.sock
     environment:
@@ -1134,6 +1184,8 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
     - prometheus_data:/prometheus
@@ -1176,6 +1228,8 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    security_opt:
+      - no-new-privileges:true
     environment:
     - GF_SECURITY_ADMIN_USER=admin
     - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-sovereign2026!}
@@ -1225,6 +1279,8 @@ services:
   blackbox_exporter:
     image: prom/blackbox-exporter:v0.25.0
     container_name: blackbox_exporter
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./blackbox.yml:/etc/blackbox_exporter/config.yml:ro
     networks:
@@ -1250,6 +1306,8 @@ services:
   nginx-private:
     image: nginx:1.27-alpine
     container_name: sa_nginx_private
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
     logging:
       driver: json-file
@@ -1294,6 +1352,8 @@ services:
   certbot-dns:
     image: certbot/dns-cloudflare:latest
     container_name: sa_certbot_dns
+    security_opt:
+      - no-new-privileges:true
     restart: always
     logging:
       driver: json-file
@@ -1327,6 +1387,8 @@ services:
       dockerfile: Dockerfile.company_research
     image: sa_company_research:latest
     container_name: sa_company_research
+    security_opt:
+      - no-new-privileges:true
     environment:
     - LITELLM_BASE_URL=http://litellm:4000
     - LITELLM_API_KEY=${LITELLM_API_KEY}
@@ -1365,6 +1427,8 @@ services:
   oauth2-proxy-grafana:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_grafana
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1412,6 +1476,8 @@ services:
   oauth2-proxy-prometheus:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_prometheus
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1457,6 +1523,8 @@ services:
   oauth2-proxy-qdrant:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_qdrant
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1502,6 +1570,8 @@ services:
   oauth2-proxy-secrets:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_secrets
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1545,6 +1615,8 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
     container_name: cadvisor
+    security_opt:
+      - no-new-privileges:true
     privileged: true
     command:
     - --housekeeping_interval=10s
@@ -1579,6 +1651,8 @@ services:
   node-exporter:
     image: prom/node-exporter:latest
     container_name: node_exporter
+    security_opt:
+      - no-new-privileges:true
     command:
     - '--path.procfs=/host/proc'
     - '--path.rootfs=/rootfs'
@@ -1615,6 +1689,8 @@ services:
       dockerfile: Dockerfile.maltego_transforms
     image: sa_maltego_transforms:latest
     container_name: maltego_transforms
+    security_opt:
+      - no-new-privileges:true
     environment:
     - LITELLM_BASE_URL=http://litellm:4000
     - LITELLM_API_KEY=${LITELLM_API_KEY}
@@ -1653,6 +1729,8 @@ services:
   maltego-desktop:
     image: kasmweb/maltego:1.18.0-rolling-daily
     container_name: maltego_desktop
+    security_opt:
+      - no-new-privileges:true
     environment:
     - VNC_PW=${MALTEGO_VNC_PW:-Maltego2026!}
     - KASM_PORT=6901
@@ -1681,6 +1759,8 @@ services:
   oauth2-proxy-maltego:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_maltego
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1726,6 +1806,8 @@ services:
   maltego-desktop-relay:
     image: nginx:alpine
     container_name: maltego_desktop_relay
+    security_opt:
+      - no-new-privileges:true
     volumes:
     - ./nginx/conf.d/maltego-relay.conf:/etc/nginx/conf.d/default.conf:ro
     networks:
@@ -1748,6 +1830,8 @@ services:
   mirofish:
     image: ghcr.io/666ghj/mirofish:latest
     container_name: mirofish
+    security_opt:
+      - no-new-privileges:true
     command: >
       sh -c "
       sed -i '/server: {/a\\    allowedHosts: true,' /app/frontend/vite.config.js &&
@@ -1790,6 +1874,8 @@ services:
   oauth2-proxy-mirofish:
     image: sa_oauth2_proxy:v7.6.0
     container_name: oauth2_proxy_mirofish
+    security_opt:
+      - no-new-privileges:true
     command:
     - --provider=oidc
     - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
@@ -1836,6 +1922,8 @@ services:
   zep:
     image: ghcr.io/getzep/zep:latest
     container_name: zep
+    security_opt:
+      - no-new-privileges:true
     environment:
     - ZEP_OPENAI_API_KEY=${LITELLM_API_KEY}
     - ZEP_OPENAI_API_URL=http://litellm:4000
