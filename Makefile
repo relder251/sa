@@ -95,9 +95,7 @@ help:
 secrets:
 	@bash scripts/pull-secrets.sh
 
-## Pull secrets then start prod stack
-deploy: secrets
-	$(MAKE) up ENV=prod
+## (deploy target defined below — see vault section)
 
 ## ── Vault secrets management ─────────────────────────────────────────────────
 ## Initialize Vault (one-time setup — run after first `make vault-up`)
@@ -125,5 +123,7 @@ vault-up:
 	docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d vault
 
 ## Deploy: fetch from Vault then start full prod stack
-deploy: vault-env
+## Validates config before starting services
+.PHONY: deploy
+deploy: vault-env validate
 	$(MAKE) up ENV=prod
