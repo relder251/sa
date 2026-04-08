@@ -22,6 +22,7 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import secrets
 import smtplib
 import ssl
@@ -36,6 +37,7 @@ from urllib.parse import parse_qs, urlencode
 import asyncpg
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Header, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import Response as StarletteResponse
 import httpx
 from jose import jwt, JWTError
 from lead_pdf_generator import generate_lead_pdf
@@ -157,6 +159,50 @@ async def lifespan(app: FastAPI):
         await _pool.close()
 
 app = FastAPI(title="SA Lead Review Portal", docs_url=None, redoc_url=None, lifespan=lifespan)
+
+# ── CSP nonce middleware ────────────────────────────────────────────────────────
+# Generates a per-request nonce, attaches it to request.state, and:
+# 1. Rewrites <style> and <script> tags in HTML responses to carry nonce="..."
+# 2. Sets the Content-Security-Policy response header with that nonce
+@app.middleware("http")
+async def csp_nonce_middleware(request, call_next):
+    nonce = secrets.token_urlsafe(16)
+    request.state.csp_nonce = nonce
+    response = await call_next(request)
+
+    content_type = response.headers.get("content-type", "")
+    if "text/html" in content_type:
+        # Buffer the full body so we can rewrite nonce attributes
+        body_bytes = b"".join([chunk async for chunk in response.body_iterator])
+        html = body_bytes.decode("utf-8", errors="replace")
+        # Inject nonce into all <style> and <script> opening tags
+        html = re.sub(r"<style(?=[\s>])", f'<style nonce="{nonce}"', html)
+        html = re.sub(r"<script(?=[\s>])", f'<script nonce="{nonce}"', html)
+        body_bytes = html.encode("utf-8")
+        # Build CSP with nonce
+        csp = (
+            f"default-src 'self'; "
+            f"script-src 'self' 'nonce-{nonce}'; "
+            f"style-src 'self' 'nonce-{nonce}' https://fonts.googleapis.com; "
+            f"font-src 'self' https://fonts.gstatic.com; "
+            f"img-src 'self' data:; "
+            f"connect-src 'self'; "
+            f"frame-ancestors 'none'; "
+            f"base-uri 'self'; "
+            f"form-action 'self'; "
+            f"object-src 'none';"
+        )
+        new_response = StarletteResponse(
+            content=body_bytes,
+            status_code=response.status_code,
+            headers=dict(response.headers),
+            media_type="text/html; charset=utf-8",
+        )
+        new_response.headers["Content-Security-Policy"] = csp
+        new_response.headers["Content-Length"] = str(len(body_bytes))
+        return new_response
+
+    return response
 
 
 # ── DB pool ────────────────────────────────────────────────────────────────────
