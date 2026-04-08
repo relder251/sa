@@ -2043,6 +2043,51 @@ services:
         condition: service_started
 
   # ---------------------------------------------------------------------------
+  # Ollama — oauth2 SSO proxy (port 11435 internal)
+  # Wraps ollama:11434 with Keycloak OIDC; skip-jwt-bearer-tokens allows API key usage
+  # ---------------------------------------------------------------------------
+  oauth2-proxy-ollama:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_ollama
+    security_opt:
+      - no-new-privileges:true
+    command:
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=ollama
+    - --client-secret=${OLLAMA_OIDC_CLIENT_SECRET}
+    - --redirect-url=${OLLAMA_REDIRECT_URL}
+    - --upstream=http://ollama:11434
+    - --http-address=0.0.0.0:11435
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --skip-jwt-bearer-tokens=true
+    - --upstream-timeout=120s
+    networks:
+    - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "11435"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
   # Zep CE — self-hosted memory graph (port 8000 internal)
   # MiroFish connects via http://zep:8000; auth disabled (Twingate-only access)
   # ---------------------------------------------------------------------------
