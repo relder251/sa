@@ -891,6 +891,9 @@
       .stats-row { gap: 1.2rem; }
       .stat-num { font-size: 2rem; }
     }
+      /* menu-open locks body scroll; sent shows button success state */
+      body.menu-open { overflow: hidden; }
+      #formBtn.sent { background: linear-gradient(135deg,#4a8a5a,#6aaa7a); }
   </style>
 </head>
 <body>
@@ -1192,12 +1195,12 @@
     ham.addEventListener('click', () => {
       ham.classList.toggle('open');
       mob.classList.toggle('open');
-      document.body.style.overflow = mob.classList.contains('open') ? 'hidden' : '';
+      document.body.classList.toggle('menu-open', mob.classList.contains('open'));
     });
     document.querySelectorAll('.mob-link').forEach(l => l.addEventListener('click', () => {
       ham.classList.remove('open');
       mob.classList.remove('open');
-      document.body.style.overflow = '';
+      document.body.classList.remove('menu-open');
     }));
 
     // Contact form — POST to n8n webhook (wired when workflow is ready)
@@ -1220,10 +1223,10 @@
           await fetch(WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         }
         btn.textContent = 'Enquiry Sent';
-        btn.style.background = 'linear-gradient(135deg,#4a8a5a,#6aaa7a)';
+        btn.classList.add('sent');
         setTimeout(() => {
           btn.textContent = 'Send Enquiry';
-          btn.style.background = '';
+          btn.classList.remove('sent');
           btn.disabled = false;
           e.target.reset();
         }, 4000);
