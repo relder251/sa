@@ -1,0 +1,14 @@
+# Image digest snapshot
+# Generated: 2026-04-08T16:24:10Z
+# Purpose: pre-update rollback reference (Watchtower runs at 03:00)
+#
+jupyter  image=quay.io/jupyter/scipy-notebook:latest  digest=sha256:d86e74f7d7a4  created=2026-04-08T01:46:17
+keycloak  image=quay.io/keycloak/keycloak:24.0.5  digest=sha256:f8ade94c1d0a  created=2026-04-08T01:46:08
+litellm  image=ghcr.io/berriai/litellm:main-latest  digest=sha256:7c311546c25e  created=2026-04-08T01:46:11
+litellm_db  image=pgvector/pgvector:pg15  digest=sha256:7f5681e45237  created=2026-04-08T01:46:06
+n8n  image=docker.n8n.io/n8nio/n8n:latest  digest=sha256:5ff0ad333090  created=2026-04-08T03:20:48
+ollama  image=ollama/ollama:latest  digest=sha256:87d71eb588a2  created=2026-04-08T03:20:47
+pipeline_server  image=agentic-sdlc-pipeline-server  digest=sha256:5d76affd60ed  created=2026-04-08T16:22:40
+portal  image=nginx:alpine  digest=sha256:645eda1c2477  created=2026-04-08T03:20:48
+qdrant  image=qdrant/qdrant:latest  digest=sha256:94728574965d  created=2026-04-08T01:46:05
+webui  image=agentic-sdlc-webui  digest=sha256:032467709f91  created=2026-04-08T01:46:18
