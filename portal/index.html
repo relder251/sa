@@ -317,6 +317,9 @@ body {
 .tag-infra { background: rgba(56, 189, 248, 0.08); color: #7dd3fc; border: 1px solid rgba(56,189,248,0.15); }
 .card-status { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--text-3); }
 .live-dot { width: 5px; height: 5px; border-radius: 50%; background: #4ade80; }
+.live-dot.down    { background: #ef4444; }
+.live-dot.stale   { background: #f59e0b; }
+.live-dot.unknown { background: #6b7280; }
 
 /* Open arrow */
 .card-arrow { position: absolute; bottom: 14px; right: 14px; font-size: 11px; color: rgba(160,154,175,0.3); transition: all 0.2s; }
@@ -1138,6 +1141,7 @@ async function loadPortal() {
     renderCards(data.services || []);
     loadApiStatus();
     loadContainers();
+    updateServiceStatus();
   } catch (err) {
     console.error('Failed to load services.json:', err);
   }
@@ -1762,10 +1766,58 @@ async function finishWizard() {
   await loadPortal();
 }
 
+
+// ── Service status polling (Prometheus container_last_seen) ─────────────────
+async function updateServiceStatus() {
+  try {
+    const res = await fetch('/api/service-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    const now = Math.floor(Date.now() / 1000);
+    const STALE_SECS = 90; // 3 × 30s scrape interval — tolerate one missed scrape
+
+    // Build container_name → last_seen_timestamp map
+    const seen = {};
+    for (const item of (data.data?.result || [])) {
+      const name = item.metric.name;
+      if (name) seen[name] = parseFloat(item.value[1]);
+    }
+
+    document.querySelectorAll('.card[data-id]').forEach(card => {
+      const svc = currentServices.find(s => s.id === card.dataset.id);
+      const dot = card.querySelector('.live-dot');
+      const statusSpan = card.querySelector('.card-status');
+      if (!dot || !svc || !statusSpan) return;
+
+      const textNode = [...statusSpan.childNodes].find(n => n.nodeType === Node.TEXT_NODE);
+      let cls, label;
+
+      if (!svc.terminal) {
+        cls = 'unknown'; label = 'external';
+      } else {
+        const ts = seen[svc.terminal];
+        if (ts === undefined) {
+          cls = 'down'; label = 'down';
+        } else if (now - ts <= STALE_SECS) {
+          cls = '';     label = 'live';
+        } else {
+          cls = 'stale'; label = 'stale';
+        }
+      }
+
+      dot.className = 'live-dot' + (cls ? ' ' + cls : '');
+      if (textNode) textNode.textContent = ' ' + label;
+    });
+  } catch (e) {
+    console.warn('[service-status] fetch failed:', e);
+  }
+}
+
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', loadPortal);
 // Auto-refresh: reload portal data every 5 minutes
 setInterval(loadPortal, 5 * 60 * 1000);
+setInterval(updateServiceStatus, 30 * 1000);
 </script>
 
 <!-- Stack Advisor Chat -->
