@@ -160,12 +160,47 @@ services:
     labels:
       com.sovereignadvisory.service: "twingate"
 
+  # Vault Root — Transit seal provider for main Vault (self-hosted KMS)
+    deploy:
+      resources:
+        limits:
+          cpus: 0.10
+          memory: 256m
+  vault-root:
+    image: hashicorp/vault:1.18
+    container_name: vault-root
+    restart: unless-stopped
+    cap_add:
+    - IPC_LOCK
+    environment:
+    - VAULT_ADDR=http://0.0.0.0:8300
+    volumes:
+    - ./vault-root/data:/vault/data
+    - ./vault-root/config/vault-root.hcl:/vault/config/vault.hcl:ro
+    command: vault server -config=/vault/config/vault.hcl
+    networks:
+    - vibe_net
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "vault", "status", "-address=http://127.0.0.1:8300"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    labels:
+      com.sovereignadvisory.service: "vault-root"
+      com.centurylinklabs.watchtower.enable: "false"
+
   # HashiCorp Vault — secrets management enclave
     deploy:
       resources:
         limits:
           cpus: '0.25'
-          memory: 64m
+          memory: 256m
   vault:
     image: hashicorp/vault:1.18
     container_name: vault
@@ -175,6 +210,10 @@ services:
     environment:
     - VAULT_ADDR=http://0.0.0.0:8200
     - VAULT_API_ADDR=https://secrets.private.sovereignadvisory.ai
+    - VAULT_TOKEN=${VAULT_TRANSIT_TOKEN}  # transit seal auth token for vault-root
+    depends_on:
+      vault-root:
+        condition: service_healthy
     volumes:
     - ./vault/data:/vault/data
     - ./vault/logs:/vault/logs

@@ -19,3 +19,10 @@ cluster_addr = "https://vault:8201"
 # Performance / stability
 default_lease_ttl = "168h"   # 7 days
 max_lease_ttl     = "8760h"  # 1 year
+
+# Transit auto-unseal via vault-root (self-hosted KMS)
+seal "transit" {
+  address    = "http://vault-root:8300"
+  mount_path = "transit/"
+  key_name   = "autounseal"
+}

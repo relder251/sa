@@ -63,3 +63,4 @@ _archive/bitwarden_import.csv
 _archive/.~lock.*
 backups/
 db/
+vault-root/data/
