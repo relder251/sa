@@ -26,6 +26,7 @@ volumes:
   qdrant_data:
   prometheus_data:
   grafana_data:
+  loki_data:
   maltego_data:
   mirofish_uploads:
   agent_zero_usr:
@@ -1323,6 +1324,73 @@ services:
   # ---------------------------------------------------------------------------
   # Blackbox Exporter — HTTP uptime probing for sovereignadvisory.ai
   # ---------------------------------------------------------------------------
+
+  # ---------------------------------------------------------------------------
+  # Loki -- log aggregation backend
+  # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512m
+  loki:
+    image: grafana/loki:3.4
+    container_name: loki
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - loki_data:/loki
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    labels:
+      com.sovereignadvisory.service: "loki"
+
+  # ---------------------------------------------------------------------------
+  # Promtail -- log shipper (Docker socket discovery)
+  # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1g
+  promtail:
+    image: grafana/promtail:3.4
+    container_name: promtail
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - ./loki/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - vibe_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      loki:
+        condition: service_healthy
+    labels:
+      com.sovereignadvisory.service: "promtail"
+
     deploy:
       resources:
         limits:
