@@ -47,6 +47,7 @@ services:
     volumes:
     - pg_data:/var/lib/postgresql/data
     - ./postgres-init:/docker-entrypoint-initdb.d:ro
+    - ./postgres-scripts:/opt/scripts:ro
     networks:
     - vibe_net
     restart: unless-stopped
