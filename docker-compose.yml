@@ -63,6 +63,13 @@ services:
       start_period: 10s
     labels:
     - "com.centurylinklabs.watchtower.enable=true"
+    command: >
+      postgres
+      -c shared_buffers=7680MB
+      -c effective_cache_size=23040MB
+      -c work_mem=64MB
+      -c maintenance_work_mem=1GB
+      -c checkpoint_completion_target=0.9
 
   # ---------------------------------------------------------------------------
   # Redis — LiteLLM caching
@@ -71,7 +78,7 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 512m
+          memory: 12g
   redis:
     image: redis:7-alpine
     container_name: redis
