@@ -12,6 +12,9 @@ networks:
     driver: bridge
   vibe_net:
     driver: bridge
+  pipeline_docker_net:
+    driver: bridge
+    internal: true
 
 volumes:
   n8n_data:
@@ -849,6 +852,44 @@ services:
       com.sovereignadvisory.service: "lead-review"
 
   # ---------------------------------------------------------------------------
+  # Pipeline Socket Proxy — filtered Docker API for pipeline_server
+  # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.10'
+          memory: 32m
+  pipeline-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    container_name: pipeline_socket_proxy
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CONTAINERS=1
+      - IMAGES=1
+      - BUILD=1
+      - POST=1
+      - NETWORKS=0
+      - VOLUMES=0
+      - SERVICES=0
+      - SWARM=0
+      - NODES=0
+      - PLUGINS=0
+      - SYSTEM=0
+      - AUTH=0
+      - SECRETS=0
+    networks:
+      - pipeline_docker_net
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
   # Pipeline Server — phases 1-10 orchestrator
   # ---------------------------------------------------------------------------
     deploy:
@@ -867,10 +908,10 @@ services:
     - ./output:/data/output
     - ./scripts:/data/scripts:ro
     - ./phases:/data/phases:ro
-    - /var/run/docker.sock:/var/run/docker.sock
     environment:
     - LITELLM_BASE_URL=http://litellm:4000
     - LITELLM_API_KEY=${LITELLM_API_KEY}
+    - DOCKER_HOST=tcp://pipeline_socket_proxy:2375
     - PHASE3_MAX_ATTEMPTS=3
     - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL:-}
     - DOCKER_REGISTRY=${DOCKER_REGISTRY:-}
@@ -884,6 +925,7 @@ services:
     - WEBUI_BASE_URL=${WEBUI_BASE_URL:-https://webui.private.sovereignadvisory.ai}
     networks:
     - vibe_net
+    - pipeline_docker_net
     restart: unless-stopped
     logging:
       driver: json-file
@@ -893,6 +935,8 @@ services:
     depends_on:
       litellm:
         condition: service_healthy
+      pipeline-socket-proxy:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:5002/health')\" "]
       interval: 30s
