@@ -1,14 +1,24 @@
 # Image digest snapshot
-# Generated: 2026-04-08T16:24:57Z
+# Generated: 2026-04-08T16:25:24Z
 # Purpose: pre-update rollback reference (Watchtower runs at 03:00)
 #
 jupyter  image=quay.io/jupyter/scipy-notebook:latest  digest=quay.io/jupyter/scipy-notebook@sha256:d86e74f7d7a4d54dc2d4a02a481fa7075b076334b4bac59994a0066502d26e6a  created=2026-04-08T01:46:17
+2026-04-08T16:25:23Z [snapshot-digests]   jupyter: quay.io/jupyter/scipy-notebook@sha256:d86e74f7d7a4d54dc2d4a02a481fa7075b076334b4bac59994a0066502d26e6a
 keycloak  image=quay.io/keycloak/keycloak:24.0.5  digest=quay.io/keycloak/keycloak@sha256:f8ade94c1d0ad2f2fa7734a455fee5392764f402c43ca35e9af6bf63a2541dc9  created=2026-04-08T01:46:08
+2026-04-08T16:25:23Z [snapshot-digests]   keycloak: quay.io/keycloak/keycloak@sha256:f8ade94c1d0ad2f2fa7734a455fee5392764f402c43ca35e9af6bf63a2541dc9
 litellm  image=ghcr.io/berriai/litellm:main-latest  digest=ghcr.io/berriai/litellm@sha256:7c311546c25e7bb6e8cafede9fcd3d0d622ac636b5c9418befaa32e85dfb0186  created=2026-04-08T01:46:11
+2026-04-08T16:25:23Z [snapshot-digests]   litellm: ghcr.io/berriai/litellm@sha256:7c311546c25e7bb6e8cafede9fcd3d0d622ac636b5c9418befaa32e85dfb0186
 litellm_db  image=pgvector/pgvector:pg15  digest=pgvector/pgvector@sha256:7f5681e45237acdf546cf7cdc0dfc0ed7752ede857fda6e54f6ea21b936f8742  created=2026-04-08T01:46:06
+2026-04-08T16:25:23Z [snapshot-digests]   litellm_db: pgvector/pgvector@sha256:7f5681e45237acdf546cf7cdc0dfc0ed7752ede857fda6e54f6ea21b936f8742
 n8n  image=docker.n8n.io/n8nio/n8n:latest  digest=docker.n8n.io/n8nio/n8n@sha256:5ff0ad333090d1901005cd764399b1be2c2a29b816704107f08c340d0d223043  created=2026-04-08T03:20:48
+2026-04-08T16:25:23Z [snapshot-digests]   n8n: docker.n8n.io/n8nio/n8n@sha256:5ff0ad333090d1901005cd764399b1be2c2a29b816704107f08c340d0d223043
 ollama  image=ollama/ollama:latest  digest=ollama/ollama@sha256:87d71eb588a28c747094ca5d011392a3790f6ea9bd9c87594780ad7c65cc7ed1  created=2026-04-08T03:20:47
+2026-04-08T16:25:24Z [snapshot-digests]   ollama: ollama/ollama@sha256:87d71eb588a28c747094ca5d011392a3790f6ea9bd9c87594780ad7c65cc7ed1
 pipeline_server  image=agentic-sdlc-pipeline-server  digest=agentic-sdlc-pipeline-server@sha256:5d76affd60ed5f5079cb53e24c99d3b6555ce5ca33250e685e153684f5e42607  created=2026-04-08T16:22:40
+2026-04-08T16:25:24Z [snapshot-digests]   pipeline_server: agentic-sdlc-pipeline-server@sha256:5d76affd60ed5f5079cb53e24c99d3b6555ce5ca33250e685e153684f5e42607
 portal  image=nginx:alpine  digest=nginx@sha256:645eda1c2477aaa9b879f73909b9222c6f19798dd45be6706268d82a661c6e6d  created=2026-04-08T03:20:48
+2026-04-08T16:25:24Z [snapshot-digests]   portal: nginx@sha256:645eda1c2477aaa9b879f73909b9222c6f19798dd45be6706268d82a661c6e6d
 qdrant  image=qdrant/qdrant:latest  digest=qdrant/qdrant@sha256:94728574965d17c6485dd361aa3c0818b325b9016dac5ea6afec7b4b2700865f  created=2026-04-08T01:46:05
+2026-04-08T16:25:24Z [snapshot-digests]   qdrant: qdrant/qdrant@sha256:94728574965d17c6485dd361aa3c0818b325b9016dac5ea6afec7b4b2700865f
 webui  image=agentic-sdlc-webui  digest=agentic-sdlc-webui@sha256:032467709f91ff7257e6978efd78fa2fd7b2483c07f2ed56d6d68b8165e073e5  created=2026-04-08T01:46:18
+2026-04-08T16:25:24Z [snapshot-digests]   webui: agentic-sdlc-webui@sha256:032467709f91ff7257e6978efd78fa2fd7b2483c07f2ed56d6d68b8165e073e5
