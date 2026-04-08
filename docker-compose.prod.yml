@@ -200,7 +200,7 @@ services:
       resources:
         limits:
           cpus: '0.25'
-          memory: 256m
+          memory: 512m
   vault:
     image: hashicorp/vault:1.18
     container_name: vault
