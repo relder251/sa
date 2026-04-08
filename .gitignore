@@ -64,3 +64,8 @@ _archive/.~lock.*
 backups/
 db/
 vault-root/data/
+
+# rclone service account credentials — never commit
+config/rclone/rclone.conf
+config/rclone/gdrive-sa.json
+ofelia.ini.bak
