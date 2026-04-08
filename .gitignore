@@ -70,3 +70,4 @@ config/rclone/rclone.conf
 config/rclone/gdrive-sa.json
 ofelia.ini.bak
 .env.bak
+.env.backup
