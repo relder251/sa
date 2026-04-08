@@ -1,5 +1,5 @@
 # Image digest snapshot
-# Generated: 2026-04-08T16:24:52Z
+# Generated: 2026-04-08T16:24:57Z
 # Purpose: pre-update rollback reference (Watchtower runs at 03:00)
 #
 jupyter  image=quay.io/jupyter/scipy-notebook:latest  digest=quay.io/jupyter/scipy-notebook@sha256:d86e74f7d7a4d54dc2d4a02a481fa7075b076334b4bac59994a0066502d26e6a  created=2026-04-08T01:46:17
