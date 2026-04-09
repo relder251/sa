@@ -70,13 +70,13 @@ services:
       start_period: 10s
     labels:
       com.sovereignadvisory.service: "nginx"
-
-  # Certbot HTTP-01 — renews public-facing TLS certs via webroot
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 64m
+          cpus: '0.25'
+          memory: 128m
+
+  # Certbot HTTP-01 — renews public-facing TLS certs via webroot
   certbot:
     image: certbot/certbot:latest
     container_name: sa_certbot
@@ -101,13 +101,13 @@ services:
     - sa_web
     labels:
       com.sovereignadvisory.service: "certbot"
-
-  # Twingate — zero-trust network connector
     deploy:
       resources:
         limits:
-          cpus: '0.10'
+          cpus: '0.5'
           memory: 64m
+
+  # Twingate — zero-trust network connector
   twingate:
     image: twingate/connector:1
     container_name: twingate-friendly-jaguar
@@ -130,13 +130,13 @@ services:
     network_mode: host
     labels:
       com.sovereignadvisory.service: "twingate"
-
-  # Twingate — hasty-spider connector (redundant)
     deploy:
       resources:
         limits:
-          cpus: '0.25'
+          cpus: '0.10'
           memory: 64m
+
+  # Twingate — hasty-spider connector (redundant)
   twingate-spider:
     image: twingate/connector:1
     container_name: twingate-hasty-spider
@@ -159,13 +159,13 @@ services:
     network_mode: host
     labels:
       com.sovereignadvisory.service: "twingate"
-
-  # Vault Root — Transit seal provider for main Vault (self-hosted KMS)
     deploy:
       resources:
         limits:
-          cpus: 0.10
-          memory: 256m
+          cpus: '0.25'
+          memory: 64m
+
+  # Vault Root — Transit seal provider for main Vault (self-hosted KMS)
   vault-root:
     image: hashicorp/vault:1.18
     container_name: vault-root
@@ -194,13 +194,13 @@ services:
     labels:
       com.sovereignadvisory.service: "vault-root"
       com.centurylinklabs.watchtower.enable: "false"
-
-  # HashiCorp Vault — secrets management enclave
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 512m
+          cpus: '0.10'
+          memory: 512m  # raised from 256m — OOM at 256m (commit 4b92650)
+
+  # HashiCorp Vault — secrets management enclave
   vault:
     image: hashicorp/vault:1.18
     container_name: vault
@@ -239,13 +239,13 @@ services:
     labels:
       com.sovereignadvisory.service: "vault"
       com.centurylinklabs.watchtower.enable: "false"
-
-  # Vaultwarden — self-hosted Bitwarden-compatible password vault
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 1g
+          cpus: '0.25'
+          memory: 512m
+
+  # Vaultwarden — self-hosted Bitwarden-compatible password vault
   vaultwarden:
     image: vaultwarden/server:latest
     container_name: vaultwarden
@@ -280,9 +280,8 @@ services:
     - vibe_net
     labels:
       com.sovereignadvisory.service: "vaultwarden"
-
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 128m
+          cpus: '0.5'
+          memory: 1g
