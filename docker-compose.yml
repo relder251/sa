@@ -30,6 +30,7 @@ volumes:
   maltego_data:
   mirofish_uploads:
   agent_zero_usr:
+  cdn_cache_data:
 
 services:
 
@@ -213,6 +214,7 @@ services:
     - GENERIC_REDIRECT_URI=${LITELLM_REDIRECT_URL}
     - GENERIC_CLIENT_NAME=Keycloak SSO
     - AUTO_REDIRECT_UI_LOGIN_TO_SSO=True
+    - PROXY_ADMIN_ID=relder
     volumes:
     - ./litellm_config.yaml:/app/config.yaml
     - ./factual_verifier.py:/app/factual_verifier.py
@@ -2131,3 +2133,33 @@ services:
         limits:
           cpus: '0.5'
           memory: 256m
+
+  # ---------------------------------------------------------------------------
+  # CDN Cache — long-term internal caching proxy for external CDN resources.
+  # Intercepts CDN URLs rewritten by nginx sub_filter and serves from local
+  # cache. Add new CDN origins in cdn-cache/nginx.conf + a sub_filter line.
+  # ---------------------------------------------------------------------------
+  cdn-cache:
+    image: nginx:1.27-alpine
+    container_name: cdn_cache
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+    - cdn_cache_data:/var/cache/nginx/cdn
+    - ./cdn-cache/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+    - vibe_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      com.sovereignadvisory.service: "cdn-cache"
