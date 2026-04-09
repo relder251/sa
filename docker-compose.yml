@@ -269,7 +269,7 @@ services:
     - WEBHOOK_URL=${N8N_BASE_URL:-http://localhost:5678}
     - N8N_HOST=${N8N_HOSTNAME:-localhost}
     - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
-    - N8N_EDITOR_BASE_URL=${N8N_BASE_URL:-http://localhost:5678}
+    - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL:-https://n8n.private.sovereignadvisory.ai}
     - NODES_EXCLUDE=[]
     - DB_TYPE=postgresdb
     - DB_POSTGRESDB_HOST=postgres
@@ -345,6 +345,7 @@ services:
     - KEYCLOAK_ADMIN=admin
     - KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
     - KC_HOSTNAME=${KC_HOSTNAME:-localhost}
+    - KC_HOSTNAME_ADMIN=kc.private.sovereignadvisory.ai
     - KC_HTTP_ENABLED=true
     - KC_HEALTH_ENABLED=true
     - JAVA_OPTS_APPEND=-Xms256m -Xmx1024m
@@ -785,7 +786,7 @@ services:
     - -c
     - |
       pip install -q openai anthropic requests psycopg2-binary sqlalchemy pandas matplotlib httpx python-dotenv &&
-      start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888
+      start-notebook.py --ServerApp.token=${JUPYTER_TOKEN} --ServerApp.ip=0.0.0.0 --ServerApp.open_browser=False --ServerApp.port=8888 --ServerApp.allow_remote_access=True --ServerApp.allow_origin=https://jupyter.private.sovereignadvisory.ai
     networks:
     - vibe_net
     restart: unless-stopped
