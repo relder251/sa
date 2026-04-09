@@ -724,6 +724,7 @@ services:
     - LITELLM_API_KEY=${LITELLM_API_KEY}
     volumes:
     - agent_zero_usr:/a0/usr
+    - /root/cc_work/agent-zero/.git:/a0/.git
     pids_limit: 2048
     cap_add:
     - NET_RAW
