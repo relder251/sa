@@ -6,14 +6,14 @@ Usage (run inside any container with access to litellm + qdrant):
 
 Environment overrides:
   LITELLM_URL   (default: http://litellm:4000)
-  LITELLM_KEY   (default: sk-vibe-coding-key-123)
+  LITELLM_KEY   (default: sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a)
   QDRANT_URL    (default: http://qdrant:6333)
 """
 import json, os, sys, time
 import urllib.request, urllib.error
 
 LITELLM_URL = os.getenv("LITELLM_URL", "http://litellm:4000")
-LITELLM_KEY = os.getenv("LITELLM_KEY", "sk-vibe-coding-key-123")
+LITELLM_KEY = os.getenv("LITELLM_KEY", "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a")
 QDRANT_URL  = os.getenv("QDRANT_URL", "http://qdrant:6333")
 COLLECTION  = "stack-knowledge"
 EMBED_MODEL = "_local-embedding"

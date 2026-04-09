@@ -14,7 +14,7 @@ from datetime import datetime
 
 # Configuration
 LITELLM_BASE = "http://localhost:4000"
-MASTER_KEY = "sk-vibe-coding-key-123"
+MASTER_KEY = "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a"
 TIER_KEYS_FILE = "/opt/agentic-sdlc/tier_keys.json"
 ALERT_THRESHOLD = 0.80  # 80% of budget
 

@@ -45,7 +45,7 @@ def _log(msg: str) -> None:
 # ── Configuration ────────────────────────────────────────────────────────────
 DEFAULT_VERIFIER_MODEL = os.getenv("CONSENSUS_VERIFIER_MODEL", "_gemini-flash-25")
 LITELLM_PROXY_URL = os.getenv("CONSENSUS_PROXY_URL", "http://localhost:4000")
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-vibe-coding-key-123")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a")
 MIN_TOKEN_THRESHOLD = int(os.getenv("CONSENSUS_MIN_TOKENS", "200"))
 REDIS_HOST = os.getenv("CONSENSUS_REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("CONSENSUS_REDIS_PORT", "6379"))

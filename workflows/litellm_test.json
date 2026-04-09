@@ -22,7 +22,7 @@
           "parameters": [
             {
               "name": "Authorization",
-              "value": "Bearer sk-vibe-coding-key-123"
+              "value": "Bearer sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a"
             },
             {
               "name": "Content-Type",

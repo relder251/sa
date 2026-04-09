@@ -45,7 +45,7 @@ def _log(msg: str) -> None:
 # ── Configuration ────────────────────────────────────────────────────────────
 VERIFIER_MODEL = os.getenv("FACTUAL_VERIFIER_MODEL", "_groq-llama3-8b")
 LITELLM_PROXY_URL = os.getenv("FACTUAL_VERIFIER_PROXY_URL", "http://localhost:4000")
-LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-vibe-coding-key-123")
+LITELLM_API_KEY = os.getenv("LITELLM_API_KEY", "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a")
 MIN_TOKEN_THRESHOLD = int(os.getenv("FACTUAL_VERIFIER_MIN_TOKENS", "100"))
 REDIS_HOST = os.getenv("FACTUAL_VERIFIER_REDIS_HOST", "redis")
 REDIS_PORT = int(os.getenv("FACTUAL_VERIFIER_REDIS_PORT", "6379"))

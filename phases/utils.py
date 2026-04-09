@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 LITELLM_URL = os.environ.get("LITELLM_BASE_URL", "http://litellm:4000")
-LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-vibe-coding-key-123")
+LITELLM_KEY = os.environ.get("LITELLM_API_KEY", "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a")
 
 
 def read_source_files(project_dir: Path) -> dict:

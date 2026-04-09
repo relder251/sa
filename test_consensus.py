@@ -6,7 +6,7 @@ import urllib.request
 import urllib.error
 
 API_URL = "http://localhost:4000/v1/chat/completions"
-API_KEY = "sk-vibe-coding-key-123"
+API_KEY = "sk-sa-prod-ce5d031e2a50ffa45d3a200c037971f81853e27ed19b894bc3630625cba0b71a"
 HEADERS = {
     "Authorization": f"Bearer {API_KEY}",
     "Content-Type": "application/json",
