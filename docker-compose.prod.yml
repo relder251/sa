@@ -31,6 +31,25 @@ services:
       com.centurylinklabs.watchtower.enable: "true"
       com.sovereignadvisory.service: "keycloak"
 
+  # Redis — tighten Docker memory limit to 2x maxmemory (256MB → 512MB cap)
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 512m
+
+  # node-exporter — bind to loopback + Docker bridge only (not 0.0.0.0)
+  # Prometheus scrapes via 172.20.0.1:9100 (vibe_net gateway); public access blocked
+  node-exporter:
+    command:
+    - '--path.procfs=/host/proc'
+    - '--path.rootfs=/rootfs'
+    - '--path.sysfs=/host/sys'
+    - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    - '--web.listen-address=127.0.0.1:9100'
+    - '--web.listen-address=172.20.0.1:9100'
+
   # nginx-private: expose on loopback only (Twingate accesses via host network)
   nginx-private:
     ports:
