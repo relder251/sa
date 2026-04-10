@@ -90,6 +90,18 @@ run bash -c "tar -czf \"$BACKUP_DIR/ssl_${DATE}.tar.gz.tmp\" -C / ssl && mv \"$B
 echo "--- n8n ---"
 run bash -c "tar -czf \"$BACKUP_DIR/n8n_${DATE}.tar.gz.tmp\" -C /data n8n && mv \"$BACKUP_DIR/n8n_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/n8n_${DATE}.tar.gz\""
 
+# --- Qdrant vector DB data ---
+echo "--- qdrant ---"
+run bash -c "tar -czf \"$BACKUP_DIR/qdrant_${DATE}.tar.gz.tmp\" -C /data qdrant && mv \"$BACKUP_DIR/qdrant_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/qdrant_${DATE}.tar.gz\""
+
+# --- Grafana dashboards and config ---
+echo "--- grafana ---"
+run bash -c "tar -czf \"$BACKUP_DIR/grafana_${DATE}.tar.gz.tmp\" -C /data grafana && mv \"$BACKUP_DIR/grafana_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/grafana_${DATE}.tar.gz\""
+
+# --- MiroFish uploads ---
+echo "--- mirofish_uploads ---"
+run bash -c "tar -czf \"$BACKUP_DIR/mirofish_uploads_${DATE}.tar.gz.tmp\" -C /data mirofish_uploads && mv \"$BACKUP_DIR/mirofish_uploads_${DATE}.tar.gz.tmp\" \"$BACKUP_DIR/mirofish_uploads_${DATE}.tar.gz\""
+
 # --- Agent Zero /usr volume ---
 # agent_zero_usr holds custom tools (MiroFish, Maltego integrations) not present in the image.
 echo "--- agent_zero_usr ---"

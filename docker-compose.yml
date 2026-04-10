@@ -1188,6 +1188,9 @@ services:
     - ./vault/data:/data/vault:ro
     - vaultwarden_data:/data/vaultwarden:ro
     - n8n_data:/data/n8n:ro
+    - qdrant_data:/data/qdrant:ro
+    - grafana_data:/data/grafana:ro
+    - mirofish_uploads:/data/mirofish_uploads:ro
     - agent_zero_usr:/data/agent_zero_usr:ro
     - ./scripts/backup.sh:/backup.sh:ro
     environment:
