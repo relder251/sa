@@ -1235,8 +1235,8 @@ services:
     - WATCHTOWER_SCHEDULE=0 0 3 * * *
     - WATCHTOWER_STOP_TIMEOUT=30s
     - WATCHTOWER_CLEANUP=true
-    - WATCHTOWER_ROLLING_RESTART=true
     - DOCKER_API_VERSION=1.41
+    - WATCHTOWER_MONITOR_ONLY=true
     networks:
     - vibe_net
     restart: unless-stopped
