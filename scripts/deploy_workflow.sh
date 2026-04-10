@@ -3,9 +3,13 @@
 # Run from the project root: bash scripts/deploy_workflow.sh <workflow.json>
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../" && pwd)"
+source "$REPO_DIR/.env.prod"
+
+: "${N8N_API_KEY:?N8N_API_KEY not set in .env.prod}"
+
 WF_JSON="${1:-/tmp/wf_fixed.json}"
 WF_ID="Wyc4UIvCYgByrAwP"
-N8N_API_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMjA5OGVkZC02NzIyLTRhODEtYWNmNS04OTk2YzRkNzIzNjUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiODgzZTJlZDktODEyNS00MTQ0LTlhYTQtOGQzNWM4MmVhNTYyIiwiaWF0IjoxNzczMzUyNTM5LCJleHAiOjE4MDQ4ODg1Mzk1MDJ9.EFVDxAafcxYHD_uTGvbuCl7zdWLd11TRziYUzzkgW3g"
 
 echo "[1/4] Importing workflow..."
 docker exec -i n8n n8n import:workflow --input=/dev/stdin < "$WF_JSON"

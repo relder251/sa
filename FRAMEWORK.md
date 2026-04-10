@@ -150,7 +150,7 @@ services:
     container_name: ${PROJECT_SLUG}-score-db
     environment:
       POSTGRES_USER: scores_user
-      POSTGRES_PASSWORD: scores_pass
+      POSTGRES_PASSWORD: $CQS_DB_PASSWORD
       POSTGRES_DB: cqs_scores
     ports:
       - "${SCORE_DB_PORT:-5434}:5432"
@@ -355,7 +355,7 @@ EVIDENCE="${5:-}"
 CYCLE="${CYCLE_ID:-unknown}"
 SLUG="${PROJECT_SLUG:?PROJECT_SLUG not set}"
 
-PGPASSWORD=scores_pass psql \
+PGPASSWORD=$CQS_DB_PASSWORD psql \
   -h localhost -p "${SCORE_DB_PORT:-5434}" \
   -U scores_user -d cqs_scores \
   -c "INSERT INTO score_events (project_slug, cycle_id, agent_name, event_type, points, description, evidence)
@@ -375,7 +375,7 @@ echo "CQS: [${AGENT}] ${EVENT} ${POINTS}pts — ${DESC}"
 set -euo pipefail
 SLUG="${PROJECT_SLUG:?PROJECT_SLUG not set}"
 
-PGPASSWORD=scores_pass psql \
+PGPASSWORD=$CQS_DB_PASSWORD psql \
   -h localhost -p "${SCORE_DB_PORT:-5434}" \
   -U scores_user -d cqs_scores \
   --pset=format=aligned \
@@ -405,7 +405,7 @@ FINGERPRINT=$(echo "${SLUG}:${FILE}:${FUNC}:${ERR_CLASS}:${DESC}" \
   | sha256sum | cut -d' ' -f1)
 
 # Check for repeat
-EXISTING=$(PGPASSWORD=scores_pass psql \
+EXISTING=$(PGPASSWORD=$CQS_DB_PASSWORD psql \
   -h localhost -p "${SCORE_DB_PORT:-5434}" \
   -U scores_user -d cqs_scores -tAc \
   "SELECT times_seen FROM bug_registry
@@ -413,7 +413,7 @@ EXISTING=$(PGPASSWORD=scores_pass psql \
 
 if [ -n "$EXISTING" ]; then
   # Repeat bug — update and signal double penalty
-  PGPASSWORD=scores_pass psql \
+  PGPASSWORD=$CQS_DB_PASSWORD psql \
     -h localhost -p "${SCORE_DB_PORT:-5434}" \
     -U scores_user -d cqs_scores \
     -c "UPDATE bug_registry SET times_seen = times_seen + 1,
@@ -424,7 +424,7 @@ if [ -n "$EXISTING" ]; then
   exit 2  # Exit 2 = repeat bug signal to caller
 else
   # New bug — register
-  PGPASSWORD=scores_pass psql \
+  PGPASSWORD=$CQS_DB_PASSWORD psql \
     -h localhost -p "${SCORE_DB_PORT:-5434}" \
     -U scores_user -d cqs_scores \
     -c "INSERT INTO bug_registry

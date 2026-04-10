@@ -3,6 +3,11 @@
 # Example: bash scripts/cqs-score.sh tester BUG_FOUND +10 "null ptr in auth.py" "auth.py:42"
 set -euo pipefail
 
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$REPO_DIR/.env.prod"
+
+: "${CQS_DB_PASSWORD:?CQS_DB_PASSWORD not set in .env.prod}"
+
 AGENT="${1:?agent required}"
 EVENT="${2:?event_type required}"
 POINTS="${3:?points required}"
@@ -11,7 +16,7 @@ EVIDENCE="${5:-}"
 CYCLE="${CYCLE_ID:-unknown}"
 SLUG="${PROJECT_SLUG:?PROJECT_SLUG not set}"
 
-PGPASSWORD=scores_pass psql \
+PGPASSWORD=$CQS_DB_PASSWORD psql \
   -h localhost -p "${SCORE_DB_PORT:-5433}" \
   -U scores_user -d cqs_scores \
   -c "INSERT INTO score_events (project_slug, cycle_id, agent_name, event_type, points, description, evidence)
