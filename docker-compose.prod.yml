@@ -217,7 +217,7 @@ services:
       resources:
         limits:
           cpus: '0.10'
-          memory: 512m  # raised from 256m — OOM at 256m (commit 4b92650)
+          memory: 768m  # raised from 256m → 512m (OOM) → 768m (headroom)
 
   # HashiCorp Vault — secrets management enclave
   vault:
@@ -262,7 +262,7 @@ services:
       resources:
         limits:
           cpus: '0.25'
-          memory: 512m
+          memory: 768m
 
   # Vaultwarden — self-hosted Bitwarden-compatible password vault
   vaultwarden:
