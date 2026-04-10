@@ -112,24 +112,29 @@ if $DRY_RUN; then
   exit 0
 fi
 
-# --- Retention: 7 daily + 4 weekly (Sunday) backups ---
+# --- Retention: 7 daily + 4 weekly (Sunday) + 3 monthly (1st-of-month) ---
 echo "--- pruning old backups ---"
 
 SUNDAYS=$(for i in 0 1 2 3; do date -d "sunday -${i} weeks" +%Y-%m-%d; done \
   | tr '\n' '|' | sed 's/|$//')
 
-# Pass 1: delete non-Sunday .gz files older than 7 days
+FIRSTS=$(for i in 0 1 2; do date -d "$(date +%Y-%m-01) -${i} months" +%Y-%m-01; done \
+  | tr '\n' '|' | sed 's/|$//')
+
+KEEP="($SUNDAYS|$FIRSTS)"
+
+# Pass 1: delete .gz/.snap files older than 7 days (keep weekly Sundays + monthly 1sts)
 find "$BACKUP_DIR" \( -name "*.gz" -o -name "*.snap" \) -mtime +7 \
-  | grep -vE "($SUNDAYS)" \
+  | grep -vE "$KEEP" \
   | xargs -r rm -f || true
 
-# Pass 2: delete non-Sunday .db / .db-wal files older than 7 days
+# Pass 2: delete .db/.db-wal files older than 7 days (keep weekly Sundays + monthly 1sts)
 find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +7 \
-  | grep -vE "($SUNDAYS)" \
+  | grep -vE "$KEEP" \
   | xargs -r rm -f || true
 
-# Pass 3: hard cutoff — delete everything older than 28 days
-find "$BACKUP_DIR" \( -name "*.gz" -o -name "*.snap" \) -mtime +28 | xargs -r rm -f
-find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +28 | xargs -r rm -f
+# Pass 3: hard cutoff — delete everything older than 90 days
+find "$BACKUP_DIR" \( -name "*.gz" -o -name "*.snap" \) -mtime +90 | xargs -r rm -f
+find "$BACKUP_DIR" \( -name "*.db" -o -name "*.db-wal" \) -mtime +90 | xargs -r rm -f
 
 echo "=== Backup complete: $DATE ==="
