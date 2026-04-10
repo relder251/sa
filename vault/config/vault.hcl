@@ -1,6 +1,7 @@
 ui = true
 log_level = "info"
 log_file = "/vault/logs/vault.log"
+disable_mlock = true
 
 storage "raft" {
   path    = "/vault/data"
