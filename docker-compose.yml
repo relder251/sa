@@ -279,7 +279,7 @@ services:
     - DB_POSTGRESDB_PASSWORD=${LITELLM_PASSWORD:-litellm_password}
     - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
     - N8N_RUNNERS_ENABLED=false
-    - N8N_TRUST_PROXY=true
+    - N8N_PROXY_HOPS=2
     - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
     - NODE_FUNCTION_ALLOW_BUILTIN=fs,path,crypto,os,child_process
     - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-false}
@@ -1757,7 +1757,7 @@ services:
     privileged: true
     command:
     - --housekeeping_interval=10s
-    - --disable_metrics=disk,diskIO
+    - --disable_metrics=disk,diskIO,referenced_memory
     devices:
     - /dev/kmsg
     volumes:
@@ -1779,8 +1779,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256m
+          cpus: '0.50'
+          memory: 512m
 
   # ---------------------------------------------------------------------------
   # node-exporter — host CPU / memory / disk / network metrics
