@@ -1760,7 +1760,6 @@ services:
     container_name: cadvisor
     security_opt:
       - no-new-privileges:true
-    privileged: true
     command:
     - --housekeeping_interval=10s
     - --disable_metrics=disk,diskIO,referenced_memory
