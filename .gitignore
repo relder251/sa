@@ -45,6 +45,7 @@ backup_*/
 # Backup / archive files left by manual edits
 *.bak
 *.bak.*
+*.bak-*
 *.archive
 *.backup
 *.bak_*
