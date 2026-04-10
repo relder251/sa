@@ -74,3 +74,10 @@ rm -f /tmp/vault_secret.json
 WRITTEN_VER=$(head -2 "$REAL_ENV" | grep -oP 'Version: \K\d+')
 echo "[vault-env] Vault version written: v${WRITTEN_VER}"
 echo "[vault-env] Backup: $BACKUP"
+
+# Prune old .env.prod backups — keep latest 3
+BACKUP_DIR="$(dirname "$REAL_ENV")"
+BACKUP_BASE="$(basename "$REAL_ENV").bak."
+find "$BACKUP_DIR" -maxdepth 1 -name "${BACKUP_BASE}*" -type f | sort -r | tail -n +4 | xargs -r rm -f
+PRUNED=$(find "$BACKUP_DIR" -maxdepth 1 -name "${BACKUP_BASE}*" -type f | wc -l)
+echo "[vault-env] Retained $PRUNED backup(s)"
