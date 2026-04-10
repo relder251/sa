@@ -69,4 +69,8 @@ PYEOF
 
 chmod 600 "$REAL_ENV"
 rm -f /tmp/vault_secret.json
+
+# Verify written version matches latest Vault version
+WRITTEN_VER=$(head -2 "$REAL_ENV" | grep -oP 'Version: \K\d+')
+echo "[vault-env] Vault version written: v${WRITTEN_VER}"
 echo "[vault-env] Backup: $BACKUP"

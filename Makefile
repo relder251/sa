@@ -3,6 +3,16 @@
 # Usage: make <target> [ENV=local|prod|test] [SVC=service-name]
 # ENV defaults to local
 # =============================================================================
+# -- Secrets Workflow ---------------------------------------------------------
+# Source of truth: HashiCorp Vault (secret/sdlc/prod)
+# Flow: Vault -> vault-env.sh -> .env.prod -> docker-compose --env-file
+# NEVER edit .env.prod manually. Use:
+#   make vault-rotate KEY=NAME VAL=value   # rotate a single secret
+#   make vault-push                         # push all .env.prod to Vault
+#   make vault-env                          # pull Vault -> .env.prod
+#   make deploy                             # pull + validate + up
+# -----------------------------------------------------------------------------
+
 
 ENV ?= local
 
@@ -122,8 +132,27 @@ vault-rotate:
 vault-up:
 	docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d vault
 
-## Deploy: fetch from Vault then start full prod stack
-## Validates config before starting services
+## Check if .env.prod is stale (older than 1 hour)
+vault-check:
+	@MTIME=$$(stat -c %Y .env.prod 2>/dev/null || echo 0); \
+	NOW=$$(date +%s); AGE=$$(( NOW - MTIME )); \
+	if [ $$AGE -gt 3600 ]; then \
+		echo "[WARN] .env.prod is $$(( AGE / 60 ))m old -- refreshing from Vault"; \
+	fi
+
+## Deploy: check freshness, fetch from Vault, unseal vault-root, then start full stack
+## Two-phase startup: vault-root must be unsealed (Shamir) before main vault can
+## auto-unseal via Transit. Running bare `make up` on a cold stack will fail because
+## vault-root starts sealed, cascading to vault and agent_zero.
 .PHONY: deploy
-deploy: vault-env validate
+deploy: vault-check vault-env validate
+	@echo "[deploy] Phase 1: Starting vault-root..."
+	$(COMPOSE) up -d vault-root
+	@sleep 3
+	@bash scripts/vault-unseal.sh
+	@echo "[deploy] Waiting for main vault to auto-unseal via Transit..."
+	@$(COMPOSE) up -d vault
+	@timeout 30 sh -c 'until docker exec vault vault status -address=http://127.0.0.1:8200 2>/dev/null | grep -q "Sealed.*false"; do sleep 2; done' \
+		|| { echo "[deploy] ERROR: vault did not unseal within 30s"; exit 1; }
+	@echo "[deploy] Phase 2: Starting all services..."
 	$(MAKE) up ENV=prod
