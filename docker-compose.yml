@@ -875,7 +875,7 @@ services:
       resources:
         limits:
           cpus: '0.10'
-          memory: 32m
+          memory: 128m
   pipeline-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     container_name: pipeline_socket_proxy
