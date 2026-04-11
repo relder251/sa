@@ -2,7 +2,7 @@
 # docker-compose.prod.yml — PROD DELTA
 # NOT a standalone file — apply on top of docker-compose.yml:
 #   docker compose -f docker-compose.yml -f docker-compose.prod.yml up
-# Adds: nginx (public), certbot (HTTP-01), twingate, vaultwarden.
+# Adds: nginx (public), twingate, vaultwarden.
 # Overrides Keycloak to `start` with postgres backend.
 # Port bindings: only nginx-public gets public-facing ports.
 # =============================================================================
@@ -95,36 +95,6 @@ services:
           cpus: '0.25'
           memory: 128m
 
-  # Certbot HTTP-01 — renews public-facing TLS certs via webroot
-  certbot:
-    image: certbot/certbot:latest
-    container_name: sa_certbot
-    security_opt:
-      - no-new-privileges:true
-    restart: always
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
-    volumes:
-    - /opt/agentic-sdlc/ssl:/etc/letsencrypt
-    - /opt/agentic-sdlc/certbot/www:/var/www/certbot
-    entrypoint: >
-      /bin/sh -c "trap exit TERM;
-        while :; do
-          certbot renew --webroot -w /var/www/certbot --quiet;
-          sleep 12h & wait $${!};
-        done"
-    networks:
-    - sa_web
-    labels:
-      com.sovereignadvisory.service: "certbot"
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 64m
 
   # Twingate — zero-trust network connector
   twingate:
