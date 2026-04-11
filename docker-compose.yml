@@ -116,7 +116,7 @@ services:
           cpus: '0.25'
           memory: 384m
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.17.1
     container_name: qdrant
     security_opt:
       - no-new-privileges:true
@@ -148,7 +148,7 @@ services:
           cpus: '0.5'
           memory: 768m
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.20.4
     container_name: ollama
     security_opt:
       - no-new-privileges:true
@@ -178,7 +178,7 @@ services:
   # LiteLLM — AI traffic proxy
   # ---------------------------------------------------------------------------
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-v1.82.6
     container_name: litellm
     security_opt:
       - no-new-privileges:true
@@ -264,7 +264,7 @@ services:
         limits:
           memory: 3g
   n8n:
-    image: docker.n8n.io/n8nio/n8n:latest
+    image: docker.n8n.io/n8nio/n8n:2.15.0
     container_name: n8n
     security_opt:
       - no-new-privileges:true
@@ -879,7 +879,7 @@ services:
           cpus: '0.10'
           memory: 128m
   pipeline-socket-proxy:
-    image: tecnativa/docker-socket-proxy:latest
+    image: tecnativa/docker-socket-proxy:v0.4.2
     container_name: pipeline_socket_proxy
     security_opt:
       - no-new-privileges:true
@@ -1189,7 +1189,7 @@ services:
           cpus: '0.10'
           memory: 64m
   ofelia:
-    image: mcuadros/ofelia:latest
+    image: mcuadros/ofelia:0.3.21
     container_name: ofelia
     security_opt:
       - no-new-privileges:true
@@ -1274,7 +1274,7 @@ services:
           cpus: '0.25'
           memory: 64m
   watchtower:
-    image: containrrr/watchtower:latest
+    image: containrrr/watchtower:1.5.3
     container_name: watchtower
     security_opt:
       - no-new-privileges:true
@@ -1305,7 +1305,7 @@ services:
           cpus: '0.5'
           memory: 64m
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.10.0
     container_name: prometheus
     security_opt:
       - no-new-privileges:true
@@ -1349,7 +1349,7 @@ services:
           cpus: '1.0'
           memory: 1536m
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:12.4.2
     container_name: grafana
     security_opt:
       - no-new-privileges:true
@@ -1540,7 +1540,7 @@ services:
           cpus: '0.5'
           memory: 64m
   certbot-dns:
-    image: certbot/dns-cloudflare:latest
+    image: certbot/dns-cloudflare:v5.4.0
     container_name: sa_certbot_dns
     security_opt:
       - no-new-privileges:true
@@ -1803,7 +1803,7 @@ services:
           cpus: '0.5'
           memory: 64m
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     security_opt:
       - no-new-privileges:true
@@ -1838,7 +1838,7 @@ services:
   # node-exporter — host CPU / memory / disk / network metrics
   # ---------------------------------------------------------------------------
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.11.0
     container_name: node_exporter
     security_opt:
       - no-new-privileges:true
@@ -2017,7 +2017,7 @@ services:
           cpus: '0.25'
           memory: 64m
   mirofish:
-    image: ghcr.io/666ghj/mirofish:latest
+    image: ghcr.io/666ghj/mirofish:v0.1.2
     container_name: mirofish
     security_opt:
       - no-new-privileges:true
@@ -2154,7 +2154,7 @@ services:
           cpus: '0.5'
           memory: 64m
   zep:
-    image: ghcr.io/getzep/zep:latest
+    image: ghcr.io/getzep/zep:0.27.2
     container_name: zep
     security_opt:
       - no-new-privileges:true
