@@ -227,6 +227,8 @@ services:
     - ./ab_manage.py:/app/ab_manage.py
     - ./rag_manager.py:/app/rag_manager.py
     - ./rag_retrieval.py:/app/rag_retrieval.py
+    - ./budget_alert.py:/app/budget_alert.py:ro
+    - ./tier_keys.json:/app/tier_keys.json:ro
     command: ["--config", "/app/config.yaml", "--port", "4000", "--num_workers", "1"]
     networks:
     - vibe_net
