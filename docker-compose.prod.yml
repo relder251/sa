@@ -236,7 +236,7 @@ services:
 
   # Vaultwarden — self-hosted Bitwarden-compatible password vault
   vaultwarden:
-    image: vaultwarden/server:1.35.4
+    image: vaultwarden/server:latest
     container_name: vaultwarden
     security_opt:
       - no-new-privileges:true

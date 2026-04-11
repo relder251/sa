@@ -156,3 +156,44 @@ deploy: vault-check vault-env validate
 		|| { echo "[deploy] ERROR: vault did not unseal within 30s"; exit 1; }
 	@echo "[deploy] Phase 2: Starting all services..."
 	$(MAKE) up ENV=prod
+
+## Upgrade a single service: tag current as :rollback, pull latest, restart, verify
+## Usage: make upgrade SVC=ollama ENV=prod
+.PHONY: upgrade
+upgrade:
+	@if [ -z "$(SVC)" ]; then echo "Usage: make upgrade SVC=<name> ENV=prod"; exit 1; fi
+	@IMAGE=$$($(COMPOSE) config --format json | python3 -c "import sys,json; svcs=json.load(sys.stdin)[\"services\"]; print(svcs.get(\"$(SVC)\",{}).get(\"image\",\"\"))"); \
+	if [ -z "$$IMAGE" ]; then echo "ERROR: service $(SVC) not found or has no image"; exit 1; fi; \
+	echo "[upgrade] Service: $(SVC)"; \
+	echo "[upgrade] Image: $$IMAGE"; \
+	ROLLBACK_TAG=$$(echo "$$IMAGE" | sed "s/:.*/:rollback/"); \
+	echo "[upgrade] Tagging current as $$ROLLBACK_TAG"; \
+	docker tag "$$IMAGE" "$$ROLLBACK_TAG" 2>/dev/null || echo "[upgrade] No local image to tag (first pull?)"; \
+	echo "[upgrade] Pulling latest..."; \
+	docker pull "$$IMAGE"; \
+	echo "[upgrade] Restarting $(SVC)..."; \
+	$(MAKE) up SVC=$(SVC); \
+	echo "[upgrade] Done. Verify $(SVC) is healthy, then run: make upgrade-clean SVC=$(SVC)"
+
+## Rollback a failed upgrade: restore :rollback tag, restart
+## Usage: make rollback SVC=ollama ENV=prod
+.PHONY: rollback
+rollback:
+	@if [ -z "$(SVC)" ]; then echo "Usage: make rollback SVC=<name> ENV=prod"; exit 1; fi
+	@IMAGE=$$($(COMPOSE) config --format json | python3 -c "import sys,json; svcs=json.load(sys.stdin)[\"services\"]; print(svcs.get(\"$(SVC)\",{}).get(\"image\",\"\"))"); \
+	ROLLBACK_TAG=$$(echo "$$IMAGE" | sed "s/:.*/:rollback/"); \
+	if ! docker image inspect "$$ROLLBACK_TAG" >/dev/null 2>&1; then echo "ERROR: no rollback image $$ROLLBACK_TAG"; exit 1; fi; \
+	echo "[rollback] Restoring $$ROLLBACK_TAG -> $$IMAGE"; \
+	docker tag "$$ROLLBACK_TAG" "$$IMAGE"; \
+	echo "[rollback] Restarting $(SVC)..."; \
+	$(MAKE) up SVC=$(SVC); \
+	echo "[rollback] Done. $(SVC) restored to previous version."
+
+## Clean up rollback tag after successful upgrade
+## Usage: make upgrade-clean SVC=ollama ENV=prod
+.PHONY: upgrade-clean
+upgrade-clean:
+	@if [ -z "$(SVC)" ]; then echo "Usage: make upgrade-clean SVC=<name> ENV=prod"; exit 1; fi
+	@IMAGE=$$($(COMPOSE) config --format json | python3 -c "import sys,json; svcs=json.load(sys.stdin)[\"services\"]; print(svcs.get(\"$(SVC)\",{}).get(\"image\",\"\"))"); \
+	ROLLBACK_TAG=$$(echo "$$IMAGE" | sed "s/:.*/:rollback/"); \
+	docker rmi "$$ROLLBACK_TAG" 2>/dev/null && echo "[clean] Removed $$ROLLBACK_TAG" || echo "[clean] No rollback tag to remove"
