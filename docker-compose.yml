@@ -1068,15 +1068,10 @@ services:
     - DATABASE_URL=postgresql://${LITELLM_USER:-litellm}:${LITELLM_PASSWORD:-litellm_password}@postgres:5432/open_webui
     - OLLAMA_BASE_URL=http://ollama:11434
     - WEBUI_SECRET_KEY=${OPEN_WEBUI_SECRET_KEY}
-      # Keycloak OIDC SSO
-    - ENABLE_OAUTH_SIGNUP=true
+      # Trusted-header auth via oauth2-proxy (Keycloak OIDC at proxy level)
+    - WEBUI_AUTH_TRUSTED_EMAIL_HEADER=X-Forwarded-Email
+    - WEBUI_AUTH_TRUSTED_NAME_HEADER=X-Forwarded-User
     - DEFAULT_USER_ROLE=user
-    - OAUTH_MERGE_ACCOUNTS_BY_EMAIL=true
-    - OAUTH_PROVIDER_NAME=Keycloak
-    - OPENID_PROVIDER_URL=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc/.well-known/openid-configuration
-    - OAUTH_CLIENT_ID=open-webui
-    - OAUTH_CLIENT_SECRET=${OPEN_WEBUI_OIDC_CLIENT_SECRET}
-    - OAUTH_SCOPES=openid email profile
     - WEBUI_URL=https://ollama-ui.private.sovereignadvisory.ai
     networks:
     - vibe_net
@@ -1096,6 +1091,56 @@ services:
       retries: 3
       start_period: 60s
 
+
+  # ---------------------------------------------------------------------------
+  # oauth2-proxy — Open WebUI / ollama-ui (port 8081 internal)
+  # ---------------------------------------------------------------------------
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2g
+  oauth2-proxy-openwebui:
+    image: sa_oauth2_proxy:v7.6.0
+    container_name: oauth2_proxy_openwebui
+    security_opt:
+      - no-new-privileges:true
+    command:
+    - --provider=oidc
+    - --oidc-issuer-url=${KEYCLOAK_ISSUER_URL}/realms/agentic-sdlc
+    - --client-id=open-webui
+    - --client-secret=${OPEN_WEBUI_OIDC_CLIENT_SECRET}
+    - --redirect-url=https://ollama-ui.private.sovereignadvisory.ai/oauth2/callback
+    - --upstream=http://open_webui:8080
+    - --http-address=0.0.0.0:8081
+    - --cookie-secret=${OAUTH2_PROXY_COOKIE_SECRET_OPENWEBUI}
+    - --cookie-secure=${OAUTH2_COOKIE_SECURE:-false}
+    - --email-domain=*
+    - --skip-provider-button=true
+    - --code-challenge-method=S256
+    - --allowed-role=agentic-sdlc:admin
+    - --allowed-role=agentic-sdlc:user
+    - --proxy-websockets=true
+    - --pass-user-headers=true
+    networks:
+    - vibe_net
+    healthcheck:
+      test: ["CMD", "/nc", "-z", "localhost", "8081"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      open-webui:
+        condition: service_healthy
   # ---------------------------------------------------------------------------
   # Free Model Sync — discovers/registers free models into LiteLLM every 6h
   # ---------------------------------------------------------------------------
@@ -1103,7 +1148,7 @@ services:
       resources:
         limits:
           cpus: '0.5'
-          memory: 2g
+          memory: 64m
   free-model-sync:
     build:
       context: .
